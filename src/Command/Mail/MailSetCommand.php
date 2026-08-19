@@ -1,0 +1,59 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Command\Mail;
+
+use Symfony\Component\Console\Attribute\AsCommand;
+use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\OutputInterface;
+
+#[AsCommand(name: 'mail:set', description: 'Replace the full recipient list of a mail group')]
+final class MailSetCommand extends AbstractMailCommand
+{
+    protected function configure(): void
+    {
+        $this
+            ->addArgument('email', InputArgument::REQUIRED, 'Group email address, e.g. all@company.com')
+            ->addOption('recipients', null, InputOption::VALUE_REQUIRED, 'Comma-separated recipient email addresses');
+    }
+
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $email = (string) $input->getArgument('email');
+
+        try {
+            $recipients = $this->parseRecipients((string) $input->getOption('recipients'));
+        } catch (\InvalidArgumentException $e) {
+            $output->writeln(sprintf('<error>%s</error>', $e->getMessage()));
+
+            return self::FAILURE;
+        }
+
+        if ([] === $recipients) {
+            $output->writeln('<error>--recipients must contain at least one address.</error>');
+
+            return self::FAILURE;
+        }
+
+        $context = $this->context();
+        $repository = $context->mailGroupRepository();
+        $this->adoptIfNew($email);
+
+        foreach ($recipients as $recipient) {
+            $repository->upsertActive($email, $recipient);
+        }
+        foreach ($repository->activeRecipients($email) as $existing) {
+            if (!in_array($existing, $recipients, true)) {
+                $repository->remove($email, $existing);
+            }
+        }
+
+        $context->syncLogRepository()->log('mail_group', $email, 'set', 'ok');
+        $this->applyAndReport($output, $email);
+
+        return self::SUCCESS;
+    }
+}

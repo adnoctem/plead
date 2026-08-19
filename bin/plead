@@ -1,0 +1,19 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use App\Application\PleadApplication;
+use Symfony\Component\Dotenv\Dotenv;
+
+require dirname(__DIR__) . '/vendor/autoload.php';
+
+date_default_timezone_set(getenv('TZ') ?: 'Europe/Berlin');
+
+error_reporting(E_ALL & ~E_DEPRECATED);
+
+if (is_file(dirname(__DIR__) . '/.env')) {
+    (new Dotenv())->usePutenv()->loadEnv(dirname(__DIR__) . '/.env');
+}
+
+exit((new PleadApplication())->run());

@@ -1,0 +1,51 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Config;
+
+use Symfony\Component\Yaml\Yaml;
+
+final class ConfigFile
+{
+    /** @param string[] $candidates */
+    public static function targetFile(array $candidates): string
+    {
+        foreach ($candidates as $candidate) {
+            if (is_file($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return $candidates[0];
+    }
+
+    /** @return array<string, mixed> */
+    public static function read(string $file): array
+    {
+        if (!is_file($file)) {
+            return [];
+        }
+
+        if (str_ends_with(strtolower($file), '.json')) {
+            return json_decode((string) file_get_contents($file), true) ?: [];
+        }
+
+        return Yaml::parse((string) file_get_contents($file)) ?: [];
+    }
+
+    /** @param array<string, mixed> $data */
+    public static function write(string $target, array $data): void
+    {
+        $directory = dirname($target);
+        if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
+            throw new \RuntimeException(sprintf('Unable to create config directory: %s', $directory));
+        }
+
+        if (str_ends_with(strtolower($target), '.json')) {
+            file_put_contents($target, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+        } else {
+            file_put_contents($target, Yaml::dump($data, 8, 4));
+        }
+    }
+}

@@ -1,0 +1,46 @@
+# .gitignore - plead
+
+###> general/editors ###
+
+# IntelliJ IDEA
+.idea/*
+!.idea/dataSources.xml
+
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+###>
+
+###> general/secret ###
+
+# secrets
+secrets/*
+###>
+
+###> source/temp ###
+
+# distribution
+dist/*
+build/*
+###>
+
+###> source/symfony ###
+
+# .env files
+/.env.local
+/.env.local.php
+/.env.*.local
+
+# secrets
+/config/secrets/prod/prod.decrypt.private.php
+
+/public/bundles/
+/var/
+/vendor/
+###>
+
+# phpunit
+/.phpunit.cache/
