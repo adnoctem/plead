@@ -19,7 +19,8 @@ final class ExtensionCallCommand extends AbstractPleadCommand
         $this
             ->addArgument('id', InputArgument::REQUIRED, 'Extension id, e.g. git')
             ->addArgument('operation', InputArgument::REQUIRED, 'Operation name exposed by the extension')
-            ->addOption('param', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Operation parameter, name:value (repeatable)');
+            ->addOption('param', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Operation parameter, name:value (repeatable)')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -57,7 +58,7 @@ final class ExtensionCallCommand extends AbstractPleadCommand
 
             return self::SUCCESS;
         } catch (\Throwable $e) {
-            $context->syncLogRepository()->resolve($logId, 'error:' . $e->getMessage());
+            $context->syncLogRepository()->resolve($logId, 'error:'.$e->getMessage());
             $output->writeln(sprintf('<error>%s</error>', $e->getMessage()));
 
             return self::FAILURE;

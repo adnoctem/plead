@@ -54,6 +54,6 @@ final class RecordingRestGateway extends PleskRestGateway
             throw new \RuntimeException('boom');
         }
 
-        return ['code' => 0, 'stdout' => 'done: ' . implode(' ', $params), 'stderr' => ''];
+        return ['code' => 0, 'stdout' => 'done: '.implode(' ', $params), 'stderr' => ''];
     }
 }

@@ -9,9 +9,7 @@ use App\Util\DateNormalizer;
 
 final class AutoReplyRepository
 {
-    public function __construct(private readonly Connection $connection)
-    {
-    }
+    public function __construct(private readonly Connection $connection) {}
 
     public function upsert(string $email, string $message, string $startDate, string $endDate): void
     {
@@ -19,17 +17,17 @@ final class AutoReplyRepository
         // no longer matches, so the row is flagged dirty for the watcher.
         $statement = $this->connection->pdo()->prepare(
             <<<'SQL'
-            INSERT INTO auto_replies (email, message, start_date, end_date, status, reconciled, reconciled_at, updated_at)
-            VALUES (:email, :message, :start_date, :end_date, 'scheduled', 0, NULL, :updated_at)
-            ON CONFLICT(email) DO UPDATE SET
-                message = :message,
-                start_date = :start_date,
-                end_date = :end_date,
-                status = 'scheduled',
-                reconciled = 0,
-                reconciled_at = NULL,
-                updated_at = :updated_at
-            SQL,
+                INSERT INTO auto_replies (email, message, start_date, end_date, status, reconciled, reconciled_at, updated_at)
+                VALUES (:email, :message, :start_date, :end_date, 'scheduled', 0, NULL, :updated_at)
+                ON CONFLICT(email) DO UPDATE SET
+                    message = :message,
+                    start_date = :start_date,
+                    end_date = :end_date,
+                    status = 'scheduled',
+                    reconciled = 0,
+                    reconciled_at = NULL,
+                    updated_at = :updated_at
+                SQL,
         );
         $statement->execute([
             'email' => $email,
@@ -49,13 +47,13 @@ final class AutoReplyRepository
     {
         $statement = $this->connection->pdo()->prepare(
             <<<'SQL'
-            UPDATE auto_replies
-            SET status = 'disabled',
-                reconciled = 0,
-                reconciled_at = NULL,
-                updated_at = :updated_at
-            WHERE email = :email
-            SQL,
+                UPDATE auto_replies
+                SET status = 'disabled',
+                    reconciled = 0,
+                    reconciled_at = NULL,
+                    updated_at = :updated_at
+                WHERE email = :email
+                SQL,
         );
         $statement->execute([
             'email' => $email,
@@ -63,7 +61,7 @@ final class AutoReplyRepository
         ]);
     }
 
-    /** @return array<string, mixed>|null */
+    /** @return null|array<string, mixed> */
     public function find(string $email): ?array
     {
         $statement = $this->connection->pdo()->prepare(
@@ -86,7 +84,8 @@ final class AutoReplyRepository
     {
         $rows = $this->connection->pdo()
             ->query('SELECT email, message, start_date, end_date, status, reconciled, reconciled_at, updated_at FROM auto_replies WHERE reconciled = 0')
-            ->fetchAll(\PDO::FETCH_ASSOC);
+            ->fetchAll(\PDO::FETCH_ASSOC)
+        ;
 
         return $this->dueRows($rows, $now);
     }
@@ -101,7 +100,8 @@ final class AutoReplyRepository
     {
         $rows = $this->connection->pdo()
             ->query('SELECT email, message, start_date, end_date, status, reconciled, reconciled_at, updated_at FROM auto_replies')
-            ->fetchAll(\PDO::FETCH_ASSOC);
+            ->fetchAll(\PDO::FETCH_ASSOC)
+        ;
 
         return $this->dueRows($rows, $now);
     }
@@ -119,7 +119,8 @@ final class AutoReplyRepository
     {
         return $this->connection->pdo()
             ->query('SELECT email, message, start_date, end_date, status, reconciled, reconciled_at, updated_at FROM auto_replies ORDER BY email')
-            ->fetchAll(\PDO::FETCH_ASSOC);
+            ->fetchAll(\PDO::FETCH_ASSOC)
+        ;
     }
 
     /**

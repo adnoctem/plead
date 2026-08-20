@@ -13,9 +13,7 @@ use App\Database\Connection;
  */
 final class MailAddressRepository
 {
-    public function __construct(private readonly Connection $connection)
-    {
-    }
+    public function __construct(private readonly Connection $connection) {}
 
     /**
      * Move every local record of an address to its new name. Only rows that

@@ -18,8 +18,7 @@ final class AutoReplyReconciler
         private readonly PleskMailGateway $gateway,
         private readonly LoggerInterface $logger,
         private readonly bool $dryRun,
-    ) {
-    }
+    ) {}
 
     /**
      * @return int number of entries applied this pass
@@ -89,7 +88,7 @@ final class AutoReplyReconciler
         } catch (\Throwable $e) {
             // Keep the entry dirty (reconciled = 0) so the watcher retries;
             // the error text lands in the audit trail.
-            $this->syncLog->resolve($logId, 'error:' . $e->getMessage());
+            $this->syncLog->resolve($logId, 'error:'.$e->getMessage());
             $this->logger->error('Failed to apply auto-reply for {email}: {error}', [
                 'email' => $email,
                 'error' => $e->getMessage(),

@@ -59,7 +59,7 @@ final class AutoresponderListCommand extends AbstractMailCommand
             $rows = $gateway->listMailnamesBulk(array_column($gateway->listDomains(), 'id'));
             $pairs = [];
             foreach ($rows as $row) {
-                $email = $row['name'] . '@' . $gateway->domainNameForSite((int) $row['site_id']);
+                $email = $row['name'].'@'.$gateway->domainNameForSite((int) $row['site_id']);
                 $pairs[] = ['email' => $email];
             }
 
@@ -83,7 +83,7 @@ final class AutoresponderListCommand extends AbstractMailCommand
 
             $found = true;
             $suffix = null !== $autoresponder['end_date'] ? sprintf(' (until %s)', $autoresponder['end_date']) : '';
-            $output->writeln($pair['email'] . $suffix);
+            $output->writeln($pair['email'].$suffix);
         }
 
         if (!$found) {

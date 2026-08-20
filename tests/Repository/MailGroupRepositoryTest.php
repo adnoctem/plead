@@ -6,8 +6,13 @@ namespace App\Tests\Repository;
 
 use App\Database\Connection;
 use App\Repository\MailGroupRepository;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * @internal
+ */
+#[CoversNothing]
 final class MailGroupRepositoryTest extends TestCase
 {
     private MailGroupRepository $repository;
@@ -15,7 +20,7 @@ final class MailGroupRepositoryTest extends TestCase
     protected function setUp(): void
     {
         $this->repository = new MailGroupRepository(
-            new Connection(sys_get_temp_dir() . '/plead-mail-repo-test-' . bin2hex(random_bytes(4)) . '/plead.sqlite'),
+            new Connection(sys_get_temp_dir().'/plead-mail-repo-test-'.bin2hex(random_bytes(4)).'/plead.sqlite'),
         );
     }
 

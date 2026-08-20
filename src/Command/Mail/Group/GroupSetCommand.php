@@ -17,7 +17,8 @@ final class GroupSetCommand extends AbstractGroupCommand
     {
         $this
             ->addArgument('email', InputArgument::REQUIRED, 'Group email address, e.g. all@company.com')
-            ->addOption('recipients', null, InputOption::VALUE_REQUIRED, 'Comma-separated recipient email addresses');
+            ->addOption('recipients', null, InputOption::VALUE_REQUIRED, 'Comma-separated recipient email addresses')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -40,6 +41,7 @@ final class GroupSetCommand extends AbstractGroupCommand
 
         $context = $this->context();
         $repository = $context->mailGroupRepository();
+
         try {
             $this->adoptIfNew($email);
         } catch (\Throwable $e) {

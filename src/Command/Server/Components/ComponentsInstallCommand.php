@@ -18,7 +18,8 @@ final class ComponentsInstallCommand extends AbstractPleadCommand
     {
         $this
             ->addArgument('component-id', InputArgument::REQUIRED, 'Component id, e.g. fail2ban')
-            ->addOption('update-id', null, InputOption::VALUE_REQUIRED, 'Update id the component belongs to (required by the docs shape)');
+            ->addOption('update-id', null, InputOption::VALUE_REQUIRED, 'Update id the component belongs to (required by the docs shape)')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -50,7 +51,7 @@ final class ComponentsInstallCommand extends AbstractPleadCommand
 
             return self::SUCCESS;
         } catch (\Throwable $e) {
-            $context->syncLogRepository()->resolve($logId, 'error:' . $e->getMessage());
+            $context->syncLogRepository()->resolve($logId, 'error:'.$e->getMessage());
             $output->writeln(sprintf('<error>%s</error>', $e->getMessage()));
 
             return self::FAILURE;

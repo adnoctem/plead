@@ -8,7 +8,6 @@ use App\Command\AbstractPleadCommand;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 #[AsCommand(name: 'server:ip:remove', description: 'Remove an IP address from the server')]
@@ -37,7 +36,7 @@ final class IpRemoveCommand extends AbstractPleadCommand
 
             return self::SUCCESS;
         } catch (\Throwable $e) {
-            $context->syncLogRepository()->resolve($logId, 'error:' . $e->getMessage());
+            $context->syncLogRepository()->resolve($logId, 'error:'.$e->getMessage());
             $output->writeln(sprintf('<error>%s</error>', $e->getMessage()));
 
             return self::FAILURE;

@@ -5,14 +5,20 @@ declare(strict_types=1);
 namespace App\Tests\Command\Mail\Autoresponder;
 
 use App\Application\RuntimeContext;
+use App\Command\AbstractPleadCommand;
 use App\Command\Mail\Autoresponder\AutoresponderGetCommand;
 use App\Command\Mail\Autoresponder\AutoresponderListCommand;
 use App\Command\Mail\Autoresponder\AutoresponderSetCommand;
 use App\Config\PathProvider\PathProviderInterface;
 use App\Tests\Support\RecordingGateway;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
 
+/**
+ * @internal
+ */
+#[CoversNothing]
 final class AutoresponderCommandsTest extends TestCase
 {
     private string $base;
@@ -23,67 +29,57 @@ final class AutoresponderCommandsTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->base = sys_get_temp_dir() . '/plead-set-test-' . bin2hex(random_bytes(4));
-        mkdir($this->base . '/config', 0777, true);
-        mkdir($this->base . '/data', 0777, true);
+        $this->base = sys_get_temp_dir().'/plead-set-test-'.bin2hex(random_bytes(4));
+        mkdir($this->base.'/config', 0o777, true);
+        mkdir($this->base.'/data', 0o777, true);
         file_put_contents(
-            $this->base . '/config/plead.yaml',
+            $this->base.'/config/plead.yaml',
             "plesk:\n    host: fake.local\n    secret_key: test-key\n",
         );
-        $this->messageFile = $this->base . '/message.txt';
+        $this->messageFile = $this->base.'/message.txt';
         file_put_contents($this->messageFile, 'Bin im Urlaub & Grüße');
 
         $this->paths = new class($this->base) implements PathProviderInterface {
-            public function __construct(private readonly string $base)
-            {
-            }
+            public function __construct(private readonly string $base) {}
 
             public function configHome(): string
             {
-                return $this->base . '/config';
+                return $this->base.'/config';
             }
 
             public function configDirs(): array
             {
-                return [$this->base . '/config'];
+                return [$this->base.'/config'];
             }
 
             public function configPaths(): array
             {
-                return [$this->base . '/config/plead.yaml'];
+                return [$this->base.'/config/plead.yaml'];
             }
 
             public function dataHome(): string
             {
-                return $this->base . '/data';
+                return $this->base.'/data';
             }
 
             public function dataDir(): string
             {
-                return $this->base . '/data';
+                return $this->base.'/data';
             }
 
             public function cacheHome(): string
             {
-                return $this->base . '/cache';
+                return $this->base.'/cache';
             }
 
             public function logFile(): string
             {
-                return $this->base . '/data/plead.log';
+                return $this->base.'/data/plead.log';
             }
         };
 
         $this->gateway = new RecordingGateway();
         $this->context = new RuntimeContext($this->paths, null, false, null, 0, gateway: $this->gateway);
-    }
-
-    private function tester(\App\Command\AbstractPleadCommand $command): CommandTester
-    {
-        $tester = new CommandTester($command);
-        $command->setContext($this->context);
-
-        return $tester;
     }
 
     public function testSchedulesFutureStartWithoutApplying(): void
@@ -136,7 +132,7 @@ final class AutoresponderCommandsTest extends TestCase
         $tester = $this->tester(new AutoresponderSetCommand());
         $tester->execute([
             'email' => 'user@company.com',
-            '--message-file' => $this->base . '/does-not-exist.txt',
+            '--message-file' => $this->base.'/does-not-exist.txt',
             '--end-date' => '2099-01-05T08:00:00+02:00',
         ]);
 
@@ -265,5 +261,13 @@ final class AutoresponderCommandsTest extends TestCase
 
         self::assertSame(0, $tester->getStatusCode());
         self::assertStringContainsString('would be applied (dry-run)', $tester->getDisplay());
+    }
+
+    private function tester(AbstractPleadCommand $command): CommandTester
+    {
+        $tester = new CommandTester($command);
+        $command->setContext($this->context);
+
+        return $tester;
     }
 }

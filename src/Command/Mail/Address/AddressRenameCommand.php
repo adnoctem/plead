@@ -17,7 +17,8 @@ final class AddressRenameCommand extends AbstractMailCommand
     {
         $this
             ->addArgument('email', InputArgument::REQUIRED, 'Current email address to rename')
-            ->addArgument('new-name', InputArgument::REQUIRED, 'New local part, e.g. newuser (not a full email address)');
+            ->addArgument('new-name', InputArgument::REQUIRED, 'New local part, e.g. newuser (not a full email address)')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -38,7 +39,7 @@ final class AddressRenameCommand extends AbstractMailCommand
         }
 
         $context = $this->context();
-        $newEmail = $newName . '@' . explode('@', $email, 2)[1];
+        $newEmail = $newName.'@'.explode('@', $email, 2)[1];
         $logId = $context->syncLogRepository()->logPending('mail_address', $email, 'rename', [
             'from' => $email,
             'to' => $newEmail,
@@ -61,7 +62,7 @@ final class AddressRenameCommand extends AbstractMailCommand
 
             return self::SUCCESS;
         } catch (\Throwable $e) {
-            $context->syncLogRepository()->resolve($logId, 'error:' . $e->getMessage());
+            $context->syncLogRepository()->resolve($logId, 'error:'.$e->getMessage());
             $output->writeln(sprintf('<error>%s</error>', $e->getMessage()));
 
             return self::FAILURE;

@@ -5,8 +5,13 @@ declare(strict_types=1);
 namespace App\Tests\Util;
 
 use App\Util\DateNormalizer;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * @internal
+ */
+#[CoversNothing]
 final class DateNormalizerTest extends TestCase
 {
     public function testNormalizesIsoWithOffsetUnchanged(): void

@@ -9,9 +9,7 @@ use App\Util\DateNormalizer;
 
 final class MailAliasRepository
 {
-    public function __construct(private readonly Connection $connection)
-    {
-    }
+    public function __construct(private readonly Connection $connection) {}
 
     /** Add or re-activate an alias for a mailbox. */
     public function upsertActive(string $email, string $aliasEmail): void
@@ -20,14 +18,14 @@ final class MailAliasRepository
         // until the reconciler confirms it on Plesk.
         $statement = $this->connection->pdo()->prepare(
             <<<'SQL'
-            INSERT INTO mail_aliases (email, alias_email, removed_at, reconciled, reconciled_at, updated_at)
-            VALUES (:email, :alias_email, NULL, 0, NULL, :updated_at)
-            ON CONFLICT(email, alias_email) DO UPDATE SET
-                removed_at = NULL,
-                reconciled = 0,
-                reconciled_at = NULL,
-                updated_at = :updated_at
-            SQL,
+                INSERT INTO mail_aliases (email, alias_email, removed_at, reconciled, reconciled_at, updated_at)
+                VALUES (:email, :alias_email, NULL, 0, NULL, :updated_at)
+                ON CONFLICT(email, alias_email) DO UPDATE SET
+                    removed_at = NULL,
+                    reconciled = 0,
+                    reconciled_at = NULL,
+                    updated_at = :updated_at
+                SQL,
         );
         $statement->execute([
             'email' => $email,
@@ -41,14 +39,14 @@ final class MailAliasRepository
     {
         $statement = $this->connection->pdo()->prepare(
             <<<'SQL'
-            INSERT INTO mail_aliases (email, alias_email, removed_at, reconciled, reconciled_at, updated_at)
-            VALUES (:email, :alias_email, :removed_at, 0, NULL, :updated_at)
-            ON CONFLICT(email, alias_email) DO UPDATE SET
-                removed_at = COALESCE(removed_at, :removed_at),
-                reconciled = 0,
-                reconciled_at = NULL,
-                updated_at = :updated_at
-            SQL,
+                INSERT INTO mail_aliases (email, alias_email, removed_at, reconciled, reconciled_at, updated_at)
+                VALUES (:email, :alias_email, :removed_at, 0, NULL, :updated_at)
+                ON CONFLICT(email, alias_email) DO UPDATE SET
+                    removed_at = COALESCE(removed_at, :removed_at),
+                    reconciled = 0,
+                    reconciled_at = NULL,
+                    updated_at = :updated_at
+                SQL,
         );
         $statement->execute([
             'email' => $email,
@@ -118,7 +116,9 @@ final class MailAliasRepository
         return (int) $statement->fetchColumn() > 0;
     }
 
-    /** @return array<int, array<string, string>> full row history for a mailbox */
+    /**
+     * @return array<int, array{alias_email: string, removed_at: null|string, reconciled: string, updated_at: string}> full row history for a mailbox
+     */
     public function history(string $email): array
     {
         $statement = $this->connection->pdo()->prepare(
@@ -149,6 +149,7 @@ final class MailAliasRepository
                  GROUP BY email
                  ORDER BY email',
             )
-            ->fetchAll(\PDO::FETCH_ASSOC);
+            ->fetchAll(\PDO::FETCH_ASSOC)
+        ;
     }
 }

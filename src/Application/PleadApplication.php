@@ -45,10 +45,6 @@ use App\Command\Mail\Group\GroupListCommand;
 use App\Command\Mail\Group\GroupRemoveCommand;
 use App\Command\Mail\Group\GroupSetCommand;
 use App\Command\Mail\Group\GroupWatchCommand;
-use App\Command\Server\ServerAdminCommand;
-use App\Command\Server\ServerExecCommand;
-use App\Command\Server\ServerInfoCommand;
-use App\Command\Server\ServerRefCommand;
 use App\Command\Server\Components\ComponentsInstallCommand;
 use App\Command\Server\Components\ComponentsListCommand;
 use App\Command\Server\Extension\ExtensionCallCommand;
@@ -61,6 +57,10 @@ use App\Command\Server\Ip\IpGetCommand;
 use App\Command\Server\Ip\IpListCommand;
 use App\Command\Server\Ip\IpRemoveCommand;
 use App\Command\Server\Ip\IpSetCommand;
+use App\Command\Server\ServerAdminCommand;
+use App\Command\Server\ServerExecCommand;
+use App\Command\Server\ServerInfoCommand;
+use App\Command\Server\ServerRefCommand;
 use App\Command\Server\Service\ServiceRestartCommand;
 use App\Command\Server\Service\ServiceStartCommand;
 use App\Command\Server\Service\ServiceStatusCommand;
@@ -154,6 +154,15 @@ final class PleadApplication extends Application
         ]);
     }
 
+    public function context(): RuntimeContext
+    {
+        if (null === $this->context) {
+            throw new \LogicException('RuntimeContext has not been built yet.');
+        }
+
+        return $this->context;
+    }
+
     protected function getDefaultInputDefinition(): InputDefinition
     {
         $definition = parent::getDefaultInputDefinition();
@@ -198,14 +207,5 @@ final class PleadApplication extends Application
         }
 
         return parent::doRunCommand($command, $input, $output);
-    }
-
-    public function context(): RuntimeContext
-    {
-        if (null === $this->context) {
-            throw new \LogicException('RuntimeContext has not been built yet.');
-        }
-
-        return $this->context;
     }
 }

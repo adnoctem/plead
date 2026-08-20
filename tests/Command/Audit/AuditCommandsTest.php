@@ -10,9 +10,14 @@ use App\Command\Audit\AuditExportCommand;
 use App\Command\Audit\AuditTrailCommand;
 use App\Config\PathProvider\PathProviderInterface;
 use App\Tests\Support\RecordingGateway;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
 
+/**
+ * @internal
+ */
+#[CoversNothing]
 final class AuditCommandsTest extends TestCase
 {
     private string $base;
@@ -20,52 +25,50 @@ final class AuditCommandsTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->base = sys_get_temp_dir() . '/plead-audit-cmd-' . bin2hex(random_bytes(4));
-        mkdir($this->base . '/config', 0777, true);
-        mkdir($this->base . '/data', 0777, true);
+        $this->base = sys_get_temp_dir().'/plead-audit-cmd-'.bin2hex(random_bytes(4));
+        mkdir($this->base.'/config', 0o777, true);
+        mkdir($this->base.'/data', 0o777, true);
         file_put_contents(
-            $this->base . '/config/plead.yaml',
+            $this->base.'/config/plead.yaml',
             "plesk:\n    host: fake.local\n    secret_key: test-key\n",
         );
 
         $paths = new class($this->base) implements PathProviderInterface {
-            public function __construct(private readonly string $base)
-            {
-            }
+            public function __construct(private readonly string $base) {}
 
             public function configHome(): string
             {
-                return $this->base . '/config';
+                return $this->base.'/config';
             }
 
             public function configDirs(): array
             {
-                return [$this->base . '/config'];
+                return [$this->base.'/config'];
             }
 
             public function configPaths(): array
             {
-                return [$this->base . '/config/plead.yaml'];
+                return [$this->base.'/config/plead.yaml'];
             }
 
             public function dataHome(): string
             {
-                return $this->base . '/data';
+                return $this->base.'/data';
             }
 
             public function dataDir(): string
             {
-                return $this->base . '/data';
+                return $this->base.'/data';
             }
 
             public function cacheHome(): string
             {
-                return $this->base . '/cache';
+                return $this->base.'/cache';
             }
 
             public function logFile(): string
             {
-                return $this->base . '/data/plead.log';
+                return $this->base.'/data/plead.log';
             }
         };
 
@@ -81,14 +84,6 @@ final class AuditCommandsTest extends TestCase
         ]);
         $syncLog->resolve($id, 'error:mail does not exist');
         $syncLog->log('mail_alias', 'user@company.com', 'adopt', 'ok');
-    }
-
-    private function tester(AbstractPleadCommand $command): CommandTester
-    {
-        $tester = new CommandTester($command);
-        $command->setContext($this->context);
-
-        return $tester;
     }
 
     public function testTrailNonInteractivePrintsTable(): void
@@ -140,52 +135,50 @@ final class AuditCommandsTest extends TestCase
 
     public function testTrailEmptyTrail(): void
     {
-        $fresh = $this->base . '/empty';
-        mkdir($fresh . '/config', 0777, true);
-        mkdir($fresh . '/data', 0777, true);
+        $fresh = $this->base.'/empty';
+        mkdir($fresh.'/config', 0o777, true);
+        mkdir($fresh.'/data', 0o777, true);
         file_put_contents(
-            $fresh . '/config/plead.yaml',
+            $fresh.'/config/plead.yaml',
             "plesk:\n    host: fake.local\n    secret_key: test-key\n",
         );
         $emptyContext = new RuntimeContext(
             new class($fresh) implements PathProviderInterface {
-                public function __construct(private readonly string $base)
-                {
-                }
+                public function __construct(private readonly string $base) {}
 
                 public function configHome(): string
                 {
-                    return $this->base . '/config';
+                    return $this->base.'/config';
                 }
 
                 public function configDirs(): array
                 {
-                    return [$this->base . '/config'];
+                    return [$this->base.'/config'];
                 }
 
                 public function configPaths(): array
                 {
-                    return [$this->base . '/config/plead.yaml'];
+                    return [$this->base.'/config/plead.yaml'];
                 }
 
                 public function dataHome(): string
                 {
-                    return $this->base . '/data';
+                    return $this->base.'/data';
                 }
 
                 public function dataDir(): string
                 {
-                    return $this->base . '/data';
+                    return $this->base.'/data';
                 }
 
                 public function cacheHome(): string
                 {
-                    return $this->base . '/cache';
+                    return $this->base.'/cache';
                 }
 
                 public function logFile(): string
                 {
-                    return $this->base . '/data/plead.log';
+                    return $this->base.'/data/plead.log';
                 }
             },
             null,
@@ -207,7 +200,7 @@ final class AuditCommandsTest extends TestCase
 
     public function testExportJsonToFile(): void
     {
-        $target = $this->base . '/export.json';
+        $target = $this->base.'/export.json';
 
         $tester = $this->tester(new AuditExportCommand());
         $tester->execute(['-o' => $target]);
@@ -229,7 +222,7 @@ final class AuditCommandsTest extends TestCase
 
     public function testExportYamlToFile(): void
     {
-        $target = $this->base . '/export.yaml';
+        $target = $this->base.'/export.yaml';
 
         $tester = $this->tester(new AuditExportCommand());
         $tester->execute(['--format' => 'yaml', '-o' => $target]);
@@ -248,8 +241,8 @@ final class AuditCommandsTest extends TestCase
         $tester->execute([]);
 
         self::assertSame(0, $tester->getStatusCode());
-        self::assertStringContainsString($this->base . '/data/audit-export-', $tester->getDisplay());
-        self::assertSame(1, count(glob($this->base . '/data/audit-export-*.json') ?: []));
+        self::assertStringContainsString($this->base.'/data/audit-export-', $tester->getDisplay());
+        self::assertSame(1, count(glob($this->base.'/data/audit-export-*.json') ?: []));
     }
 
     public function testExportRejectsUnknownFormat(): void
@@ -259,5 +252,13 @@ final class AuditCommandsTest extends TestCase
 
         self::assertNotSame(0, $tester->getStatusCode());
         self::assertStringContainsString('Unknown format', $tester->getDisplay());
+    }
+
+    private function tester(AbstractPleadCommand $command): CommandTester
+    {
+        $tester = new CommandTester($command);
+        $command->setContext($this->context);
+
+        return $tester;
     }
 }

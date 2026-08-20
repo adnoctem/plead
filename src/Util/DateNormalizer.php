@@ -29,6 +29,6 @@ final class DateNormalizer
 
     public static function now(): string
     {
-        return (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM);
+        return new \DateTimeImmutable()->format(\DateTimeInterface::ATOM);
     }
 }

@@ -8,12 +8,12 @@ final class WindowsPathProvider implements PathProviderInterface
 {
     public function configHome(): string
     {
-        return $this->local() . '/plead';
+        return $this->local().'/plead';
     }
 
     public function dataHome(): string
     {
-        return $this->env('PLEAD_DATA_DIR', $this->local() . '/plead');
+        return $this->env('PLEAD_DATA_DIR', $this->local().'/plead');
     }
 
     public function dataDir(): string
@@ -23,17 +23,17 @@ final class WindowsPathProvider implements PathProviderInterface
 
     public function cacheHome(): string
     {
-        return $this->local() . '/plead/cache';
+        return $this->local().'/plead/cache';
     }
 
     public function configDirs(): array
     {
         $dirs = [$this->configHome()];
         if (false !== ($roaming = getenv('APPDATA')) && '' !== $roaming) {
-            $dirs[] = $roaming . '/plead';
+            $dirs[] = $roaming.'/plead';
         }
         if (false !== ($programData = getenv('ProgramData')) && '' !== $programData) {
-            $dirs[] = $programData . '/plead';
+            $dirs[] = $programData.'/plead';
         }
 
         return $dirs;
@@ -43,8 +43,8 @@ final class WindowsPathProvider implements PathProviderInterface
     {
         $paths = [];
         foreach ($this->configDirs() as $dir) {
-            $paths[] = $dir . '/plead.yaml';
-            $paths[] = $dir . '/plead.json';
+            $paths[] = $dir.'/plead.yaml';
+            $paths[] = $dir.'/plead.json';
         }
 
         return $paths;
@@ -52,7 +52,7 @@ final class WindowsPathProvider implements PathProviderInterface
 
     public function logFile(): string
     {
-        return $this->dataDir() . '/plead.log';
+        return $this->dataDir().'/plead.log';
     }
 
     private function local(): string

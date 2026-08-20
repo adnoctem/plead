@@ -17,7 +17,8 @@ final class AddressGetCommand extends AbstractMailCommand
     {
         $this
             ->addArgument('email', InputArgument::REQUIRED, 'Email address to inspect')
-            ->addLocalOption();
+            ->addLocalOption()
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -49,7 +50,7 @@ final class AddressGetCommand extends AbstractMailCommand
                 $marker = null !== $membership['removed_at']
                     ? ' (removed)'
                     : ('0' === (string) $membership['reconciled'] ? ' (pending)' : '');
-                $output->writeln('  - ' . $membership['list_email'] . $marker);
+                $output->writeln('  - '.$membership['list_email'].$marker);
             }
         }
 
@@ -93,7 +94,7 @@ final class AddressGetCommand extends AbstractMailCommand
             $output->writeln('  (none)');
         } else {
             foreach ($info['forwarding'] as $address) {
-                $output->writeln('  - ' . $address);
+                $output->writeln('  - '.$address);
             }
         }
 

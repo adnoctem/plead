@@ -138,7 +138,7 @@ The following is the list of supported scopes:
 
 - `src` — Application code under `src/` and the `bin/plead` entrypoint
 - `templates` — Changes to Twig templates (`templates/`)
-- `config` — Changes to configuration files (`.editorconfig`, `.pre-commit-config.yaml`, `.releaserc`, `config/`, etc.)
+- `config` — Changes to configuration files (`.php-cs-fixer.dist.php`, `.pre-commit-config.yaml`, `.releaserc`, `config/`, etc.)
 - `docs` — Documentation changes (`README.md`, `docs/`)
 
 #### Summary

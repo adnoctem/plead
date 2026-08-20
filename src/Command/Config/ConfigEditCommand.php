@@ -51,7 +51,7 @@ final class ConfigEditCommand extends AbstractPleadCommand
         try {
             $this->context()->configLoader()->load($target);
             $output->writeln('<info>Configuration is valid.</info>');
-        } catch (InvalidConfigurationException | \RuntimeException $e) {
+        } catch (InvalidConfigurationException|\RuntimeException $e) {
             $output->writeln(sprintf('<error>Configuration is invalid: %s</error>', $e->getMessage()));
 
             return self::FAILURE;
@@ -87,7 +87,7 @@ final class ConfigEditCommand extends AbstractPleadCommand
         // open. A stale swap file means the config is either open in another
         // editor (edits would fight each other) or a previous session crashed;
         // both are worth surfacing before the user edits blindly.
-        $swap = dirname($target) . DIRECTORY_SEPARATOR . '.' . basename($target) . '.swp';
+        $swap = dirname($target).DIRECTORY_SEPARATOR.'.'.basename($target).'.swp';
         if (is_file($swap)) {
             $output->writeln(sprintf(
                 '<comment>Stale swap file found at %s. Is the config already open in another editor?</comment>',

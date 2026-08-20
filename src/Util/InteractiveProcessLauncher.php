@@ -22,7 +22,7 @@ final class InteractiveProcessLauncher
         }
 
         foreach (explode(PATH_SEPARATOR, (string) getenv('PATH')) as $dir) {
-            $candidate = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR . $program;
+            $candidate = rtrim($dir, '/\\').DIRECTORY_SEPARATOR.$program;
             if (is_file($candidate) && is_executable($candidate)) {
                 return $candidate;
             }

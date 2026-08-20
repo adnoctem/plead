@@ -22,7 +22,8 @@ final class AutoresponderSetCommand extends AbstractMailCommand
             ->addOption('enabled', null, InputOption::VALUE_REQUIRED, 'Whether the auto-reply should be enabled: true|false|yes|no|1|0 (default: true)')
             ->addOption('message-file', null, InputOption::VALUE_REQUIRED, 'File containing the auto-reply message (rendered as a Twig template)')
             ->addOption('start-date', null, InputOption::VALUE_REQUIRED, 'When the auto-reply becomes active (default: now). Any date string is accepted and normalized to ISO 8601 with offset.')
-            ->addOption('end-date', null, InputOption::VALUE_REQUIRED, 'When the auto-reply stops. Plesk handles the turn-off natively.');
+            ->addOption('end-date', null, InputOption::VALUE_REQUIRED, 'When the auto-reply stops. Plesk handles the turn-off natively.')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -130,7 +131,7 @@ final class AutoresponderSetCommand extends AbstractMailCommand
         try {
             $context->gateway()->disableAutoresponder($email);
         } catch (\Throwable $e) {
-            $context->syncLogRepository()->resolve($logId, 'error:' . $e->getMessage());
+            $context->syncLogRepository()->resolve($logId, 'error:'.$e->getMessage());
 
             if (null !== $row) {
                 $output->writeln(sprintf(

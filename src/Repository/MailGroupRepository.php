@@ -9,9 +9,7 @@ use App\Util\DateNormalizer;
 
 final class MailGroupRepository
 {
-    public function __construct(private readonly Connection $connection)
-    {
-    }
+    public function __construct(private readonly Connection $connection) {}
 
     /** Add or re-activate a recipient for a list. */
     public function upsertActive(string $listEmail, string $recipientEmail): void
@@ -20,14 +18,14 @@ final class MailGroupRepository
         // until the watcher confirms it on Plesk.
         $statement = $this->connection->pdo()->prepare(
             <<<'SQL'
-            INSERT INTO mail_recipients (list_email, recipient_email, removed_at, reconciled, reconciled_at, updated_at)
-            VALUES (:list_email, :recipient_email, NULL, 0, NULL, :updated_at)
-            ON CONFLICT(list_email, recipient_email) DO UPDATE SET
-                removed_at = NULL,
-                reconciled = 0,
-                reconciled_at = NULL,
-                updated_at = :updated_at
-            SQL,
+                INSERT INTO mail_recipients (list_email, recipient_email, removed_at, reconciled, reconciled_at, updated_at)
+                VALUES (:list_email, :recipient_email, NULL, 0, NULL, :updated_at)
+                ON CONFLICT(list_email, recipient_email) DO UPDATE SET
+                    removed_at = NULL,
+                    reconciled = 0,
+                    reconciled_at = NULL,
+                    updated_at = :updated_at
+                SQL,
         );
         $statement->execute([
             'list_email' => $listEmail,
@@ -41,14 +39,14 @@ final class MailGroupRepository
     {
         $statement = $this->connection->pdo()->prepare(
             <<<'SQL'
-            INSERT INTO mail_recipients (list_email, recipient_email, removed_at, reconciled, reconciled_at, updated_at)
-            VALUES (:list_email, :recipient_email, :removed_at, 0, NULL, :updated_at)
-            ON CONFLICT(list_email, recipient_email) DO UPDATE SET
-                removed_at = COALESCE(removed_at, :removed_at),
-                reconciled = 0,
-                reconciled_at = NULL,
-                updated_at = :updated_at
-            SQL,
+                INSERT INTO mail_recipients (list_email, recipient_email, removed_at, reconciled, reconciled_at, updated_at)
+                VALUES (:list_email, :recipient_email, :removed_at, 0, NULL, :updated_at)
+                ON CONFLICT(list_email, recipient_email) DO UPDATE SET
+                    removed_at = COALESCE(removed_at, :removed_at),
+                    reconciled = 0,
+                    reconciled_at = NULL,
+                    updated_at = :updated_at
+                SQL,
         );
         $statement->execute([
             'list_email' => $listEmail,
@@ -119,7 +117,7 @@ final class MailGroupRepository
         return (int) $statement->fetchColumn() > 0;
     }
 
-    /** @return array<int, array<string, string>> full row history for a list */
+    /** @return array<int, array{recipient_email: string, removed_at: null|string, reconciled: string, updated_at: string}> full row history for a list */
     public function history(string $listEmail): array
     {
         $statement = $this->connection->pdo()->prepare(
@@ -151,14 +149,15 @@ final class MailGroupRepository
                  GROUP BY list_email
                  ORDER BY list_email',
             )
-            ->fetchAll(\PDO::FETCH_ASSOC);
+            ->fetchAll(\PDO::FETCH_ASSOC)
+        ;
     }
 
     /**
      * Every distinct recipient address with its memberships for
      * mail:address:list (--local).
      *
-     * @return array<int, array<string, string>>
+     * @return array<int, array{recipient_email: string, list_email: string, removed_at: null|string, reconciled: string, updated_at: string}>
      */
     public function addressIndex(): array
     {
@@ -168,10 +167,11 @@ final class MailGroupRepository
                  FROM mail_recipients
                  ORDER BY recipient_email, list_email',
             )
-            ->fetchAll(\PDO::FETCH_ASSOC);
+            ->fetchAll(\PDO::FETCH_ASSOC)
+        ;
     }
 
-    /** @return array<int, array<string, string>> memberships of one address */
+    /** @return array<int, array{list_email: string, removed_at: null|string, reconciled: string}> memberships of one address */
     public function listsOf(string $recipientEmail): array
     {
         $statement = $this->connection->pdo()->prepare(

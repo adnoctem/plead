@@ -16,7 +16,8 @@ final class GroupRemoveCommand extends AbstractGroupCommand
     {
         $this
             ->addArgument('email', InputArgument::REQUIRED, 'Group email address, e.g. all@company.com')
-            ->addArgument('recipient', InputArgument::REQUIRED, 'Recipient email address to remove');
+            ->addArgument('recipient', InputArgument::REQUIRED, 'Recipient email address to remove')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -31,6 +32,7 @@ final class GroupRemoveCommand extends AbstractGroupCommand
         }
 
         $context = $this->context();
+
         try {
             $this->adoptIfNew($email);
         } catch (\Throwable $e) {

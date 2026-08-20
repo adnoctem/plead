@@ -12,9 +12,7 @@ use Symfony\Component\Yaml\Yaml;
 
 final class ConfigLoader
 {
-    public function __construct(private readonly PathProviderInterface $paths)
-    {
-    }
+    public function __construct(private readonly PathProviderInterface $paths) {}
 
     /**
      * @return array<string, mixed> resolved, validated configuration
@@ -36,7 +34,7 @@ final class ConfigLoader
         $configs = array_reverse($raw);
         $configs[] = $this->environmentOverrides();
 
-        $processed = (new Processor())->processConfiguration(new PleadConfiguration(), $configs);
+        $processed = new Processor()->processConfiguration(new PleadConfiguration(), $configs);
 
         if (!isset($processed['plesk']['host'])) {
             throw new InvalidConfigurationException(
@@ -49,7 +47,7 @@ final class ConfigLoader
         if (!$hasSecretKey && !$hasCredentials) {
             throw new InvalidConfigurationException(
                 'Either plesk.secret_key or plesk.login with plesk.password is required. '
-                . 'Set it via `plead config:set ...` or the PLEAD_PLESK_SECRET_KEY / PLEAD_PLESK_LOGIN + PLEAD_PLESK_PASSWORD environment variables.',
+                .'Set it via `plead config:set ...` or the PLEAD_PLESK_SECRET_KEY / PLEAD_PLESK_LOGIN + PLEAD_PLESK_PASSWORD environment variables.',
             );
         }
 
@@ -72,7 +70,7 @@ final class ConfigLoader
                 'json' => json_decode($content, true, 512, JSON_THROW_ON_ERROR),
                 default => throw new \RuntimeException(sprintf('Unsupported config file extension: %s', $file)),
             };
-        } catch (ParseException | \JsonException $e) {
+        } catch (\JsonException|ParseException $e) {
             throw new \RuntimeException(sprintf('Failed to parse config file %s: %s', $file, $e->getMessage()), 0, $e);
         }
     }

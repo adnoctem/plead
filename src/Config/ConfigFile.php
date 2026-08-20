@@ -38,12 +38,12 @@ final class ConfigFile
     public static function write(string $target, array $data): void
     {
         $directory = dirname($target);
-        if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
+        if (!is_dir($directory) && !mkdir($directory, 0o775, true) && !is_dir($directory)) {
             throw new \RuntimeException(sprintf('Unable to create config directory: %s', $directory));
         }
 
         if (str_ends_with(strtolower($target), '.json')) {
-            file_put_contents($target, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+            file_put_contents($target, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n");
         } else {
             file_put_contents($target, Yaml::dump($data, 8, 4));
         }

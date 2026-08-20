@@ -22,7 +22,7 @@ final class ContextInterpolatingFormatter extends LineFormatter
         $replace = [];
         foreach ($context as $key => $value) {
             if (is_scalar($value) || null === $value) {
-                $replace['{' . $key . '}'] = (string) $value;
+                $replace['{'.$key.'}'] = (string) $value;
             }
         }
 

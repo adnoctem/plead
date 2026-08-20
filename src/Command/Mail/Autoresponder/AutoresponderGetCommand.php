@@ -17,7 +17,8 @@ final class AutoresponderGetCommand extends AbstractMailCommand
     {
         $this
             ->addArgument('email', InputArgument::REQUIRED, 'Email address to inspect, e.g. user@company.com')
-            ->addLocalOption();
+            ->addLocalOption()
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -44,7 +45,7 @@ final class AutoresponderGetCommand extends AbstractMailCommand
         $output->writeln(sprintf('State:     %s', '1' === (string) $row['reconciled'] ? 'reconciled' : 'pending'));
         $output->writeln(sprintf('Start:     %s', $row['start_date']));
         $output->writeln(sprintf('End:       %s', $row['end_date']));
-        $output->writeln(sprintf('Reconciled:%s', null !== $row['reconciled_at'] ? ' ' . $row['reconciled_at'] : ' (not yet)'));
+        $output->writeln(sprintf('Reconciled:%s', null !== $row['reconciled_at'] ? ' '.$row['reconciled_at'] : ' (not yet)'));
         $output->writeln('Message:');
         $output->writeln($row['message']);
 

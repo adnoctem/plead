@@ -10,8 +10,7 @@ final class PleskEndpoint
         public readonly string $host,
         public readonly int $port,
         public readonly string $protocol,
-    ) {
-    }
+    ) {}
 
     /**
      * Parse a host value that may carry a protocol and/or port, e.g.

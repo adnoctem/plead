@@ -10,8 +10,13 @@ use App\Repository\AutoReplyRepository;
 use App\Repository\SyncLogRepository;
 use App\Tests\Support\RecordingGateway;
 use Monolog\Logger;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * @internal
+ */
+#[CoversNothing]
 final class AutoReplyReconcilerTest extends TestCase
 {
     private Connection $connection;
@@ -21,15 +26,10 @@ final class AutoReplyReconcilerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->connection = new Connection(sys_get_temp_dir() . '/plead-reconciler-test-' . bin2hex(random_bytes(4)) . '/plead.sqlite');
+        $this->connection = new Connection(sys_get_temp_dir().'/plead-reconciler-test-'.bin2hex(random_bytes(4)).'/plead.sqlite');
         $this->repository = new AutoReplyRepository($this->connection);
         $this->syncLog = new SyncLogRepository($this->connection);
         $this->gateway = new RecordingGateway();
-    }
-
-    private function reconciler(bool $dryRun = false): AutoReplyReconciler
-    {
-        return new AutoReplyReconciler($this->repository, $this->syncLog, $this->gateway, new Logger('test'), $dryRun);
     }
 
     public function testAppliesDueEntriesAndMarksReconciled(): void
@@ -110,5 +110,10 @@ final class AutoReplyReconcilerTest extends TestCase
 
         self::assertSame(1, $applied);
         self::assertCount(1, $this->gateway->calls);
+    }
+
+    private function reconciler(bool $dryRun = false): AutoReplyReconciler
+    {
+        return new AutoReplyReconciler($this->repository, $this->syncLog, $this->gateway, new Logger('test'), $dryRun);
     }
 }

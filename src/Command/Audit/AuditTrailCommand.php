@@ -20,7 +20,8 @@ final class AuditTrailCommand extends AbstractPleadCommand
         $this
             ->addOption('resource', null, InputOption::VALUE_REQUIRED, 'Only entries of this resource type, e.g. mail_group')
             ->addOption('result', null, InputOption::VALUE_REQUIRED, 'Only entries with this result, e.g. ok, pending, error')
-            ->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Maximum number of entries (default: 200)');
+            ->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Maximum number of entries (default: 200)')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -49,6 +50,6 @@ final class AuditTrailCommand extends AbstractPleadCommand
             && stream_isatty(STDIN)
             && 'Windows' !== PHP_OS_FAMILY;
 
-        return (new AuditTrailViewer($output, $interactive, $entries))->run();
+        return new AuditTrailViewer($output, $interactive, $entries)->run();
     }
 }

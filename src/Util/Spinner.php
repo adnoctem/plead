@@ -25,8 +25,7 @@ final class Spinner
     public function __construct(
         private readonly OutputInterface $output,
         private readonly bool $active,
-    ) {
-    }
+    ) {}
 
     /** Begin spinning on the current line. */
     public function start(): void
@@ -89,12 +88,12 @@ final class Spinner
     {
         $frame = self::FRAMES[$this->frame];
         $this->frame = ($this->frame + 1) % count(self::FRAMES);
-        $this->overwrite($frame . ('' !== $detail ? ' ' . $detail : ''));
+        $this->overwrite($frame.('' !== $detail ? ' '.$detail : ''));
     }
 
     private function overwrite(string $message): void
     {
         // CR moves to the start of the line, ESC [ 2K erases it.
-        $this->output->write("\x0D\x1B[2K" . $message);
+        $this->output->write("\x0D\x1B[2K".$message);
     }
 }

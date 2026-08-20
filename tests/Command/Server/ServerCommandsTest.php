@@ -32,9 +32,14 @@ use App\Command\Server\Session\SessionTerminateCommand;
 use App\Config\PathProvider\PathProviderInterface;
 use App\Tests\Support\RecordingGateway;
 use App\Tests\Support\RecordingRestGateway;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
 
+/**
+ * @internal
+ */
+#[CoversNothing]
 final class ServerCommandsTest extends TestCase
 {
     private string $base;
@@ -44,66 +49,56 @@ final class ServerCommandsTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->base = sys_get_temp_dir() . '/plead-server-cmd-' . bin2hex(random_bytes(4));
-        mkdir($this->base . '/config', 0777, true);
-        mkdir($this->base . '/data', 0777, true);
+        $this->base = sys_get_temp_dir().'/plead-server-cmd-'.bin2hex(random_bytes(4));
+        mkdir($this->base.'/config', 0o777, true);
+        mkdir($this->base.'/data', 0o777, true);
         file_put_contents(
-            $this->base . '/config/plead.yaml',
+            $this->base.'/config/plead.yaml',
             "plesk:\n    host: fake.local\n    secret_key: test-key\n",
         );
 
         $paths = new class($this->base) implements PathProviderInterface {
-            public function __construct(private readonly string $base)
-            {
-            }
+            public function __construct(private readonly string $base) {}
 
             public function configHome(): string
             {
-                return $this->base . '/config';
+                return $this->base.'/config';
             }
 
             public function configDirs(): array
             {
-                return [$this->base . '/config'];
+                return [$this->base.'/config'];
             }
 
             public function configPaths(): array
             {
-                return [$this->base . '/config/plead.yaml'];
+                return [$this->base.'/config/plead.yaml'];
             }
 
             public function dataHome(): string
             {
-                return $this->base . '/data';
+                return $this->base.'/data';
             }
 
             public function dataDir(): string
             {
-                return $this->base . '/data';
+                return $this->base.'/data';
             }
 
             public function cacheHome(): string
             {
-                return $this->base . '/cache';
+                return $this->base.'/cache';
             }
 
             public function logFile(): string
             {
-                return $this->base . '/data/plead.log';
+                return $this->base.'/data/plead.log';
             }
         };
 
         $this->gateway = new RecordingGateway();
         $this->restGateway = new RecordingRestGateway();
         $this->context = new RuntimeContext($paths, null, false, null, 0, gateway: $this->gateway, restGateway: $this->restGateway);
-    }
-
-    private function tester(AbstractPleadCommand $command): CommandTester
-    {
-        $tester = new CommandTester($command);
-        $command->setContext($this->context);
-
-        return $tester;
     }
 
     public function testServerInfoDisplaysEverything(): void
@@ -581,5 +576,13 @@ final class ServerCommandsTest extends TestCase
 
         self::assertNotSame(0, $tester->getStatusCode());
         self::assertStringContainsString('boom', $tester->getDisplay());
+    }
+
+    private function tester(AbstractPleadCommand $command): CommandTester
+    {
+        $tester = new CommandTester($command);
+        $command->setContext($this->context);
+
+        return $tester;
     }
 }

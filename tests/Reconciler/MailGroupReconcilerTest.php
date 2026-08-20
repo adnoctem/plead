@@ -10,8 +10,13 @@ use App\Repository\MailGroupRepository;
 use App\Repository\SyncLogRepository;
 use App\Tests\Support\RecordingGateway;
 use Monolog\Logger;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * @internal
+ */
+#[CoversNothing]
 final class MailGroupReconcilerTest extends TestCase
 {
     private Connection $connection;
@@ -21,15 +26,10 @@ final class MailGroupReconcilerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->connection = new Connection(sys_get_temp_dir() . '/plead-mail-reconciler-' . bin2hex(random_bytes(4)) . '/plead.sqlite');
+        $this->connection = new Connection(sys_get_temp_dir().'/plead-mail-reconciler-'.bin2hex(random_bytes(4)).'/plead.sqlite');
         $this->repository = new MailGroupRepository($this->connection);
         $this->syncLog = new SyncLogRepository($this->connection);
         $this->gateway = new RecordingGateway();
-    }
-
-    private function reconciler(bool $dryRun = false): MailGroupReconciler
-    {
-        return new MailGroupReconciler($this->repository, $this->syncLog, $this->gateway, new Logger('test'), $dryRun);
     }
 
     public function testAddsMissingRecipientsAndMarksListReconciled(): void
@@ -175,5 +175,10 @@ final class MailGroupReconcilerTest extends TestCase
         self::assertContains('dry-run', $results);
         self::assertSame(['alice@company.com'], $this->repository->activeRecipients('group@company.com'));
         self::assertSame(['group@company.com'], $this->repository->unreconciledLists());
+    }
+
+    private function reconciler(bool $dryRun = false): MailGroupReconciler
+    {
+        return new MailGroupReconciler($this->repository, $this->syncLog, $this->gateway, new Logger('test'), $dryRun);
     }
 }

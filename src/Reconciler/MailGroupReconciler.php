@@ -17,8 +17,7 @@ final class MailGroupReconciler
         private readonly PleskMailGateway $gateway,
         private readonly LoggerInterface $logger,
         private readonly bool $dryRun,
-    ) {
-    }
+    ) {}
 
     /**
      * @return int number of lists changed this pass
@@ -67,7 +66,7 @@ final class MailGroupReconciler
         } catch (\Throwable $e) {
             // Read failure (e.g. server unreachable): leave the list dirty so
             // the watcher retries, and record the failure in the audit trail.
-            $this->syncLog->log('mail_group', $listEmail, 'read', 'error:' . $e->getMessage());
+            $this->syncLog->log('mail_group', $listEmail, 'read', 'error:'.$e->getMessage());
             $this->logger->error('Failed to read forwarding for {list}: {error}', [
                 'list' => $listEmail,
                 'error' => $e->getMessage(),
@@ -93,7 +92,7 @@ final class MailGroupReconciler
 
         $failed = false;
         if ([] !== $toAdd) {
-            $failed = !$this->apply('add', $listEmail, $toAdd) || $failed;
+            $failed = !$this->apply('add', $listEmail, $toAdd);
         }
 
         if ([] !== $toRemove) {
@@ -143,7 +142,7 @@ final class MailGroupReconciler
 
             return true;
         } catch (\Throwable $e) {
-            $this->syncLog->resolve($logId, 'error:' . $e->getMessage());
+            $this->syncLog->resolve($logId, 'error:'.$e->getMessage());
             $this->logger->error('Failed to {operation} recipients for {list}: {error}', [
                 'operation' => $operation,
                 'list' => $listEmail,

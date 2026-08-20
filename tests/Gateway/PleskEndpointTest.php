@@ -5,8 +5,13 @@ declare(strict_types=1);
 namespace App\Tests\Gateway;
 
 use App\Gateway\PleskEndpoint;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * @internal
+ */
+#[CoversNothing]
 final class PleskEndpointTest extends TestCase
 {
     public function testBareHostDefaultsToHttpsPort8443(): void

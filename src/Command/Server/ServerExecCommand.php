@@ -19,7 +19,8 @@ final class ServerExecCommand extends AbstractPleadCommand
         $this
             ->addArgument('id', InputArgument::REQUIRED, 'CLI command id from server:ref, e.g. extension, domain, mail')
             ->addArgument('args', InputArgument::IS_ARRAY, 'Command arguments passed through verbatim (use -- before them if they start with -)')
-            ->addOption('no-fail-on-error', null, InputOption::VALUE_NONE, 'Return the exit code instead of failing on non-zero exits');
+            ->addOption('no-fail-on-error', null, InputOption::VALUE_NONE, 'Return the exit code instead of failing on non-zero exits')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -60,7 +61,7 @@ final class ServerExecCommand extends AbstractPleadCommand
 
             return self::SUCCESS;
         } catch (\Throwable $e) {
-            $context->syncLogRepository()->resolve($logId, 'error:' . $e->getMessage());
+            $context->syncLogRepository()->resolve($logId, 'error:'.$e->getMessage());
             $output->writeln(sprintf('<error>%s</error>', $e->getMessage()));
 
             return self::FAILURE;

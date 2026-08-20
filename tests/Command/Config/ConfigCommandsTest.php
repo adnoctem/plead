@@ -5,9 +5,14 @@ declare(strict_types=1);
 namespace App\Tests\Command\Config;
 
 use App\Application\PleadApplication;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\ApplicationTester;
 
+/**
+ * @internal
+ */
+#[CoversNothing]
 final class ConfigCommandsTest extends TestCase
 {
     private string $configDir;
@@ -16,12 +21,12 @@ final class ConfigCommandsTest extends TestCase
 
     protected function setUp(): void
     {
-        $base = sys_get_temp_dir() . '/plead-app-test-' . bin2hex(random_bytes(4));
-        $this->configDir = $base . '/config';
-        $this->dataDir = $base . '/data';
-        putenv('HOME=' . $base);
-        putenv('XDG_CONFIG_HOME=' . $this->configDir);
-        putenv('XDG_DATA_HOME=' . $this->dataDir);
+        $base = sys_get_temp_dir().'/plead-app-test-'.bin2hex(random_bytes(4));
+        $this->configDir = $base.'/config';
+        $this->dataDir = $base.'/data';
+        putenv('HOME='.$base);
+        putenv('XDG_CONFIG_HOME='.$this->configDir);
+        putenv('XDG_DATA_HOME='.$this->dataDir);
         putenv('PLEAD_PLESK_HOST');
         putenv('PLEAD_PLESK_SECRET_KEY');
 
@@ -85,6 +90,7 @@ final class ConfigCommandsTest extends TestCase
         $this->tester->run(['command' => 'config:set', 'key' => 'log_level', 'value' => 'debug']);
 
         putenv('PLEAD_PLESK_HOST=env.example.com');
+
         try {
             $this->tester->run(['command' => 'config:view']);
         } finally {

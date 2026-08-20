@@ -30,9 +30,8 @@ build/*
 ###> source/symfony ###
 
 # .env files
-/.env.local
-/.env.local.php
-/.env.*.local
+/.env*
+!.env.template
 
 # secrets
 /config/secrets/prod/prod.decrypt.private.php
@@ -44,3 +43,6 @@ build/*
 
 # phpunit
 /.phpunit.cache/
+
+# php-cs-fixer
+/.php-cs-fixer.cache

@@ -6,32 +6,17 @@ namespace App\Tests\Gateway;
 
 use App\Gateway\PleskRestGateway;
 use Monolog\Logger;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * @internal
+ */
+#[CoversNothing]
 final class PleskRestGatewayTest extends TestCase
 {
     /** @var array<int, array{method: string, url: string, headers: string[], body: ?string}> */
     private array $requests = [];
-
-    private function gateway(array $responses): PleskRestGateway
-    {
-        $this->requests = [];
-
-        return new PleskRestGateway(
-            'dellius.delta4x4.net',
-            8443,
-            'https',
-            'secret-key',
-            false,
-            new Logger('test'),
-            function (string $method, string $url, array $headers, ?string $body) use ($responses): array {
-                $this->requests[] = ['method' => $method, 'url' => $url, 'headers' => $headers, 'body' => $body];
-                $response = array_shift($responses) ?? [200, '[]'];
-
-                return [$response[0], $response[1]];
-            },
-        );
-    }
 
     public function testCliCommandsBuildsRequestAndParses(): void
     {
@@ -136,5 +121,28 @@ final class PleskRestGatewayTest extends TestCase
         $this->expectExceptionMessage('Invalid JSON');
 
         $gateway->cliCommands();
+    }
+
+    /**
+     * @param array<int, array{0: int, 1: string}> $responses
+     */
+    private function gateway(array $responses): PleskRestGateway
+    {
+        $this->requests = [];
+
+        return new PleskRestGateway(
+            'dellius.delta4x4.net',
+            8443,
+            'https',
+            'secret-key',
+            false,
+            new Logger('test'),
+            function (string $method, string $url, array $headers, ?string $body) use ($responses): array {
+                $this->requests[] = ['method' => $method, 'url' => $url, 'headers' => $headers, 'body' => $body];
+                $response = array_shift($responses) ?? [200, '[]'];
+
+                return [$response[0], $response[1]];
+            },
+        );
     }
 }

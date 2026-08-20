@@ -19,7 +19,8 @@ final class DomainSetCommand extends AbstractPleadCommand
         $this
             ->addArgument('domain', InputArgument::REQUIRED, 'Domain name, e.g. delta4x4.net')
             ->addOption('description', null, InputOption::VALUE_REQUIRED, 'New description for the domain')
-            ->addOption('status', null, InputOption::VALUE_REQUIRED, 'Domain status: enabled|disabled (0/16 via gen_setup, validated live)');
+            ->addOption('status', null, InputOption::VALUE_REQUIRED, 'Domain status: enabled|disabled (0/16 via gen_setup, validated live)')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -51,6 +52,7 @@ final class DomainSetCommand extends AbstractPleadCommand
         // Audit the change with the ORIGINAL values: read the current state
         // first. A read failure does not block the mutation.
         $old = [];
+
         try {
             $info = $gateway->getDomain($domain);
             if (null !== $info) {
@@ -95,7 +97,7 @@ final class DomainSetCommand extends AbstractPleadCommand
 
             return self::SUCCESS;
         } catch (\Throwable $e) {
-            $context->syncLogRepository()->resolve($logId, 'error:' . $e->getMessage());
+            $context->syncLogRepository()->resolve($logId, 'error:'.$e->getMessage());
             $output->writeln(sprintf('<error>%s</error>', $e->getMessage()));
 
             return self::FAILURE;

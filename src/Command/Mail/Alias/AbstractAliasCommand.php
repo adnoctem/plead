@@ -59,7 +59,7 @@ abstract class AbstractAliasCommand extends AbstractMailCommand
 
     protected function displayAlias(string $mailboxEmail, string $alias): string
     {
-        return str_contains($alias, '@') ? $alias : $alias . '@' . explode('@', $mailboxEmail, 2)[1];
+        return str_contains($alias, '@') ? $alias : $alias.'@'.explode('@', $mailboxEmail, 2)[1];
     }
 
     /** @return string[] */

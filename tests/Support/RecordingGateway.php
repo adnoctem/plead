@@ -79,7 +79,7 @@ final class RecordingGateway extends PleskMailGateway
     /** @var array<string, array<int, array<string, string>>> domain => descriptor properties */
     public array $descriptors = [];
 
-    /** @var array<int, array<string, string>> extensions returned by listExtensions */
+    /** @var array<int, array{id: string, name: string, version: string, release: string, active: bool}> extensions returned by listExtensions */
     public array $extensions = [];
 
     /** @var string[] extensions installed (id or url) */
@@ -218,7 +218,11 @@ final class RecordingGateway extends PleskMailGateway
         $this->aliases[$email] = array_values(array_diff($this->aliases[$email] ?? [], $aliases));
     }
 
-    /** @param string[] $emails @return array<string, string[]> */
+    /**
+     * @param string[] $emails
+     *
+     * @return array<string, string[]>
+     */
     public function getAliasesBulk(array $emails): array
     {
         $result = [];
@@ -317,7 +321,7 @@ final class RecordingGateway extends PleskMailGateway
         if (in_array($service, $this->failFor, true)) {
             throw new \RuntimeException('boom');
         }
-        $this->serviceOps[] = $operation . ':' . $service;
+        $this->serviceOps[] = $operation.':'.$service;
     }
 
     /** @return array<int, array<string, string>> */
@@ -432,13 +436,13 @@ final class RecordingGateway extends PleskMailGateway
         return $this->descriptors[$name] ?? [];
     }
 
-    /** @return array<int, array<string, string>> */
+    /** @return array<int, array{id: string, name: string, version: string, release: string, active: bool}> */
     public function listExtensions(): array
     {
         return $this->extensions;
     }
 
-    /** @return array<string, string>|null */
+    /** @return null|array{id: string, name: string, version: string, release: string, active: bool} */
     public function getExtension(string $id): ?array
     {
         foreach ($this->extensions as $extension) {
@@ -513,7 +517,7 @@ final class RecordingGateway extends PleskMailGateway
             throw new \RuntimeException('boom');
         }
 
-        return ['code' => 0, 'stdout' => 'done: ' . implode(' ', $params), 'stderr' => ''];
+        return ['code' => 0, 'stdout' => 'done: '.implode(' ', $params), 'stderr' => ''];
     }
 
     /** @return array<int, array<string, int|string>> */
@@ -534,7 +538,14 @@ final class RecordingGateway extends PleskMailGateway
             return null;
         }
 
-        return $this->mailboxes[$email];
+        // Match the real gateway's contract: every key the commands read is
+        // always present, even when a test seeds only the relevant subset.
+        return $this->mailboxes[$email] + [
+            'mailbox_quota' => 0,
+            'mailbox_usage' => 0,
+            'antivir' => '',
+            'outgoing_messages_mbox_limit' => '',
+        ];
     }
 
     public function deleteAddress(string $email): void
@@ -588,7 +599,11 @@ final class RecordingGateway extends PleskMailGateway
         return $rows;
     }
 
-    /** @param string[] $emails @return array<string, string[]> */
+    /**
+     * @param string[] $emails
+     *
+     * @return array<string, string[]>
+     */
     public function getForwardingBulk(array $emails): array
     {
         $result = [];
@@ -599,7 +614,11 @@ final class RecordingGateway extends PleskMailGateway
         return $result;
     }
 
-    /** @param string[] $emails @return array<string, array<string, mixed>|null> */
+    /**
+     * @param string[] $emails
+     *
+     * @return array<string, null|array<string, mixed>>
+     */
     public function getAutoresponderBulk(array $emails): array
     {
         $result = [];
@@ -610,7 +629,11 @@ final class RecordingGateway extends PleskMailGateway
         return $result;
     }
 
-    /** @param string[] $emails @return array<string, array<string, mixed>|null> */
+    /**
+     * @param string[] $emails
+     *
+     * @return array<string, null|array<string, mixed>>
+     */
     public function getMailboxInfoBulk(array $emails): array
     {
         $result = [];

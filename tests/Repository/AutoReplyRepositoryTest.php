@@ -7,8 +7,13 @@ namespace App\Tests\Repository;
 use App\Database\Connection;
 use App\Repository\AutoReplyRepository;
 use App\Repository\SyncLogRepository;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * @internal
+ */
+#[CoversNothing]
 final class AutoReplyRepositoryTest extends TestCase
 {
     private Connection $connection;
@@ -16,7 +21,7 @@ final class AutoReplyRepositoryTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->connection = new Connection(sys_get_temp_dir() . '/plead-repo-test-' . bin2hex(random_bytes(4)) . '/plead.sqlite');
+        $this->connection = new Connection(sys_get_temp_dir().'/plead-repo-test-'.bin2hex(random_bytes(4)).'/plead.sqlite');
         $this->repository = new AutoReplyRepository($this->connection);
     }
 

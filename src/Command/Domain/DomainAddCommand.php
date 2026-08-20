@@ -29,7 +29,8 @@ final class DomainAddCommand extends AbstractPleadCommand
             ->addOption('parent', null, InputOption::VALUE_REQUIRED, 'Webspace (subscription) the domain belongs to; defaults to the administrator')
             ->addOption('description', null, InputOption::VALUE_REQUIRED, 'Domain description')
             ->addOption('dest-url', null, InputOption::VALUE_REQUIRED, 'Target URL for forwarding/frame-forwarding types')
-            ->addOption('property', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Virtual-hosting property, name:value (repeatable), e.g. --property=ftp_login:user');
+            ->addOption('property', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Virtual-hosting property, name:value (repeatable), e.g. --property=ftp_login:user')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -93,7 +94,7 @@ final class DomainAddCommand extends AbstractPleadCommand
 
             return self::SUCCESS;
         } catch (\Throwable $e) {
-            $context->syncLogRepository()->resolve($logId, 'error:' . $e->getMessage());
+            $context->syncLogRepository()->resolve($logId, 'error:'.$e->getMessage());
             $output->writeln(sprintf('<error>%s</error>', $e->getMessage()));
 
             return self::FAILURE;

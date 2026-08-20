@@ -6,9 +6,14 @@ namespace App\Tests\Config;
 
 use App\Config\ConfigLoader;
 use App\Config\PathProvider\PathProviderInterface;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 
+/**
+ * @internal
+ */
+#[CoversNothing]
 final class ConfigLoaderTest extends TestCase
 {
     private string $systemDir;
@@ -17,18 +22,17 @@ final class ConfigLoaderTest extends TestCase
 
     protected function setUp(): void
     {
-        $base = sys_get_temp_dir() . '/plead-config-test-' . bin2hex(random_bytes(4));
-        $this->systemDir = $base . '/system';
-        $this->userDir = $base . '/user';
-        mkdir($this->systemDir, 0777, true);
-        mkdir($this->userDir, 0777, true);
+        $base = sys_get_temp_dir().'/plead-config-test-'.bin2hex(random_bytes(4));
+        $this->systemDir = $base.'/system';
+        $this->userDir = $base.'/user';
+        mkdir($this->systemDir, 0o777, true);
+        mkdir($this->userDir, 0o777, true);
 
         $paths = new class($this->systemDir, $this->userDir) implements PathProviderInterface {
             public function __construct(
                 private readonly string $systemDir,
                 private readonly string $userDir,
-            ) {
-            }
+            ) {}
 
             public function configHome(): string
             {
@@ -42,7 +46,7 @@ final class ConfigLoaderTest extends TestCase
 
             public function configPaths(): array
             {
-                return [$this->userDir . '/plead.yaml', $this->userDir . '/plead.json', $this->systemDir . '/plead.yaml', $this->systemDir . '/plead.json'];
+                return [$this->userDir.'/plead.yaml', $this->userDir.'/plead.json', $this->systemDir.'/plead.yaml', $this->systemDir.'/plead.json'];
             }
 
             public function dataHome(): string
@@ -62,7 +66,7 @@ final class ConfigLoaderTest extends TestCase
 
             public function logFile(): string
             {
-                return sys_get_temp_dir() . '/plead.log';
+                return sys_get_temp_dir().'/plead.log';
             }
         };
 
@@ -71,8 +75,8 @@ final class ConfigLoaderTest extends TestCase
 
     public function testUserConfigWinsOverSystemWide(): void
     {
-        file_put_contents($this->systemDir . '/plead.yaml', "plesk:\n    host: system.example.com\n    secret_key: system-key\n");
-        file_put_contents($this->userDir . '/plead.yaml', "plesk:\n    host: user.example.com\n    secret_key: user-key\n");
+        file_put_contents($this->systemDir.'/plead.yaml', "plesk:\n    host: system.example.com\n    secret_key: system-key\n");
+        file_put_contents($this->userDir.'/plead.yaml', "plesk:\n    host: user.example.com\n    secret_key: user-key\n");
 
         $config = $this->loader->load();
 
@@ -82,7 +86,7 @@ final class ConfigLoaderTest extends TestCase
 
     public function testMissingFilesAreSkippedAndDefaultsApply(): void
     {
-        file_put_contents($this->userDir . '/plead.yaml', "plesk:\n    host: only-host.example.com\n    secret_key: k\n");
+        file_put_contents($this->userDir.'/plead.yaml', "plesk:\n    host: only-host.example.com\n    secret_key: k\n");
 
         $config = $this->loader->load();
 
@@ -92,10 +96,10 @@ final class ConfigLoaderTest extends TestCase
 
     public function testJsonAndYamlMerge(): void
     {
-        file_put_contents($this->systemDir . '/plead.json', json_encode([
+        file_put_contents($this->systemDir.'/plead.json', json_encode([
             'plesk' => ['host' => 'json.example.com', 'secret_key' => 'json-key'],
         ], JSON_THROW_ON_ERROR));
-        file_put_contents($this->userDir . '/plead.yaml', "log_level: debug\n");
+        file_put_contents($this->userDir.'/plead.yaml', "log_level: debug\n");
 
         $config = $this->loader->load();
 
@@ -105,20 +109,21 @@ final class ConfigLoaderTest extends TestCase
 
     public function testExplicitPathLoadsOnlyThatFile(): void
     {
-        file_put_contents($this->systemDir . '/plead.yaml', "plesk:\n    host: system.example.com\n    secret_key: system-key\n");
-        file_put_contents($this->userDir . '/plead.yaml', "plesk:\n    host: user.example.com\n    secret_key: user-key\n");
-        file_put_contents($this->userDir . '/custom.yaml', "plesk:\n    host: custom.example.com\n    secret_key: custom-key\n");
+        file_put_contents($this->systemDir.'/plead.yaml', "plesk:\n    host: system.example.com\n    secret_key: system-key\n");
+        file_put_contents($this->userDir.'/plead.yaml', "plesk:\n    host: user.example.com\n    secret_key: user-key\n");
+        file_put_contents($this->userDir.'/custom.yaml', "plesk:\n    host: custom.example.com\n    secret_key: custom-key\n");
 
-        $config = $this->loader->load($this->userDir . '/custom.yaml');
+        $config = $this->loader->load($this->userDir.'/custom.yaml');
 
         self::assertSame('custom.example.com', $config['plesk']['host']);
     }
 
     public function testEnvironmentOverridesConfigFiles(): void
     {
-        file_put_contents($this->userDir . '/plead.yaml', "plesk:\n    host: user.example.com\n    secret_key: user-key\n");
+        file_put_contents($this->userDir.'/plead.yaml', "plesk:\n    host: user.example.com\n    secret_key: user-key\n");
 
         putenv('PLEAD_PLESK_HOST=env.example.com');
+
         try {
             $config = $this->loader->load();
         } finally {
@@ -131,7 +136,7 @@ final class ConfigLoaderTest extends TestCase
 
     public function testMissingRequiredKeysThrow(): void
     {
-        file_put_contents($this->userDir . '/plead.yaml', "log_level: debug\n");
+        file_put_contents($this->userDir.'/plead.yaml', "log_level: debug\n");
 
         $this->expectException(InvalidConfigurationException::class);
 
@@ -140,7 +145,7 @@ final class ConfigLoaderTest extends TestCase
 
     public function testCredentialsOnlyConfigPasses(): void
     {
-        file_put_contents($this->userDir . '/plead.yaml', "plesk:\n    host: mail.company.com\n    login: admin\n    password: s3cret\n");
+        file_put_contents($this->userDir.'/plead.yaml', "plesk:\n    host: mail.company.com\n    login: admin\n    password: s3cret\n");
 
         $config = $this->loader->load();
 
@@ -151,7 +156,7 @@ final class ConfigLoaderTest extends TestCase
 
     public function testMissingBothAuthMethodsThrows(): void
     {
-        file_put_contents($this->userDir . '/plead.yaml', "plesk:\n    host: mail.company.com\n");
+        file_put_contents($this->userDir.'/plead.yaml', "plesk:\n    host: mail.company.com\n");
 
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('plesk.secret_key or plesk.login');
@@ -161,7 +166,7 @@ final class ConfigLoaderTest extends TestCase
 
     public function testPartialCredentialsThrow(): void
     {
-        file_put_contents($this->userDir . '/plead.yaml', "plesk:\n    host: mail.company.com\n    login: admin\n");
+        file_put_contents($this->userDir.'/plead.yaml', "plesk:\n    host: mail.company.com\n    login: admin\n");
 
         $this->expectException(InvalidConfigurationException::class);
 
@@ -170,9 +175,10 @@ final class ConfigLoaderTest extends TestCase
 
     public function testCredentialsEnvOverridesApply(): void
     {
-        file_put_contents($this->userDir . '/plead.yaml', "plesk:\n    host: mail.company.com\n    login: file-admin\n    password: file-pass\n");
+        file_put_contents($this->userDir.'/plead.yaml', "plesk:\n    host: mail.company.com\n    login: file-admin\n    password: file-pass\n");
 
         putenv('PLEAD_PLESK_PASSWORD=env-pass');
+
         try {
             $config = $this->loader->load();
         } finally {

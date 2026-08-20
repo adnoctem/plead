@@ -5,16 +5,21 @@ declare(strict_types=1);
 namespace App\Tests\Config;
 
 use App\Config\PathProvider\UnixPathProvider;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * @internal
+ */
+#[CoversNothing]
 final class UnixPathProviderTest extends TestCase
 {
     private string $home;
 
     protected function setUp(): void
     {
-        $this->home = sys_get_temp_dir() . '/plead-home-test';
-        putenv('HOME=' . $this->home);
+        $this->home = sys_get_temp_dir().'/plead-home-test';
+        putenv('HOME='.$this->home);
         putenv('XDG_CONFIG_HOME');
         putenv('XDG_DATA_HOME');
         putenv('XDG_CACHE_HOME');
@@ -34,10 +39,10 @@ final class UnixPathProviderTest extends TestCase
     {
         $provider = new UnixPathProvider();
 
-        self::assertSame($this->home . '/.config', $provider->configHome());
-        self::assertSame($this->home . '/.local/share', $provider->dataHome());
-        self::assertSame($this->home . '/.cache', $provider->cacheHome());
-        self::assertSame($this->home . '/.local/share/plead', $provider->dataDir());
+        self::assertSame($this->home.'/.config', $provider->configHome());
+        self::assertSame($this->home.'/.local/share', $provider->dataHome());
+        self::assertSame($this->home.'/.cache', $provider->cacheHome());
+        self::assertSame($this->home.'/.local/share/plead', $provider->dataDir());
     }
 
     public function testXdgOverridesAreHonored(): void
@@ -55,7 +60,7 @@ final class UnixPathProviderTest extends TestCase
     {
         $provider = new UnixPathProvider();
 
-        self::assertSame([$this->home . '/.config/plead', '/etc/plead'], $provider->configDirs());
+        self::assertSame([$this->home.'/.config/plead', '/etc/plead'], $provider->configDirs());
     }
 
     public function testConfigPathsAlternateYamlThenJsonPerDir(): void
@@ -63,8 +68,8 @@ final class UnixPathProviderTest extends TestCase
         $provider = new UnixPathProvider();
 
         self::assertSame([
-            $this->home . '/.config/plead/plead.yaml',
-            $this->home . '/.config/plead/plead.json',
+            $this->home.'/.config/plead/plead.yaml',
+            $this->home.'/.config/plead/plead.json',
             '/etc/plead/plead.yaml',
             '/etc/plead/plead.json',
         ], $provider->configPaths());
@@ -74,7 +79,7 @@ final class UnixPathProviderTest extends TestCase
     {
         $provider = new UnixPathProvider();
 
-        self::assertSame($this->home . '/.local/share/plead/plead.log', $provider->logFile());
+        self::assertSame($this->home.'/.local/share/plead/plead.log', $provider->logFile());
     }
 
     public function testPleadDataDirOverridesDataHome(): void

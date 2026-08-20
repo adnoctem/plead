@@ -16,7 +16,7 @@ final class DbPathCommand extends AbstractPleadCommand
     {
         $path = $this->context()->databaseFile();
         $exists = is_file($path) ? ' (exists)' : '';
-        $output->writeln('database: ' . $path . $exists);
+        $output->writeln('database: '.$path.$exists);
 
         return self::SUCCESS;
     }

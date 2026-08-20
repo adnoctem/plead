@@ -29,8 +29,7 @@ final class AuditTrailViewer
         private readonly OutputInterface $output,
         private readonly bool $interactive,
         private readonly array $entries,
-    ) {
-    }
+    ) {}
 
     public function run(): int
     {
@@ -103,29 +102,42 @@ final class AuditTrailViewer
                 switch ($key) {
                     case 'up':
                         $selected = max(0, $selected - 1);
+
                         break;
+
                     case 'down':
                         $selected = min(count($this->entries) - 1, $selected + 1);
+
                         break;
+
                     case 'page-up':
                         $selected = max(0, $selected - $height);
+
                         break;
+
                     case 'page-down':
                         $selected = min(count($this->entries) - 1, $selected + $height);
+
                         break;
+
                     case 'home':
                         $selected = 0;
+
                         break;
+
                     case 'end':
                         $selected = count($this->entries) - 1;
+
                         break;
+
                     case 'enter':
                         $detail = true;
+
                         break;
                 }
             }
         } finally {
-            $this->output->write(self::CLEAR . self::CURSOR_SHOW);
+            $this->output->write(self::CLEAR.self::CURSOR_SHOW);
             if ($rawMode) {
                 $this->leaveRawMode();
             }
@@ -150,7 +162,7 @@ final class AuditTrailViewer
         }
 
         $lines = [sprintf('Audit trail - %d entr%s  (arrow keys: move, Enter: detail, q: quit)', $total, 1 === $total ? 'y' : 'ies')];
-        for ($i = 0; $i < $window; $i++) {
+        for ($i = 0; $i < $window; ++$i) {
             $entry = $this->entries[$offset + $i];
             $row = sprintf(
                 '%6d  %-16s  %-10s  %-12s  %s',
@@ -160,7 +172,7 @@ final class AuditTrailViewer
                 $entry['result'],
                 $this->truncate($entry['resource_id'], max(10, $this->terminalColumns() - 66)),
             );
-            $lines[] = $offset + $i === $selected ? self::REVERSE_ON . $row . self::REVERSE_OFF : $row;
+            $lines[] = $offset + $i === $selected ? self::REVERSE_ON.$row.self::REVERSE_OFF : $row;
         }
 
         $this->renderFrame($lines);
@@ -168,6 +180,9 @@ final class AuditTrailViewer
         return [$offset, $selected];
     }
 
+    /**
+     * @param null|array<string, mixed> $entry
+     */
     private function renderDetail(?array $entry): void
     {
         $lines = ['Detail - ESC: back, q: quit'];
@@ -190,7 +205,7 @@ final class AuditTrailViewer
     /** @param string[] $lines */
     private function renderFrame(array $lines): void
     {
-        $this->output->write(self::CLEAR . implode("\n", $lines) . "\n");
+        $this->output->write(self::CLEAR.implode("\n", $lines)."\n");
     }
 
     private function readKey(): string
@@ -211,7 +226,7 @@ final class AuditTrailViewer
 
         // Escape sequence: collect up to 3 more bytes without blocking.
         $rest = '';
-        for ($i = 0; $i < 3; $i++) {
+        for ($i = 0; $i < 3; ++$i) {
             $read = [STDIN];
             $write = null;
             $except = null;
@@ -225,7 +240,7 @@ final class AuditTrailViewer
             $rest .= $byte;
         }
 
-        return $this->keyNames()[$first . $rest] ?? 'other';
+        return $this->keyNames()[$first.$rest] ?? 'other';
     }
 
     /** @return array<string, string> escape/plain sequences to semantic keys */
@@ -251,7 +266,7 @@ final class AuditTrailViewer
             return $value;
         }
 
-        return substr($value, 0, max(1, $width - 1)) . '…';
+        return substr($value, 0, max(1, $width - 1)).'…';
     }
 
     private function terminalLines(): int
@@ -270,9 +285,8 @@ final class AuditTrailViewer
 
     private function enterRawMode(): bool
     {
-        $output = (string) shell_exec('stty -icanon -echo 2>/dev/null');
-
-        return false !== $output;
+        // stty produces no output; shell_exec returns null when it fails.
+        return null !== shell_exec('stty -icanon -echo 2>/dev/null');
     }
 
     private function leaveRawMode(): void

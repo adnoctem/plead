@@ -22,7 +22,8 @@ final class DomainTrafficSetCommand extends AbstractPleadCommand
             ->addOption('smtp-in', null, InputOption::VALUE_REQUIRED, 'SMTP inbound bytes')
             ->addOption('smtp-out', null, InputOption::VALUE_REQUIRED, 'SMTP outbound bytes')
             ->addOption('pop3-imap-in', null, InputOption::VALUE_REQUIRED, 'POP3/IMAP inbound bytes')
-            ->addOption('pop3-imap-out', null, InputOption::VALUE_REQUIRED, 'POP3/IMAP outbound bytes');
+            ->addOption('pop3-imap-out', null, InputOption::VALUE_REQUIRED, 'POP3/IMAP outbound bytes')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -31,7 +32,7 @@ final class DomainTrafficSetCommand extends AbstractPleadCommand
 
         $date = $input->getOption('date');
         if (null === $date || !preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $date)) {
-            $output->writeln(sprintf('<error>Provide --date in YYYY-MM-DD format%s.</error>', null === $date ? '' : ', got: ' . $date));
+            $output->writeln(sprintf('<error>Provide --date in YYYY-MM-DD format%s.</error>', null === $date ? '' : ', got: '.$date));
 
             return self::FAILURE;
         }
@@ -71,7 +72,7 @@ final class DomainTrafficSetCommand extends AbstractPleadCommand
 
             return self::SUCCESS;
         } catch (\Throwable $e) {
-            $context->syncLogRepository()->resolve($logId, 'error:' . $e->getMessage());
+            $context->syncLogRepository()->resolve($logId, 'error:'.$e->getMessage());
             $output->writeln(sprintf('<error>%s</error>', $e->getMessage()));
 
             return self::FAILURE;

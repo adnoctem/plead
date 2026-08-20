@@ -19,7 +19,8 @@ final class IpSetCommand extends AbstractPleadCommand
         $this
             ->addArgument('ip', InputArgument::REQUIRED, 'IP address to update')
             ->addOption('type', null, InputOption::VALUE_REQUIRED, 'Type: shared|exclusive')
-            ->addOption('public-ip', null, InputOption::VALUE_REQUIRED, 'Public IP address (for NAT)');
+            ->addOption('public-ip', null, InputOption::VALUE_REQUIRED, 'Public IP address (for NAT)')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -53,6 +54,7 @@ final class IpSetCommand extends AbstractPleadCommand
         // Audit the change with the ORIGINAL values: read the current state
         // first. A read failure does not block the mutation.
         $old = [];
+
         try {
             foreach ($context->gateway()->listIps() as $ip) {
                 if ($ip['ip_address'] === $ipAddress) {
@@ -62,6 +64,7 @@ final class IpSetCommand extends AbstractPleadCommand
                     if (isset($properties['public_ip_address'])) {
                         $old['public_ip_address'] = $ip['public_ip_address'];
                     }
+
                     break;
                 }
             }
@@ -86,7 +89,7 @@ final class IpSetCommand extends AbstractPleadCommand
 
             return self::SUCCESS;
         } catch (\Throwable $e) {
-            $context->syncLogRepository()->resolve($logId, 'error:' . $e->getMessage());
+            $context->syncLogRepository()->resolve($logId, 'error:'.$e->getMessage());
             $output->writeln(sprintf('<error>%s</error>', $e->getMessage()));
 
             return self::FAILURE;

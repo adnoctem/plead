@@ -6,18 +6,23 @@ namespace App\Tests\Command\Mail\Address;
 
 use App\Application\RuntimeContext;
 use App\Command\AbstractPleadCommand;
-use App\Command\Mail\Address\AddressRemoveCommand;
 use App\Command\Mail\Address\AddressExportCommand;
 use App\Command\Mail\Address\AddressGetCommand;
 use App\Command\Mail\Address\AddressListCommand;
 use App\Command\Mail\Address\AddressPasswordCommand;
+use App\Command\Mail\Address\AddressRemoveCommand;
 use App\Command\Mail\Address\AddressRenameCommand;
 use App\Command\Mail\Address\AddressSetCommand;
 use App\Config\PathProvider\PathProviderInterface;
 use App\Tests\Support\RecordingGateway;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
 
+/**
+ * @internal
+ */
+#[CoversNothing]
 final class AddressCommandsTest extends TestCase
 {
     private string $base;
@@ -26,68 +31,16 @@ final class AddressCommandsTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->base = sys_get_temp_dir() . '/plead-addr-cmd-' . bin2hex(random_bytes(4));
-        mkdir($this->base . '/config', 0777, true);
-        mkdir($this->base . '/data', 0777, true);
+        $this->base = sys_get_temp_dir().'/plead-addr-cmd-'.bin2hex(random_bytes(4));
+        mkdir($this->base.'/config', 0o777, true);
+        mkdir($this->base.'/data', 0o777, true);
         file_put_contents(
-            $this->base . '/config/plead.yaml',
+            $this->base.'/config/plead.yaml',
             "plesk:\n    host: fake.local\n    secret_key: test-key\n",
         );
 
         $this->gateway = new RecordingGateway();
         $this->context = new RuntimeContext($this->contextPaths(), null, false, null, 0, gateway: $this->gateway);
-    }
-
-    private function contextPaths(): PathProviderInterface
-    {
-        return new class($this->base) implements PathProviderInterface {
-            public function __construct(private readonly string $base)
-            {
-            }
-
-            public function configHome(): string
-            {
-                return $this->base . '/config';
-            }
-
-            public function configDirs(): array
-            {
-                return [$this->base . '/config'];
-            }
-
-            public function configPaths(): array
-            {
-                return [$this->base . '/config/plead.yaml'];
-            }
-
-            public function dataHome(): string
-            {
-                return $this->base . '/data';
-            }
-
-            public function dataDir(): string
-            {
-                return $this->base . '/data';
-            }
-
-            public function cacheHome(): string
-            {
-                return $this->base . '/cache';
-            }
-
-            public function logFile(): string
-            {
-                return $this->base . '/data/plead.log';
-            }
-        };
-    }
-
-    private function tester(AbstractPleadCommand $command): CommandTester
-    {
-        $tester = new CommandTester($command);
-        $command->setContext($this->context);
-
-        return $tester;
     }
 
     public function testListLiveShowsMailnames(): void
@@ -439,7 +392,7 @@ final class AddressCommandsTest extends TestCase
 
     public function testExportToFile(): void
     {
-        $target = $this->base . '/export.csv';
+        $target = $this->base.'/export.csv';
 
         $tester = $this->tester(new AddressExportCommand());
         $tester->execute(['--output' => $target]);
@@ -455,5 +408,55 @@ final class AddressCommandsTest extends TestCase
         $tester->execute(['--format' => 'xml']);
 
         self::assertNotSame(0, $tester->getStatusCode());
+    }
+
+    private function contextPaths(): PathProviderInterface
+    {
+        return new class($this->base) implements PathProviderInterface {
+            public function __construct(private readonly string $base) {}
+
+            public function configHome(): string
+            {
+                return $this->base.'/config';
+            }
+
+            public function configDirs(): array
+            {
+                return [$this->base.'/config'];
+            }
+
+            public function configPaths(): array
+            {
+                return [$this->base.'/config/plead.yaml'];
+            }
+
+            public function dataHome(): string
+            {
+                return $this->base.'/data';
+            }
+
+            public function dataDir(): string
+            {
+                return $this->base.'/data';
+            }
+
+            public function cacheHome(): string
+            {
+                return $this->base.'/cache';
+            }
+
+            public function logFile(): string
+            {
+                return $this->base.'/data/plead.log';
+            }
+        };
+    }
+
+    private function tester(AbstractPleadCommand $command): CommandTester
+    {
+        $tester = new CommandTester($command);
+        $command->setContext($this->context);
+
+        return $tester;
     }
 }

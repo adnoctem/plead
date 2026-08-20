@@ -18,7 +18,8 @@ final class AddressExportCommand extends AbstractMailCommand
         $this
             ->addOption('domain', null, InputOption::VALUE_REQUIRED, 'Only export addresses on this domain')
             ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Export format: csv or json', 'csv')
-            ->addOption('output', 'o', InputOption::VALUE_REQUIRED, 'Write to a file instead of stdout');
+            ->addOption('output', 'o', InputOption::VALUE_REQUIRED, 'Write to a file instead of stdout')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -55,12 +56,13 @@ final class AddressExportCommand extends AbstractMailCommand
         return self::SUCCESS;
     }
 
-    /** @return array<int, array<string, string>>|null */
+    /** @return null|array<int, array<string, string>> */
     private function collect(string $domainFilter, OutputInterface $output): ?array
     {
         $gateway = $this->context()->gateway();
 
         $rows = [];
+
         try {
             $domains = $gateway->listDomains();
             $siteIds = [];
@@ -78,7 +80,7 @@ final class AddressExportCommand extends AbstractMailCommand
             // another - three HTTP round trips total.
             $mailnames = $gateway->listMailnamesBulk($siteIds);
             $emails = array_map(
-                static fn (array $row): string => $row['name'] . '@' . $domainBySite[$row['site_id']],
+                static fn (array $row): string => $row['name'].'@'.$domainBySite[$row['site_id']],
                 $mailnames,
             );
             $infos = $gateway->getMailboxInfoBulk($emails);
@@ -129,6 +131,6 @@ final class AddressExportCommand extends AbstractMailCommand
     /** @param array<int, array<string, string>> $rows */
     private function toJson(array $rows): string
     {
-        return json_encode($rows, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n";
+        return json_encode($rows, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
     }
 }

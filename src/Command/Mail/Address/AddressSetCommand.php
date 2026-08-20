@@ -21,7 +21,8 @@ final class AddressSetCommand extends AbstractMailCommand
             ->addOption('description', null, InputOption::VALUE_REQUIRED, 'New description for the address')
             ->addOption('outgoing-limit', null, InputOption::VALUE_REQUIRED, 'New outgoing-messages limit per mailbox (0 = no limit)')
             ->addOption('quota', null, InputOption::VALUE_REQUIRED, 'New mailbox size limit in MiB (e.g. 512)')
-            ->addOption('antivir', null, InputOption::VALUE_REQUIRED, 'Antivirus mode: off|in|out|inout (validated enum)');
+            ->addOption('antivir', null, InputOption::VALUE_REQUIRED, 'Antivirus mode: off|in|out|inout (validated enum)')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -83,20 +84,21 @@ final class AddressSetCommand extends AbstractMailCommand
         // first. A read failure does not block the mutation - the intent is
         // still recorded, just without the old values.
         $old = [];
+
         try {
             $info = $context->gateway()->getMailboxInfo($email);
             if (null !== $info) {
                 if (isset($properties['description'])) {
-                    $old['description'] = (string) ($info['description'] ?? '');
+                    $old['description'] = $info['description'];
                 }
                 if (isset($properties['outgoing-messages-mbox-limit'])) {
-                    $old['outgoing_messages_mbox_limit'] = (string) ($info['outgoing_messages_mbox_limit'] ?? '');
+                    $old['outgoing_messages_mbox_limit'] = $info['outgoing_messages_mbox_limit'];
                 }
                 if (isset($properties['antivir'])) {
-                    $old['antivir'] = (string) ($info['antivir'] ?? '');
+                    $old['antivir'] = $info['antivir'];
                 }
                 if (null !== $quotaMiB) {
-                    $old['quota_mib'] = (int) ($info['mailbox_quota'] ?? 0) / 1048576;
+                    $old['quota_mib'] = $info['mailbox_quota'] / 1048576;
                 }
             }
         } catch (\Throwable) {
@@ -130,7 +132,7 @@ final class AddressSetCommand extends AbstractMailCommand
 
             return self::SUCCESS;
         } catch (\Throwable $e) {
-            $context->syncLogRepository()->resolve($logId, 'error:' . $e->getMessage());
+            $context->syncLogRepository()->resolve($logId, 'error:'.$e->getMessage());
             $output->writeln(sprintf('<error>%s</error>', $e->getMessage()));
 
             return self::FAILURE;

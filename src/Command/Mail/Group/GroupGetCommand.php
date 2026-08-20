@@ -16,7 +16,8 @@ final class GroupGetCommand extends AbstractGroupCommand
     {
         $this
             ->addArgument('email', InputArgument::REQUIRED, 'Group email address, e.g. all@company.com')
-            ->addLocalOption();
+            ->addLocalOption()
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -47,7 +48,7 @@ final class GroupGetCommand extends AbstractGroupCommand
             $output->writeln('Active recipients:');
             foreach ($active as $row) {
                 $marker = '0' === (string) $row['reconciled'] ? ' (pending)' : '';
-                $output->writeln('  - ' . $row['recipient_email'] . $marker);
+                $output->writeln('  - '.$row['recipient_email'].$marker);
             }
         } else {
             $output->writeln('Active recipients: (none)');
@@ -83,7 +84,7 @@ final class GroupGetCommand extends AbstractGroupCommand
 
         $output->writeln('Recipients:');
         foreach ($recipients as $recipient) {
-            $output->writeln('  - ' . $recipient);
+            $output->writeln('  - '.$recipient);
         }
 
         return self::SUCCESS;

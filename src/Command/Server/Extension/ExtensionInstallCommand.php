@@ -18,7 +18,8 @@ final class ExtensionInstallCommand extends AbstractPleadCommand
     {
         $this
             ->addArgument('id', InputArgument::OPTIONAL, 'Extension id to install')
-            ->addOption('url', null, InputOption::VALUE_REQUIRED, 'Extension package URL to install from');
+            ->addOption('url', null, InputOption::VALUE_REQUIRED, 'Extension package URL to install from')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -53,7 +54,7 @@ final class ExtensionInstallCommand extends AbstractPleadCommand
 
             return self::SUCCESS;
         } catch (\Throwable $e) {
-            $context->syncLogRepository()->resolve($logId, 'error:' . $e->getMessage());
+            $context->syncLogRepository()->resolve($logId, 'error:'.$e->getMessage());
             $output->writeln(sprintf('<error>%s</error>', $e->getMessage()));
 
             return self::FAILURE;

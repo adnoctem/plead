@@ -5,9 +5,14 @@ declare(strict_types=1);
 namespace App\Tests\Util;
 
 use App\Util\Spinner;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Output\BufferedOutput;
 
+/**
+ * @internal
+ */
+#[CoversNothing]
 final class SpinnerTest extends TestCase
 {
     public function testActiveSpinnerHidesCursorOverwritesAndFinishes(): void

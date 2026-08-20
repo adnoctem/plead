@@ -16,7 +16,8 @@ final class AliasAddCommand extends AbstractAliasCommand
     {
         $this
             ->addArgument('email', InputArgument::REQUIRED, 'Mailbox email address, e.g. user@company.com')
-            ->addArgument('alias', InputArgument::REQUIRED, 'Alias email address to add');
+            ->addArgument('alias', InputArgument::REQUIRED, 'Alias email address to add')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -33,6 +34,7 @@ final class AliasAddCommand extends AbstractAliasCommand
         }
 
         $context = $this->context();
+
         try {
             $this->adoptIfNew($email);
         } catch (\Throwable $e) {

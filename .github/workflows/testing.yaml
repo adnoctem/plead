@@ -5,10 +5,7 @@ on: ["push", "pull_request"]
 permissions: {}
 
 env:
-    fail-fast: true
     PHPUNIT_FLAGS: "-v tests"
-    SYMFONY_PHPUNIT_DIR: "$HOME/symfony-bridge/.phpunit"
-    SYMFONY_DEPRECATIONS_HELPER: "max[indirect]=52"
 
 jobs:
     php-cs-fixer:
@@ -42,8 +39,8 @@ jobs:
               uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
               with:
                   coverage: none
-                  extensions: intl
-                  php-version: 8.5
+                  extensions: pdo_sqlite, sqlite3, xml, yaml
+                  php-version: 8.4
                   tools: composer:v2
 
             - name: "Set composer cache directory"
@@ -60,28 +57,13 @@ jobs:
             - name: "Install dependencies"
               run: composer install --ansi --no-interaction --no-progress
 
-            - name: Install PHPUnit
-              id: install
-              run: vendor/bin/simple-phpunit install
-
-            - name: Lint YAML files
-              if: always() && steps.install.outcome == 'success'
-              run: ./bin/console lint:yaml config --parse-tags
-
-            - name: Lint Parameters and Services
-              if: always() && steps.install.outcome == 'success'
-              run: ./bin/console lint:container --no-debug
-
             - name: Lint Composer config
-              if: always() && steps.install.outcome == 'success'
               run: composer validate --strict
 
             - name: Check if any dependencies are compromised
-              if: always() && steps.install.outcome == 'success'
               run: composer audit
 
             - name: Run PHPStan
-              if: always() && steps.install.outcome == 'success'
               run: ./vendor/bin/phpstan analyze
 
     test:
@@ -104,7 +86,7 @@ jobs:
               uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
               with:
                   coverage: none
-                  extensions: "intl, mbstring, pdo_sqlite, zip"
+                  extensions: pdo_sqlite, sqlite3, xml, yaml
                   php-version: ${{ matrix.php-version }}
                   tools: composer:v2
 
@@ -126,14 +108,11 @@ jobs:
             - name: "Install dependencies"
               run: composer install --ansi --no-interaction --no-progress
 
-            - name: "Install PHPUnit"
-              run: vendor/bin/simple-phpunit install
-
             - name: "PHPUnit version"
-              run: vendor/bin/simple-phpunit --version
+              run: vendor/bin/phpunit --version
 
             - name: "Run tests"
-              run: vendor/bin/simple-phpunit ${{ env.PHPUNIT_FLAGS }}
+              run: vendor/bin/phpunit ${{ env.PHPUNIT_FLAGS }}
 
 #    dispatch:
 #        runs-on: ubuntu-latest

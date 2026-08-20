@@ -51,7 +51,7 @@ final class ServerRefCommand extends AbstractPleadCommand
 
         $output->writeln(sprintf('%d CLI commands available (server:exec <id> <args...>):', count($commands)));
         foreach ($commands as $command) {
-            $output->writeln('  ' . $command);
+            $output->writeln('  '.$command);
         }
     }
 

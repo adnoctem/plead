@@ -20,7 +20,8 @@ final class IpAddCommand extends AbstractPleadCommand
             ->addArgument('ip', InputArgument::REQUIRED, 'IP address to add')
             ->addOption('netmask', null, InputOption::VALUE_REQUIRED, 'Netmask, e.g. 255.255.255.0')
             ->addOption('type', null, InputOption::VALUE_REQUIRED, 'Type: shared|exclusive')
-            ->addOption('interface', null, InputOption::VALUE_REQUIRED, 'Server network interface, e.g. eth0');
+            ->addOption('interface', null, InputOption::VALUE_REQUIRED, 'Server network interface, e.g. eth0')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -64,7 +65,7 @@ final class IpAddCommand extends AbstractPleadCommand
 
             return self::SUCCESS;
         } catch (\Throwable $e) {
-            $context->syncLogRepository()->resolve($logId, 'error:' . $e->getMessage());
+            $context->syncLogRepository()->resolve($logId, 'error:'.$e->getMessage());
             $output->writeln(sprintf('<error>%s</error>', $e->getMessage()));
 
             return self::FAILURE;

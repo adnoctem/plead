@@ -16,7 +16,8 @@ final class GroupAddCommand extends AbstractGroupCommand
     {
         $this
             ->addArgument('email', InputArgument::REQUIRED, 'Group email address, e.g. all@company.com')
-            ->addArgument('recipient', InputArgument::REQUIRED, 'Recipient email address to add');
+            ->addArgument('recipient', InputArgument::REQUIRED, 'Recipient email address to add')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -31,6 +32,7 @@ final class GroupAddCommand extends AbstractGroupCommand
         }
 
         $context = $this->context();
+
         try {
             $this->adoptIfNew($email);
         } catch (\Throwable $e) {

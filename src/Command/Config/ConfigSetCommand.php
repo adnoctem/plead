@@ -27,7 +27,8 @@ final class ConfigSetCommand extends AbstractPleadCommand
     {
         $this
             ->addArgument('key', InputArgument::REQUIRED, 'Dotted configuration key')
-            ->addArgument('value', InputArgument::REQUIRED, 'Value to store');
+            ->addArgument('value', InputArgument::REQUIRED, 'Value to store')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

@@ -19,7 +19,8 @@ final class AddressPasswordCommand extends AbstractMailCommand
         $this
             ->addArgument('email', InputArgument::REQUIRED, 'Email address whose password to change')
             ->addOption('password', null, InputOption::VALUE_REQUIRED, 'New password; mutually exclusive with --generate')
-            ->addOption('generate', null, InputOption::VALUE_NONE, 'Generate a random password and print it once');
+            ->addOption('generate', null, InputOption::VALUE_NONE, 'Generate a random password and print it once')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -65,7 +66,7 @@ final class AddressPasswordCommand extends AbstractMailCommand
 
             return self::SUCCESS;
         } catch (\Throwable $e) {
-            $context->syncLogRepository()->resolve($logId, 'error:' . $e->getMessage());
+            $context->syncLogRepository()->resolve($logId, 'error:'.$e->getMessage());
             $output->writeln(sprintf('<error>%s</error>', $e->getMessage()));
 
             return self::FAILURE;

@@ -6,8 +6,13 @@ namespace App\Tests\Repository;
 
 use App\Database\Connection;
 use App\Repository\MailAliasRepository;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * @internal
+ */
+#[CoversNothing]
 final class MailAliasRepositoryTest extends TestCase
 {
     private MailAliasRepository $repository;
@@ -15,7 +20,7 @@ final class MailAliasRepositoryTest extends TestCase
     protected function setUp(): void
     {
         $this->repository = new MailAliasRepository(
-            new Connection(sys_get_temp_dir() . '/plead-alias-repo-test-' . bin2hex(random_bytes(4)) . '/plead.sqlite'),
+            new Connection(sys_get_temp_dir().'/plead-alias-repo-test-'.bin2hex(random_bytes(4)).'/plead.sqlite'),
         );
     }
 

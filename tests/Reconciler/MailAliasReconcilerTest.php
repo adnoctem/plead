@@ -10,8 +10,13 @@ use App\Repository\MailAliasRepository;
 use App\Repository\SyncLogRepository;
 use App\Tests\Support\RecordingGateway;
 use Monolog\Logger;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * @internal
+ */
+#[CoversNothing]
 final class MailAliasReconcilerTest extends TestCase
 {
     private Connection $connection;
@@ -21,15 +26,10 @@ final class MailAliasReconcilerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->connection = new Connection(sys_get_temp_dir() . '/plead-alias-reconciler-' . bin2hex(random_bytes(4)) . '/plead.sqlite');
+        $this->connection = new Connection(sys_get_temp_dir().'/plead-alias-reconciler-'.bin2hex(random_bytes(4)).'/plead.sqlite');
         $this->repository = new MailAliasRepository($this->connection);
         $this->syncLog = new SyncLogRepository($this->connection);
         $this->gateway = new RecordingGateway();
-    }
-
-    private function reconciler(bool $dryRun = false): MailAliasReconciler
-    {
-        return new MailAliasReconciler($this->repository, $this->syncLog, $this->gateway, new Logger('test'), $dryRun);
     }
 
     public function testAddsMissingAliasesAndMarksMailboxReconciled(): void
@@ -146,5 +146,10 @@ final class MailAliasReconcilerTest extends TestCase
         self::assertContains('dry-run', $results);
         self::assertSame(['info@company.com'], $this->repository->activeAliases('user@company.com'));
         self::assertSame(['user@company.com'], $this->repository->unreconciledLists());
+    }
+
+    private function reconciler(bool $dryRun = false): MailAliasReconciler
+    {
+        return new MailAliasReconciler($this->repository, $this->syncLog, $this->gateway, new Logger('test'), $dryRun);
     }
 }

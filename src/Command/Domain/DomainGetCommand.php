@@ -59,7 +59,7 @@ final class DomainGetCommand extends AbstractPleadCommand
 
         foreach (['limits', 'prefs'] as $section) {
             if (isset($info[$section]) && [] !== $info[$section]) {
-                $output->writeln(ucfirst($section) . ':');
+                $output->writeln(ucfirst($section).':');
                 foreach ($info[$section] as $key => $value) {
                     $output->writeln(sprintf('  %-20s %s', $key, $value));
                 }

@@ -18,18 +18,17 @@ class PleskMailGateway
         private readonly Client $client,
         private readonly bool $dryRun,
         private readonly LoggerInterface $logger,
-    ) {
-    }
+    ) {}
 
     /**
-     * @return array{
+     * @return null|array{
      *     enabled: bool,
      *     subject: string,
      *     text: string,
      *     content_type: string,
      *     charset: string,
-     *     end_date: string|null,
-     * }|null
+     *     end_date: null|string,
+     * }
      */
     public function getAutoresponder(string $email): ?array
     {
@@ -50,19 +49,6 @@ class PleskMailGateway
         $autoresponders = $response->xpath('//result/mailname/autoresponder');
 
         return [] === $autoresponders ? null : $this->autoresponderFromNode($autoresponders[0]);
-    }
-
-    /** @return array{enabled: bool, subject: string, text: string, content_type: string, charset: string, end_date: string|null} */
-    private function autoresponderFromNode(\SimpleXMLElement $autoresponder): array
-    {
-        return [
-            'enabled' => 'true' === strtolower((string) $autoresponder->enabled),
-            'subject' => (string) $autoresponder->subject,
-            'text' => (string) $autoresponder->text,
-            'content_type' => (string) $autoresponder->content_type,
-            'charset' => (string) $autoresponder->charset,
-            'end_date' => '' === (string) $autoresponder->end_date ? null : (string) $autoresponder->end_date,
-        ];
     }
 
     public function setAutoresponder(string $email, string $message, string $endDate): void
@@ -149,83 +135,6 @@ class PleskMailGateway
     }
 
     /** @return array<int, array<string, int|string>> */
-    private function listWebspaces(): array
-    {
-        $packet = $this->client->getPacket();
-        $get = $packet->addChild('webspace')->addChild('get');
-        // <filter> first (empty = all webspaces), then a dataset requesting
-        // gen_info (an empty dataset makes the server omit the ids).
-        $get->addChild('filter');
-        $get->addChild('dataset')->addChild('gen_info');
-
-        $response = $this->client->request($packet, Client::RESPONSE_FULL);
-
-        $domains = [];
-        foreach ($response->xpath('//result') as $node) {
-            $id = (int) $node->id;
-            if (0 === $id && isset($node->data->id)) {
-                $id = (int) $node->data->id;
-            }
-
-            $name = '';
-            if (isset($node->data->gen_info->name)) {
-                $name = (string) $node->data->gen_info->name;
-            }
-            if ('' === $name) {
-                $name = (string) $node->name;
-            }
-
-            if (0 === $id) {
-                // Never emit a bogus id of 0 (Plesk rejects it in follow-up
-                // requests); skip results without an id.
-                continue;
-            }
-
-            $domains[] = [
-                'id' => $id,
-                'name' => $name,
-            ];
-        }
-
-        return $domains;
-    }
-
-    /** @return array<int, array<string, int|string>> */
-    private function listSites(): array
-    {
-        $packet = $this->client->getPacket();
-        $get = $packet->addChild('site')->addChild('get');
-        $get->addChild('filter');
-        $get->addChild('dataset')->addChild('gen_info');
-
-        $response = $this->client->request($packet, Client::RESPONSE_FULL);
-
-        $domains = [];
-        foreach ($response->xpath('//result') as $node) {
-            $id = (int) $node->id;
-            if (0 === $id && isset($node->data->id)) {
-                $id = (int) $node->data->id;
-            }
-
-            $name = (string) $node->name;
-            if ('' === $name && isset($node->data->gen_info->name)) {
-                $name = (string) $node->data->gen_info->name;
-            }
-
-            if (0 === $id) {
-                continue;
-            }
-
-            $domains[] = [
-                'id' => $id,
-                'name' => $name,
-            ];
-        }
-
-        return $domains;
-    }
-
-    /** @return array<int, array<string, int|string>> */
     public function listMailnames(int $siteId): array
     {
         $packet = $this->client->getPacket();
@@ -269,7 +178,7 @@ class PleskMailGateway
      * enumeration (listDomains) is webspace-based on this server; on other
      * setups domains resolve through the site fallback instead.
      *
-     * @return array<string, mixed>|null null when the domain does not exist
+     * @return null|array<string, mixed> null when the domain does not exist
      */
     public function getDomain(string $domain): ?array
     {
@@ -332,8 +241,8 @@ class PleskMailGateway
         // limits/prefs carry many optional fields; collect whatever the
         // server reports as a flat map instead of enumerating each field.
         foreach (['limits', 'prefs'] as $section) {
-            if (isset($data->$section)) {
-                foreach ($data->$section->children() as $key => $value) {
+            if (isset($data->{$section})) {
+                foreach ($data->{$section}->children() as $key => $value) {
                     $info[$section][(string) $key] = (string) $value;
                 }
             }
@@ -402,7 +311,11 @@ class PleskMailGateway
         return $rows;
     }
 
-    /** @param string[] $emails @return array<string, string[]> */
+    /**
+     * @param string[] $emails
+     *
+     * @return array<string, string[]>
+     */
     public function getForwardingBulk(array $emails): array
     {
         $result = $this->bulkRead($emails, 'forwarding', static function (\SimpleXMLElement $mailname): array {
@@ -416,7 +329,11 @@ class PleskMailGateway
         return array_map(static fn ($value): array => $value ?? [], $result);
     }
 
-    /** @param string[] $emails @return array<string, string[]> */
+    /**
+     * @param string[] $emails
+     *
+     * @return array<string, string[]>
+     */
     public function getAliasesBulk(array $emails): array
     {
         $result = $this->bulkRead($emails, 'aliases', static function (\SimpleXMLElement $mailname): array {
@@ -430,7 +347,11 @@ class PleskMailGateway
         return array_map(static fn ($value): array => $value ?? [], $result);
     }
 
-    /** @param string[] $emails @return array<string, array<string, mixed>|null> */
+    /**
+     * @param string[] $emails
+     *
+     * @return array<string, null|array<string, mixed>>
+     */
     public function getAutoresponderBulk(array $emails): array
     {
         return $this->bulkRead($emails, 'autoresponder', function (\SimpleXMLElement $mailname): ?array {
@@ -440,102 +361,30 @@ class PleskMailGateway
         });
     }
 
-    /** @param string[] $emails @return array<string, array<string, mixed>|null> */
+    /**
+     * @param string[] $emails
+     *
+     * @return array<string, null|array<string, mixed>>
+     */
     public function getMailboxInfoBulk(array $emails): array
     {
-        return $this->bulkRead($emails, ['mailbox', 'mailbox-usage', 'forwarding', 'autoresponder'], function (\SimpleXMLElement $mailname): ?array {
+        return $this->bulkRead($emails, ['mailbox', 'mailbox-usage', 'forwarding', 'autoresponder'], function (\SimpleXMLElement $mailname): array {
             return $this->mailboxInfoFromNode($mailname);
         });
     }
 
     /**
-     * Run one mail get_info per email inside a single batched packet.
-     *
-     * @param string[]                   $emails
-     * @param string|string[]            $dataTags requested get_info data tags
-     * @param callable(\SimpleXMLElement): mixed $parse  mailname -> value
-     *
-     * @return array<string, mixed>
-     */
-    private function bulkRead(array $emails, string|array $dataTags, callable $parse): array
-    {
-        if ([] === $emails) {
-            return [];
-        }
-
-        $requests = [];
-        foreach ($emails as $email) {
-            [$siteId, $name] = $this->resolveEmail($email);
-            $request = ['mail' => ['get_info' => ['filter' => ['site-id' => (string) $siteId, 'name' => $name]]]];
-            foreach ((array) $dataTags as $tag) {
-                $request['mail']['get_info'][$tag] = '';
-            }
-            $requests[] = $request;
-        }
-
-        $result = [];
-        foreach ($this->batchQueries($requests) as $index => $response) {
-            $email = $emails[$index];
-            $mailnames = [];
-            foreach ($this->okResults($response, sprintf('mail get_info for %s', $email)) as $okResult) {
-                foreach ($okResult->mailname as $mailname) {
-                    $mailnames[] = $mailname;
-                }
-            }
-
-            // A mailname that does not exist yields an error result (skipped
-            // above), so an empty list means "not found" -> null.
-            $result[$email] = [] === $mailnames ? null : $parse($mailnames[0]);
-        }
-
-        return $result;
-    }
-
-    /**
-     * Send many requests in one HTTP POST (Plesk multi-operation packet).
-     * Unlike request(), per-operation errors do not throw: each result is
-     * inspected individually via okResults().
-     *
-     * @param list<array<string, mixed>> $requests array-form API requests
-     *
-     * @return list<\SimpleXMLElement> one response per request, in request order
-     */
-    private function batchQueries(array $requests): array
-    {
-        return $this->client->multiRequest($requests, Client::RESPONSE_FULL);
-    }
-
-    /**
-     * @return list<\SimpleXMLElement> ok results only; error results are
-     *                                  logged with the context and skipped
-     */
-    private function okResults(\SimpleXMLElement $response, string $context): array
-    {
-        $results = [];
-        foreach ($response->xpath('//result') as $result) {
-            if ('error' === strtolower((string) $result->status)) {
-                $this->logger->warning('{context}: {errtext}', [
-                    'context' => $context,
-                    'errtext' => (string) $result->errtext,
-                ]);
-
-                continue;
-            }
-
-            $results[] = $result;
-        }
-
-        return $results;
-    }
-
-    /**
-     * @return array{
+     * @return null|array{
      *     name: string,
      *     description: string,
      *     mailbox_enabled: bool,
+     *     mailbox_quota: int,
+     *     mailbox_usage: int,
      *     forwarding: string[],
      *     autoresponder_enabled: bool,
-     * }|null
+     *     antivir: string,
+     *     outgoing_messages_mbox_limit: string,
+     * }
      */
     public function getMailboxInfo(string $email): ?array
     {
@@ -559,27 +408,6 @@ class PleskMailGateway
         $mailnames = $response->xpath('//result/mailname');
 
         return [] === $mailnames ? null : $this->mailboxInfoFromNode($mailnames[0]);
-    }
-
-    /** @return array{name: string, description: string, mailbox_enabled: bool, mailbox_quota: int, mailbox_usage: int, forwarding: string[], autoresponder_enabled: bool, antivir: string, outgoing_messages_mbox_limit: string} */
-    private function mailboxInfoFromNode(\SimpleXMLElement $mailname): array
-    {
-        return [
-            'name' => (string) $mailname->name,
-            'description' => (string) $mailname->description,
-            'mailbox_enabled' => 'true' === strtolower((string) $mailname->mailbox->enabled),
-            // The <usage> element only appears when the 'mailbox-usage' data
-            // tag was requested; quota is always part of <mailbox>.
-            'mailbox_quota' => (int) $mailname->mailbox->quota,
-            'mailbox_usage' => (int) $mailname->mailbox->usage,
-            'forwarding' => array_values(array_map(
-                static fn ($node): string => (string) $node,
-                $mailname->xpath('forwarding/address'),
-            )),
-            'autoresponder_enabled' => 'true' === strtolower((string) $mailname->autoresponder->enabled),
-            'antivir' => (string) $mailname->antivir,
-            'outgoing_messages_mbox_limit' => (string) $mailname->{'outgoing-messages-mbox-limit'},
-        ];
     }
 
     public function deleteAddress(string $email): void
@@ -731,39 +559,6 @@ class PleskMailGateway
         ]);
     }
 
-    /**
-     * Perform a read request, returning null when Plesk reports the mailname
-     * does not exist (the read methods otherwise have no "not found" signal -
-     * the lib's verifyResponse turns it into an exception). Genuine errors
-     * (auth, network, ...) still propagate.
-     */
-    private function requestOrNull(\SimpleXMLElement $packet, string $email): ?XmlResponse
-    {
-        try {
-            return $this->client->request($packet, Client::RESPONSE_FULL);
-        } catch (\PleskX\Api\Exception $e) {
-            if (preg_match('/does not exist|not found/i', $e->getMessage())) {
-                $this->logger->debug('Mail address {email} not found on the server', ['email' => $email]);
-
-                return null;
-            }
-
-            throw $e;
-        }
-    }
-
-    /** @return array{0: int, 1: string} [site-id, mailname] */
-    private function resolveEmail(string $email): array
-    {
-        if (!str_contains($email, '@')) {
-            throw new \InvalidArgumentException(sprintf('Not a valid email address: "%s"', $email));
-        }
-
-        [$name, $domain] = explode('@', $email, 2);
-
-        return [$this->resolveSiteId($domain), $name];
-    }
-
     /** @return string[] forwarding recipients currently configured for the mailname */
     public function getForwarding(string $email): array
     {
@@ -799,46 +594,6 @@ class PleskMailGateway
     public function removeForwardingRecipients(string $email, array $addresses): void
     {
         $this->updateForwarding('remove', $email, $addresses);
-    }
-
-    /** @param string[] $addresses */
-    private function updateForwarding(string $operation, string $email, array $addresses): void
-    {
-        if ([] === $addresses) {
-            return;
-        }
-
-        if ($this->dryRun) {
-            $this->logger->info('DRY-RUN: would call mail update {operation} forwarding for {email}: {addresses}', [
-                'operation' => $operation,
-                'email' => $email,
-                'addresses' => implode(', ', $addresses),
-            ]);
-
-            return;
-        }
-
-        [$siteId, $name] = $this->resolveEmail($email);
-
-        $packet = $this->client->getPacket();
-        $update = $packet->addChild('mail')->addChild('update');
-        $subOperation = $update->addChild($operation);
-        $filter = $subOperation->addChild('filter');
-        $filter->addChild('site-id', (string) $siteId);
-        $mailname = $filter->addChild('mailname');
-        $mailname->addChild('name', $name);
-        $forwarding = $mailname->addChild('forwarding');
-        foreach ($addresses as $address) {
-            $forwarding->addChild('address', $address);
-        }
-
-        $this->client->request($packet);
-
-        $this->logger->info('Updated forwarding for {email}: {operation} {addresses}', [
-            'operation' => $operation,
-            'email' => $email,
-            'addresses' => implode(', ', $addresses),
-        ]);
     }
 
     /** @return string[] alias addresses currently configured for the mailname */
@@ -885,55 +640,12 @@ class PleskMailGateway
     }
 
     /**
-     * Alias entries are plain string elements (XSD: alias type string, 0..∞);
-     * add/remove keep the other settings untouched.
-     *
-     * @param string[] $aliases
-     */
-    private function updateAliases(string $operation, string $email, array $aliases): void
-    {
-        if ([] === $aliases) {
-            return;
-        }
-
-        if ($this->dryRun) {
-            $this->logger->info('DRY-RUN: would call mail update {operation} aliases for {email}: {aliases}', [
-                'operation' => $operation,
-                'email' => $email,
-                'aliases' => implode(', ', $aliases),
-            ]);
-
-            return;
-        }
-
-        [$siteId, $name] = $this->resolveEmail($email);
-
-        $packet = $this->client->getPacket();
-        $update = $packet->addChild('mail')->addChild('update');
-        $subOperation = $update->addChild($operation);
-        $filter = $subOperation->addChild('filter');
-        $filter->addChild('site-id', (string) $siteId);
-        $mailname = $filter->addChild('mailname');
-        $mailname->addChild('name', $name);
-        foreach ($aliases as $alias) {
-            $mailname->addChild('alias', $alias);
-        }
-
-        $this->client->request($packet);
-
-        $this->logger->info('Updated aliases for {email}: {operation} {aliases}', [
-            'operation' => $operation,
-            'email' => $email,
-            'aliases' => implode(', ', $aliases),
-        ]);
-    }
-
-    /**
      * Rename a mail account (local part). The mailbox keeps its settings;
      * only the name changes on the server.
      */
     public function renameAddress(string $email, string $newName): void
-    {        if ($this->dryRun) {
+    {
+        if ($this->dryRun) {
             $this->logger->info('DRY-RUN: would rename mail address {email} to {newName}', [
                 'email' => $email,
                 'newName' => $newName,
@@ -956,31 +668,6 @@ class PleskMailGateway
             'email' => $email,
             'newName' => $newName,
         ]);
-    }
-
-    private function resolveSiteId(string $domain): int
-    {
-        if (isset($this->siteIdCache[$domain])) {
-            return $this->siteIdCache[$domain];
-        }
-
-        $packet = $this->client->getPacket();
-        $get = $packet->addChild('site')->addChild('get');
-        $get->addChild('filter')->addChild('name', $domain);
-        $get->addChild('dataset')->addChild('gen_info');
-
-        $response = $this->client->request($packet, Client::RESPONSE_FULL);
-        $ids = $response->xpath('//result/id');
-        if ([] === $ids) {
-            throw new \RuntimeException(sprintf('Unable to resolve domain "%s" to a Plesk site id.', $domain));
-        }
-
-        return $this->siteIdCache[$domain] = (int) $ids[0];
-    }
-
-    private function toPleskDate(string $iso8601): string
-    {
-        return (new \DateTimeImmutable($iso8601))->format('Y-m-d');
     }
 
     /**
@@ -1259,6 +946,7 @@ class PleskMailGateway
     }
 
     /** Update IP properties (type, public IP). Packet: <ip><set>. */
+    /** @param array<string, string> $properties */
     public function setIp(string $ipAddress, array $properties): void
     {
         if ([] === $properties) {
@@ -1511,7 +1199,7 @@ class PleskMailGateway
      * Installed extensions.
      * Packet: <extension><get/>.
      *
-     * @return array<int, array<string, string>>
+     * @return array<int, array{id: string, name: string, version: string, release: string, active: bool}>
      */
     public function listExtensions(): array
     {
@@ -1528,7 +1216,11 @@ class PleskMailGateway
         return $extensions;
     }
 
-    /** One installed extension by id (native get filter), or null. */
+    /**
+     * One installed extension by id (native get filter), or null.
+     *
+     * @return null|array{id: string, name: string, version: string, release: string, active: bool}
+     */
     public function getExtension(string $id): ?array
     {
         $packet = $this->client->getPacket();
@@ -1546,18 +1238,6 @@ class PleskMailGateway
         }
 
         return $this->extensionFromNode($details[0]);
-    }
-
-    /** @return array{id: string, name: string, version: string, release: string, active: bool} */
-    private function extensionFromNode(\SimpleXMLElement $details): array
-    {
-        return [
-            'id' => (string) $details->id,
-            'name' => (string) $details->name,
-            'version' => (string) $details->version,
-            'release' => (string) $details->release,
-            'active' => 'true' === strtolower((string) $details->active),
-        ];
     }
 
     /** Install an extension by id or from a URL. */
@@ -1646,5 +1326,350 @@ class PleskMailGateway
             'id' => $id,
             'operation' => $operation,
         ]);
+    }
+
+    /** @return array{enabled: bool, subject: string, text: string, content_type: string, charset: string, end_date: null|string} */
+    private function autoresponderFromNode(\SimpleXMLElement $autoresponder): array
+    {
+        return [
+            'enabled' => 'true' === strtolower((string) $autoresponder->enabled),
+            'subject' => (string) $autoresponder->subject,
+            'text' => (string) $autoresponder->text,
+            'content_type' => (string) $autoresponder->content_type,
+            'charset' => (string) $autoresponder->charset,
+            'end_date' => '' === (string) $autoresponder->end_date ? null : (string) $autoresponder->end_date,
+        ];
+    }
+
+    /** @return array<int, array<string, int|string>> */
+    private function listWebspaces(): array
+    {
+        $packet = $this->client->getPacket();
+        $get = $packet->addChild('webspace')->addChild('get');
+        // <filter> first (empty = all webspaces), then a dataset requesting
+        // gen_info (an empty dataset makes the server omit the ids).
+        $get->addChild('filter');
+        $get->addChild('dataset')->addChild('gen_info');
+
+        $response = $this->client->request($packet, Client::RESPONSE_FULL);
+
+        $domains = [];
+        foreach ($response->xpath('//result') as $node) {
+            $id = (int) $node->id;
+            if (0 === $id && isset($node->data->id)) {
+                $id = (int) $node->data->id;
+            }
+
+            $name = '';
+            if (isset($node->data->gen_info->name)) {
+                $name = (string) $node->data->gen_info->name;
+            }
+            if ('' === $name) {
+                $name = (string) $node->name;
+            }
+
+            if (0 === $id) {
+                // Never emit a bogus id of 0 (Plesk rejects it in follow-up
+                // requests); skip results without an id.
+                continue;
+            }
+
+            $domains[] = [
+                'id' => $id,
+                'name' => $name,
+            ];
+        }
+
+        return $domains;
+    }
+
+    /** @return array<int, array<string, int|string>> */
+    private function listSites(): array
+    {
+        $packet = $this->client->getPacket();
+        $get = $packet->addChild('site')->addChild('get');
+        $get->addChild('filter');
+        $get->addChild('dataset')->addChild('gen_info');
+
+        $response = $this->client->request($packet, Client::RESPONSE_FULL);
+
+        $domains = [];
+        foreach ($response->xpath('//result') as $node) {
+            $id = (int) $node->id;
+            if (0 === $id && isset($node->data->id)) {
+                $id = (int) $node->data->id;
+            }
+
+            $name = (string) $node->name;
+            if ('' === $name && isset($node->data->gen_info->name)) {
+                $name = (string) $node->data->gen_info->name;
+            }
+
+            if (0 === $id) {
+                continue;
+            }
+
+            $domains[] = [
+                'id' => $id,
+                'name' => $name,
+            ];
+        }
+
+        return $domains;
+    }
+
+    /**
+     * Run one mail get_info per email inside a single batched packet.
+     *
+     * @param string[]                           $emails
+     * @param string|string[]                    $dataTags requested get_info data tags
+     * @param callable(\SimpleXMLElement): mixed $parse    mailname -> value
+     *
+     * @return array<string, mixed>
+     */
+    private function bulkRead(array $emails, array|string $dataTags, callable $parse): array
+    {
+        if ([] === $emails) {
+            return [];
+        }
+
+        $requests = [];
+        foreach ($emails as $email) {
+            [$siteId, $name] = $this->resolveEmail($email);
+            $request = ['mail' => ['get_info' => ['filter' => ['site-id' => (string) $siteId, 'name' => $name]]]];
+            foreach ((array) $dataTags as $tag) {
+                $request['mail']['get_info'][$tag] = '';
+            }
+            $requests[] = $request;
+        }
+
+        $result = [];
+        foreach ($this->batchQueries($requests) as $index => $response) {
+            $email = $emails[$index];
+            $mailnames = [];
+            foreach ($this->okResults($response, sprintf('mail get_info for %s', $email)) as $okResult) {
+                foreach ($okResult->mailname as $mailname) {
+                    $mailnames[] = $mailname;
+                }
+            }
+
+            // A mailname that does not exist yields an error result (skipped
+            // above), so an empty list means "not found" -> null.
+            $result[$email] = [] === $mailnames ? null : $parse($mailnames[0]);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Send many requests in one HTTP POST (Plesk multi-operation packet).
+     * Unlike request(), per-operation errors do not throw: each result is
+     * inspected individually via okResults().
+     *
+     * @param list<array<string, mixed>> $requests array-form API requests
+     *
+     * @return list<\SimpleXMLElement> one response per request, in request order
+     */
+    private function batchQueries(array $requests): array
+    {
+        return $this->client->multiRequest($requests, Client::RESPONSE_FULL);
+    }
+
+    /**
+     * @return list<\SimpleXMLElement> ok results only; error results are
+     *                                 logged with the context and skipped
+     */
+    private function okResults(\SimpleXMLElement $response, string $context): array
+    {
+        $results = [];
+        foreach ($response->xpath('//result') as $result) {
+            if ('error' === strtolower((string) $result->status)) {
+                $this->logger->warning('{context}: {errtext}', [
+                    'context' => $context,
+                    'errtext' => (string) $result->errtext,
+                ]);
+
+                continue;
+            }
+
+            $results[] = $result;
+        }
+
+        return $results;
+    }
+
+    /** @return array{name: string, description: string, mailbox_enabled: bool, mailbox_quota: int, mailbox_usage: int, forwarding: string[], autoresponder_enabled: bool, antivir: string, outgoing_messages_mbox_limit: string} */
+    private function mailboxInfoFromNode(\SimpleXMLElement $mailname): array
+    {
+        return [
+            'name' => (string) $mailname->name,
+            'description' => (string) $mailname->description,
+            'mailbox_enabled' => 'true' === strtolower((string) $mailname->mailbox->enabled),
+            // The <usage> element only appears when the 'mailbox-usage' data
+            // tag was requested; quota is always part of <mailbox>.
+            'mailbox_quota' => (int) $mailname->mailbox->quota,
+            'mailbox_usage' => (int) $mailname->mailbox->usage,
+            'forwarding' => array_values(array_map(
+                static fn ($node): string => (string) $node,
+                $mailname->xpath('forwarding/address'),
+            )),
+            'autoresponder_enabled' => 'true' === strtolower((string) $mailname->autoresponder->enabled),
+            'antivir' => (string) $mailname->antivir,
+            'outgoing_messages_mbox_limit' => (string) $mailname->{'outgoing-messages-mbox-limit'},
+        ];
+    }
+
+    /**
+     * Perform a read request, returning null when Plesk reports the mailname
+     * does not exist (the read methods otherwise have no "not found" signal -
+     * the lib's verifyResponse turns it into an exception). Genuine errors
+     * (auth, network, ...) still propagate.
+     */
+    private function requestOrNull(\SimpleXMLElement $packet, string $email): ?XmlResponse
+    {
+        try {
+            return $this->client->request($packet, Client::RESPONSE_FULL);
+        } catch (Exception $e) {
+            if (preg_match('/does not exist|not found/i', $e->getMessage())) {
+                $this->logger->debug('Mail address {email} not found on the server', ['email' => $email]);
+
+                return null;
+            }
+
+            throw $e;
+        }
+    }
+
+    /** @return array{0: int, 1: string} [site-id, mailname] */
+    private function resolveEmail(string $email): array
+    {
+        if (!str_contains($email, '@')) {
+            throw new \InvalidArgumentException(sprintf('Not a valid email address: "%s"', $email));
+        }
+
+        [$name, $domain] = explode('@', $email, 2);
+
+        return [$this->resolveSiteId($domain), $name];
+    }
+
+    /** @param string[] $addresses */
+    private function updateForwarding(string $operation, string $email, array $addresses): void
+    {
+        if ([] === $addresses) {
+            return;
+        }
+
+        if ($this->dryRun) {
+            $this->logger->info('DRY-RUN: would call mail update {operation} forwarding for {email}: {addresses}', [
+                'operation' => $operation,
+                'email' => $email,
+                'addresses' => implode(', ', $addresses),
+            ]);
+
+            return;
+        }
+
+        [$siteId, $name] = $this->resolveEmail($email);
+
+        $packet = $this->client->getPacket();
+        $update = $packet->addChild('mail')->addChild('update');
+        $subOperation = $update->addChild($operation);
+        $filter = $subOperation->addChild('filter');
+        $filter->addChild('site-id', (string) $siteId);
+        $mailname = $filter->addChild('mailname');
+        $mailname->addChild('name', $name);
+        $forwarding = $mailname->addChild('forwarding');
+        foreach ($addresses as $address) {
+            $forwarding->addChild('address', $address);
+        }
+
+        $this->client->request($packet);
+
+        $this->logger->info('Updated forwarding for {email}: {operation} {addresses}', [
+            'operation' => $operation,
+            'email' => $email,
+            'addresses' => implode(', ', $addresses),
+        ]);
+    }
+
+    /**
+     * Alias entries are plain string elements (XSD: alias type string, 0..∞);
+     * add/remove keep the other settings untouched.
+     *
+     * @param string[] $aliases
+     */
+    private function updateAliases(string $operation, string $email, array $aliases): void
+    {
+        if ([] === $aliases) {
+            return;
+        }
+
+        if ($this->dryRun) {
+            $this->logger->info('DRY-RUN: would call mail update {operation} aliases for {email}: {aliases}', [
+                'operation' => $operation,
+                'email' => $email,
+                'aliases' => implode(', ', $aliases),
+            ]);
+
+            return;
+        }
+
+        [$siteId, $name] = $this->resolveEmail($email);
+
+        $packet = $this->client->getPacket();
+        $update = $packet->addChild('mail')->addChild('update');
+        $subOperation = $update->addChild($operation);
+        $filter = $subOperation->addChild('filter');
+        $filter->addChild('site-id', (string) $siteId);
+        $mailname = $filter->addChild('mailname');
+        $mailname->addChild('name', $name);
+        foreach ($aliases as $alias) {
+            $mailname->addChild('alias', $alias);
+        }
+
+        $this->client->request($packet);
+
+        $this->logger->info('Updated aliases for {email}: {operation} {aliases}', [
+            'operation' => $operation,
+            'email' => $email,
+            'aliases' => implode(', ', $aliases),
+        ]);
+    }
+
+    private function resolveSiteId(string $domain): int
+    {
+        if (isset($this->siteIdCache[$domain])) {
+            return $this->siteIdCache[$domain];
+        }
+
+        $packet = $this->client->getPacket();
+        $get = $packet->addChild('site')->addChild('get');
+        $get->addChild('filter')->addChild('name', $domain);
+        $get->addChild('dataset')->addChild('gen_info');
+
+        $response = $this->client->request($packet, Client::RESPONSE_FULL);
+        $ids = $response->xpath('//result/id');
+        if ([] === $ids) {
+            throw new \RuntimeException(sprintf('Unable to resolve domain "%s" to a Plesk site id.', $domain));
+        }
+
+        return $this->siteIdCache[$domain] = (int) $ids[0];
+    }
+
+    private function toPleskDate(string $iso8601): string
+    {
+        return new \DateTimeImmutable($iso8601)->format('Y-m-d');
+    }
+
+    /** @return array{id: string, name: string, version: string, release: string, active: bool} */
+    private function extensionFromNode(\SimpleXMLElement $details): array
+    {
+        return [
+            'id' => (string) $details->id,
+            'name' => (string) $details->name,
+            'version' => (string) $details->version,
+            'release' => (string) $details->release,
+            'active' => 'true' === strtolower((string) $details->active),
+        ];
     }
 }

@@ -18,7 +18,8 @@ final class AuditExportCommand extends AbstractPleadCommand
     {
         $this
             ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format: json (default) or yaml')
-            ->addOption('output', 'o', InputOption::VALUE_REQUIRED, 'Target file (default: <data dir>/audit-export-<timestamp>.<ext>)');
+            ->addOption('output', 'o', InputOption::VALUE_REQUIRED, 'Target file (default: <data dir>/audit-export-<timestamp>.<ext>)')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -54,7 +55,7 @@ final class AuditExportCommand extends AbstractPleadCommand
         }
 
         $content = 'json' === $format
-            ? json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n"
+            ? json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)."\n"
             : Yaml::dump($entries, 4, 2);
 
         if (false === file_put_contents($target, $content)) {

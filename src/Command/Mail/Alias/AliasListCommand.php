@@ -54,7 +54,7 @@ final class AliasListCommand extends AbstractAliasCommand
         try {
             $rows = $gateway->listMailnamesBulk(array_column($gateway->listDomains(), 'id'));
             $emails = array_map(
-                static fn (array $row): string => $row['name'] . '@' . $gateway->domainNameForSite((int) $row['site_id']),
+                static fn (array $row): string => $row['name'].'@'.$gateway->domainNameForSite((int) $row['site_id']),
                 $rows,
             );
             $aliases = $gateway->getAliasesBulk($emails);
@@ -79,7 +79,7 @@ final class AliasListCommand extends AbstractAliasCommand
                 1 === count($addresses) ? '' : 'es',
             ));
             foreach ($addresses as $alias) {
-                $output->writeln('  - ' . $this->displayAlias($email, $alias));
+                $output->writeln('  - '.$this->displayAlias($email, $alias));
             }
         }
 

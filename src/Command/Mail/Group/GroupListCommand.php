@@ -55,7 +55,7 @@ final class GroupListCommand extends AbstractGroupCommand
         try {
             $rows = $gateway->listMailnamesBulk(array_column($gateway->listDomains(), 'id'));
             $emails = array_map(
-                static fn (array $row): string => $row['name'] . '@' . $gateway->domainNameForSite((int) $row['site_id']),
+                static fn (array $row): string => $row['name'].'@'.$gateway->domainNameForSite((int) $row['site_id']),
                 $rows,
             );
             $forwarding = $gateway->getForwardingBulk($emails);

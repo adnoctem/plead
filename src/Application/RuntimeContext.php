@@ -29,6 +29,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 final class RuntimeContext
 {
+    /** @var null|array<string, mixed> */
     private ?array $config = null;
     private ?ConfigLoader $configLoader = null;
     private ?Connection $connection = null;
@@ -85,7 +86,7 @@ final class RuntimeContext
 
     public function databaseFile(): string
     {
-        return $this->paths->dataDir() . '/plead.sqlite';
+        return $this->paths->dataDir().'/plead.sqlite';
     }
 
     public function connection(): Connection
@@ -137,41 +138,6 @@ final class RuntimeContext
         return $this->restGateway;
     }
 
-    /** @return array{0: string, 1: int, 2: string, 3: string} host, port, protocol, secret key */
-    private function pleskEndpoint(): array
-    {
-        $config = $this->config();
-        $endpoint = PleskEndpoint::fromConfig((string) $config['plesk']['host']);
-
-        $secretKey = (string) ($config['plesk']['secret_key'] ?? '');
-        if ('' === $secretKey) {
-            throw new \RuntimeException(
-                'The REST gateway requires plesk.secret_key (Basic credentials are not supported for REST calls).',
-            );
-        }
-
-        return [$endpoint->host, $endpoint->port, $endpoint->protocol, $secretKey];
-    }
-
-    private function pleskClient(): Client
-    {
-        $config = $this->config();
-        $endpoint = PleskEndpoint::fromConfig((string) $config['plesk']['host']);
-        $client = new Client($endpoint->host, $endpoint->port, $endpoint->protocol);
-
-        if (!empty($config['plesk']['secret_key'])) {
-            $client->setSecretKey($config['plesk']['secret_key']);
-        } elseif (!empty($config['plesk']['login']) && !empty($config['plesk']['password'])) {
-            $client->setCredentials($config['plesk']['login'], $config['plesk']['password']);
-        } else {
-            throw new \RuntimeException(
-                'No Plesk authentication configured. Set plesk.secret_key or plesk.login with plesk.password.',
-            );
-        }
-
-        return $client;
-    }
-
     public function reconciler(): AutoReplyReconciler
     {
         return $this->reconciler ??= new AutoReplyReconciler(
@@ -213,7 +179,7 @@ final class RuntimeContext
     public function logger(): LoggerInterface
     {
         return $this->logger ??= new Logger('plead', [
-            (new StreamHandler($this->paths->logFile(), $this->logLevel()))
+            new StreamHandler($this->paths->logFile(), $this->logLevel())
                 ->setFormatter(new ContextInterpolatingFormatter()),
         ]);
     }
@@ -230,6 +196,7 @@ final class RuntimeContext
             if ($this->verbosity >= OutputInterface::VERBOSITY_VERBOSE) {
                 return Level::Debug;
             }
+
             try {
                 $level = (string) $this->config()['log_level'];
             } catch (\Throwable) {
@@ -244,6 +211,41 @@ final class RuntimeContext
         }
     }
 
+    /** @return array{0: string, 1: int, 2: string, 3: string} host, port, protocol, secret key */
+    private function pleskEndpoint(): array
+    {
+        $config = $this->config();
+        $endpoint = PleskEndpoint::fromConfig((string) $config['plesk']['host']);
+
+        $secretKey = (string) ($config['plesk']['secret_key'] ?? '');
+        if ('' === $secretKey) {
+            throw new \RuntimeException(
+                'The REST gateway requires plesk.secret_key (Basic credentials are not supported for REST calls).',
+            );
+        }
+
+        return [$endpoint->host, $endpoint->port, $endpoint->protocol, $secretKey];
+    }
+
+    private function pleskClient(): Client
+    {
+        $config = $this->config();
+        $endpoint = PleskEndpoint::fromConfig((string) $config['plesk']['host']);
+        $client = new Client($endpoint->host, $endpoint->port, $endpoint->protocol);
+
+        if (!empty($config['plesk']['secret_key'])) {
+            $client->setSecretKey($config['plesk']['secret_key']);
+        } elseif (!empty($config['plesk']['login']) && !empty($config['plesk']['password'])) {
+            $client->setCredentials($config['plesk']['login'], $config['plesk']['password']);
+        } else {
+            throw new \RuntimeException(
+                'No Plesk authentication configured. Set plesk.secret_key or plesk.login with plesk.password.',
+            );
+        }
+
+        return $client;
+    }
+
     private function templatePath(): string
     {
         $configured = $this->config()['template']['auto_reply_path'];
@@ -251,7 +253,7 @@ final class RuntimeContext
             return $configured;
         }
 
-        $absolute = dirname(__DIR__, 2) . '/' . $configured;
+        $absolute = dirname(__DIR__, 2).'/'.$configured;
 
         return is_file($absolute) ? $absolute : $configured;
     }

@@ -6,10 +6,16 @@ namespace App\Tests\Gateway;
 
 use App\Gateway\PleskMailGateway;
 use Monolog\Logger;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 use PleskX\Api\Client;
+use PleskX\Api\Exception;
 use PleskX\Api\XmlResponse;
 
+/**
+ * @internal
+ */
+#[CoversNothing]
 final class PleskMailGatewayTest extends TestCase
 {
     private FakeClient $client;
@@ -24,28 +30,28 @@ final class PleskMailGatewayTest extends TestCase
     public function testGetAutoresponderBuildsPacketWithSiteIdAndName(): void
     {
         $this->client->autoresponderXml = <<<'XML'
-        <packet>
-          <mail>
-            <get_info>
-              <result>
-                <status>ok</status>
-                <mailname>
-                  <id>42</id>
-                  <name>user</name>
-                  <autoresponder>
-                    <enabled>true</enabled>
-                    <subject>Regarding controllers</subject>
-                    <text>Gerne &amp; sofort</text>
-                    <content_type>text/plain</content_type>
-                    <charset>utf-8</charset>
-                    <end_date>2026-08-20</end_date>
-                  </autoresponder>
-                </mailname>
-              </result>
-            </get_info>
-          </mail>
-        </packet>
-        XML;
+            <packet>
+              <mail>
+                <get_info>
+                  <result>
+                    <status>ok</status>
+                    <mailname>
+                      <id>42</id>
+                      <name>user</name>
+                      <autoresponder>
+                        <enabled>true</enabled>
+                        <subject>Regarding controllers</subject>
+                        <text>Gerne &amp; sofort</text>
+                        <content_type>text/plain</content_type>
+                        <charset>utf-8</charset>
+                        <end_date>2026-08-20</end_date>
+                      </autoresponder>
+                    </mailname>
+                  </result>
+                </get_info>
+              </mail>
+            </packet>
+            XML;
 
         $result = $this->gateway->getAutoresponder('user@company.com');
 
@@ -73,20 +79,20 @@ final class PleskMailGatewayTest extends TestCase
     public function testGetAutoresponderReturnsNullWhenAbsent(): void
     {
         $this->client->autoresponderXml = <<<'XML'
-        <packet>
-          <mail>
-            <get_info>
-              <result>
-                <status>ok</status>
-                <mailname>
-                  <id>42</id>
-                  <name>user</name>
-                </mailname>
-              </result>
-            </get_info>
-          </mail>
-        </packet>
-        XML;
+            <packet>
+              <mail>
+                <get_info>
+                  <result>
+                    <status>ok</status>
+                    <mailname>
+                      <id>42</id>
+                      <name>user</name>
+                    </mailname>
+                  </result>
+                </get_info>
+              </mail>
+            </packet>
+            XML;
 
         self::assertNull($this->gateway->getAutoresponder('user@company.com'));
     }
@@ -161,24 +167,24 @@ final class PleskMailGatewayTest extends TestCase
     public function testGetForwardingParsesAddresses(): void
     {
         $this->client->forwardingXml = <<<'XML'
-        <packet>
-          <mail>
-            <get_info>
-              <result>
-                <status>ok</status>
-                <mailname>
-                  <id>42</id>
-                  <name>group</name>
-                  <forwarding>
-                    <address>alice@company.com</address>
-                    <address>bob@company.com</address>
-                  </forwarding>
-                </mailname>
-              </result>
-            </get_info>
-          </mail>
-        </packet>
-        XML;
+            <packet>
+              <mail>
+                <get_info>
+                  <result>
+                    <status>ok</status>
+                    <mailname>
+                      <id>42</id>
+                      <name>group</name>
+                      <forwarding>
+                        <address>alice@company.com</address>
+                        <address>bob@company.com</address>
+                      </forwarding>
+                    </mailname>
+                  </result>
+                </get_info>
+              </mail>
+            </packet>
+            XML;
 
         $recipients = $this->gateway->getForwarding('group@company.com');
 
@@ -193,20 +199,20 @@ final class PleskMailGatewayTest extends TestCase
     public function testGetForwardingReturnsEmptyWhenAbsent(): void
     {
         $this->client->forwardingXml = <<<'XML'
-        <packet>
-          <mail>
-            <get_info>
-              <result>
-                <status>ok</status>
-                <mailname>
-                  <id>42</id>
-                  <name>group</name>
-                </mailname>
-              </result>
-            </get_info>
-          </mail>
-        </packet>
-        XML;
+            <packet>
+              <mail>
+                <get_info>
+                  <result>
+                    <status>ok</status>
+                    <mailname>
+                      <id>42</id>
+                      <name>group</name>
+                    </mailname>
+                  </result>
+                </get_info>
+              </mail>
+            </packet>
+            XML;
 
         self::assertSame([], $this->gateway->getForwarding('group@company.com'));
     }
@@ -636,22 +642,22 @@ final class PleskMailGatewayTest extends TestCase
     public function testGetAliasesParsesAliasElements(): void
     {
         $this->client->aliasesXml = <<<'XML'
-        <packet>
-          <mail>
-            <get_info>
-              <result>
-                <status>ok</status>
-                <mailname>
-                  <id>42</id>
-                  <name>user</name>
-                  <alias>info@company.com</alias>
-                  <alias>sales@company.com</alias>
-                </mailname>
-              </result>
-            </get_info>
-          </mail>
-        </packet>
-        XML;
+            <packet>
+              <mail>
+                <get_info>
+                  <result>
+                    <status>ok</status>
+                    <mailname>
+                      <id>42</id>
+                      <name>user</name>
+                      <alias>info@company.com</alias>
+                      <alias>sales@company.com</alias>
+                    </mailname>
+                  </result>
+                </get_info>
+              </mail>
+            </packet>
+            XML;
 
         $aliases = $this->gateway->getAliases('user@company.com');
 
@@ -690,21 +696,21 @@ final class PleskMailGatewayTest extends TestCase
     public function testGetMailboxInfoRequestsMailboxUsageTag(): void
     {
         $this->client->mailboxInfoXml = <<<'XML'
-        <packet>
-          <mail>
-            <get_info>
-              <result>
-                <status>ok</status>
-                <mailname>
-                  <id>42</id>
-                  <name>user</name>
-                  <mailbox><enabled>true</enabled><quota>268435456</quota><usage>53909274</usage></mailbox>
-                </mailname>
-              </result>
-            </get_info>
-          </mail>
-        </packet>
-        XML;
+            <packet>
+              <mail>
+                <get_info>
+                  <result>
+                    <status>ok</status>
+                    <mailname>
+                      <id>42</id>
+                      <name>user</name>
+                      <mailbox><enabled>true</enabled><quota>268435456</quota><usage>53909274</usage></mailbox>
+                    </mailname>
+                  </result>
+                </get_info>
+              </mail>
+            </packet>
+            XML;
 
         $info = $this->gateway->getMailboxInfo('user@company.com');
 
@@ -940,6 +946,7 @@ final class FakeClient extends Client
     public array $requests = [];
 
     /** @var list<array<string, mixed>> batched request arrays recorded by multiRequest */
+    /** @var array<int, list<array<string, mixed>>> one entry per multiRequest call */
     public array $multiRequests = [];
 
     public string $autoresponderXml = '<packet><mail><get_info><result><status>ok</status><mailname><id>42</id><name>user</name></mailname></result></get_info></mail></packet>';
@@ -988,6 +995,9 @@ final class FakeClient extends Client
         parent::__construct('fake.local', 8443, 'https');
     }
 
+    /**
+     * @param \SimpleXMLElement|string $request
+     */
     public function request($request, int $mode = self::RESPONSE_SHORT): XmlResponse
     {
         $xml = $request instanceof \SimpleXMLElement ? $request->asXML() : (string) $request;
@@ -1042,10 +1052,6 @@ final class FakeClient extends Client
             return new XmlResponse('<packet><ip><result><status>ok</status><ip_address>x</ip_address></result></ip></packet>');
         }
 
-        if (str_contains($xml, '<components')) {
-            return new XmlResponse($this->componentsXml);
-        }
-
         if (str_contains($xml, '<updater><install-component>')) {
             return new XmlResponse('<packet><updater><install-component><result><status>ok</status></result></install-component></updater></packet>');
         }
@@ -1087,7 +1093,7 @@ final class FakeClient extends Client
 
         if ($this->mailDoesNotExist) {
             // Only mail requests (not site lookups) fail this way.
-            throw new \PleskX\Api\Exception('mail does not exist', 1013);
+            throw new Exception('mail does not exist', 1013);
         }
 
         if (str_contains($xml, '<aliases/>')) {
@@ -1123,6 +1129,11 @@ final class FakeClient extends Client
         return new XmlResponse($this->autoresponderXml);
     }
 
+    /**
+     * @param list<array<string, mixed>> $requests
+     *
+     * @return list<\SimpleXMLElement>
+     */
     public function multiRequest(array $requests, int $mode = self::RESPONSE_SHORT): array
     {
         $this->multiRequests[] = $requests;

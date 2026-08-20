@@ -9,25 +9,23 @@ use App\Util\DateNormalizer;
 
 final class SyncLogRepository
 {
-    public function __construct(private readonly Connection $connection)
-    {
-    }
+    public function __construct(private readonly Connection $connection) {}
 
     /**
      * Record an intent BEFORE the mutation reaches Plesk. The returned id is
      * passed to resolve() once the outcome is known, so the audit trail
      * always captures what was attempted - even if the RPC never happened.
      *
-     * @param array<string, mixed>|null $details values involved in the change
-     *                                             (e.g. rename from/to)
+     * @param null|array<string, mixed> $details values involved in the change
+     *                                           (e.g. rename from/to)
      */
     public function logPending(string $resourceType, string $resourceId, string $action, ?array $details = null): int
     {
         $statement = $this->connection->pdo()->prepare(
             <<<'SQL'
-            INSERT INTO sync_log (resource_type, resource_id, action, result, details, occurred_at)
-            VALUES (:resource_type, :resource_id, :action, 'pending', :details, :occurred_at)
-            SQL,
+                INSERT INTO sync_log (resource_type, resource_id, action, result, details, occurred_at)
+                VALUES (:resource_type, :resource_id, :action, 'pending', :details, :occurred_at)
+                SQL,
         );
         $statement->execute([
             'resource_type' => $resourceType,
@@ -52,15 +50,15 @@ final class SyncLogRepository
     /**
      * One-shot record for operations without a follow-up RPC (e.g. adoption).
      *
-     * @param array<string, mixed>|null $details values involved in the change
+     * @param null|array<string, mixed> $details values involved in the change
      */
     public function log(string $resourceType, string $resourceId, string $action, string $result, ?array $details = null): void
     {
         $statement = $this->connection->pdo()->prepare(
             <<<'SQL'
-            INSERT INTO sync_log (resource_type, resource_id, action, result, details, occurred_at)
-            VALUES (:resource_type, :resource_id, :action, :result, :details, :occurred_at)
-            SQL,
+                INSERT INTO sync_log (resource_type, resource_id, action, result, details, occurred_at)
+                VALUES (:resource_type, :resource_id, :action, :result, :details, :occurred_at)
+                SQL,
         );
         $statement->execute([
             'resource_type' => $resourceType,
@@ -102,10 +100,10 @@ final class SyncLogRepository
         if (null !== $result) {
             $where[] = 'result = :result OR result LIKE :result_prefix';
             $params['result'] = $result;
-            $params['result_prefix'] = $result . ':%';
+            $params['result_prefix'] = $result.':%';
         }
         if ([] !== $where) {
-            $sql .= ' WHERE ' . implode(' AND ', $where);
+            $sql .= ' WHERE '.implode(' AND ', $where);
         }
         $sql .= ' ORDER BY id DESC';
         if (null !== $limit) {
@@ -114,7 +112,7 @@ final class SyncLogRepository
 
         $statement = $this->connection->pdo()->prepare($sql);
         foreach ($params as $name => $value) {
-            $statement->bindValue(':' . $name, $value);
+            $statement->bindValue(':'.$name, $value);
         }
         if (null !== $limit) {
             $statement->bindValue(':limit', $limit, \PDO::PARAM_INT);

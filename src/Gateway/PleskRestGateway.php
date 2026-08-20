@@ -18,7 +18,7 @@ use Psr\Log\LoggerInterface;
  */
 class PleskRestGateway
 {
-    /** @var callable(string $method, string $url, array<string, string> $headers, ?string $body): array{0: int, 1: string} */
+    /** @var callable(string, string, list<string>, ?string): array{0: int, 1: string} */
     private $transport;
 
     public function __construct(
@@ -49,8 +49,8 @@ class PleskRestGateway
      */
     public function cliRef(string $id): array
     {
-        [$status, $body] = $this->request('GET', '/cli/' . rawurlencode($id) . '/ref');
-        $data = $this->decode($status, $body, '/cli/' . $id . '/ref');
+        [$status, $body] = $this->request('GET', '/cli/'.rawurlencode($id).'/ref');
+        $data = $this->decode($status, $body, '/cli/'.$id.'/ref');
 
         return is_array($data) ? $data : [];
     }
@@ -75,12 +75,12 @@ class PleskRestGateway
             return ['code' => 0, 'stdout' => '', 'stderr' => ''];
         }
 
-        [$status, $body] = $this->request('POST', '/cli/' . rawurlencode($id) . '/call', [
+        [$status, $body] = $this->request('POST', '/cli/'.rawurlencode($id).'/call', [
             'params' => $params,
             'fail_on_error' => $failOnError,
         ]);
 
-        $data = $this->decode($status, $body, '/cli/' . $id . '/call');
+        $data = $this->decode($status, $body, '/cli/'.$id.'/call');
         if (!is_array($data) || !array_key_exists('code', $data)) {
             throw new \RuntimeException(sprintf('Unexpected response from /cli/%s/call.', $id));
         }
@@ -96,7 +96,7 @@ class PleskRestGateway
                 'CLI command %s exited with code %d%s',
                 $id,
                 $result['code'],
-                '' !== $result['stderr'] ? ': ' . $result['stderr'] : '',
+                '' !== $result['stderr'] ? ': '.$result['stderr'] : '',
             ));
         }
 
@@ -109,7 +109,7 @@ class PleskRestGateway
     }
 
     /**
-     * @param array<string, mixed>|null $jsonBody
+     * @param null|array<string, mixed> $jsonBody
      *
      * @return array{0: int, 1: string}
      */
@@ -118,7 +118,7 @@ class PleskRestGateway
         $url = sprintf('%s://%s:%d/api/v2%s', $this->protocol, $this->host, $this->port, $path);
         $headers = [
             'Accept: application/json',
-            'X-API-Key: ' . $this->secretKey,
+            'X-API-Key: '.$this->secretKey,
         ];
         $body = null;
         if (null !== $jsonBody) {
@@ -141,13 +141,18 @@ class PleskRestGateway
 
         if ($status >= 400) {
             $message = $data['stderr'] ?? $data['message'] ?? $data['error'] ?? substr($body, 0, 200);
+
             throw new \RuntimeException(sprintf('%s failed (HTTP %d): %s', $context, $status, is_string($message) ? $message : json_encode($message)));
         }
 
         return $data;
     }
 
-    /** @param array<string, string> $headers */
+    /**
+     * @param list<string> $headers
+     *
+     * @return array{0: int, 1: string}
+     */
     private function curl(string $method, string $url, array $headers, ?string $body): array
     {
         $curl = curl_init($url);
@@ -157,7 +162,7 @@ class PleskRestGateway
             CURLOPT_CUSTOMREQUEST => $method,
             CURLOPT_HTTPHEADER => $headers,
             CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => false,
+            CURLOPT_SSL_VERIFYHOST => 0,
             CURLOPT_TIMEOUT => 60,
         ]);
         if (null !== $body) {

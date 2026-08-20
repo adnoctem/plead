@@ -5,22 +5,28 @@ declare(strict_types=1);
 namespace App\Tests\Template;
 
 use App\Template\AutoReplyRenderer;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
+use Twig\Error\LoaderError;
 
+/**
+ * @internal
+ */
+#[CoversNothing]
 final class AutoReplyRendererTest extends TestCase
 {
     private string $templateDir;
 
     protected function setUp(): void
     {
-        $this->templateDir = sys_get_temp_dir() . '/plead-template-test-' . bin2hex(random_bytes(4));
-        mkdir($this->templateDir, 0777, true);
-        file_put_contents($this->templateDir . '/reply.txt.twig', "Subject: {{ subject }}\n\n{{ message }}\n{{ date|date('Y-m-d') }}");
+        $this->templateDir = sys_get_temp_dir().'/plead-template-test-'.bin2hex(random_bytes(4));
+        mkdir($this->templateDir, 0o777, true);
+        file_put_contents($this->templateDir.'/reply.txt.twig', "Subject: {{ subject }}\n\n{{ message }}\n{{ date|date('Y-m-d') }}");
     }
 
     public function testAutoescapeIsDisabledForPlainTextMessages(): void
     {
-        $renderer = new AutoReplyRenderer($this->templateDir . '/reply.txt.twig');
+        $renderer = new AutoReplyRenderer($this->templateDir.'/reply.txt.twig');
 
         $output = $renderer->render([
             'subject' => 'Out of office & more \' details',
@@ -37,9 +43,9 @@ final class AutoReplyRendererTest extends TestCase
 
     public function testMissingTemplateThrows(): void
     {
-        $renderer = new AutoReplyRenderer($this->templateDir . '/nope.txt.twig');
+        $renderer = new AutoReplyRenderer($this->templateDir.'/nope.txt.twig');
 
-        $this->expectException(\Twig\Error\LoaderError::class);
+        $this->expectException(LoaderError::class);
 
         $renderer->render(['message' => 'x']);
     }

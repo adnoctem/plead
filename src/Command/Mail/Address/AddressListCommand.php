@@ -17,7 +17,8 @@ final class AddressListCommand extends AbstractMailCommand
     {
         $this
             ->addLocalOption()
-            ->addOption('domain', null, InputOption::VALUE_REQUIRED, 'Only list addresses on this domain');
+            ->addOption('domain', null, InputOption::VALUE_REQUIRED, 'Only list addresses on this domain')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -44,12 +45,12 @@ final class AddressListCommand extends AbstractMailCommand
         }
 
         foreach ($memberships as $address => $groups) {
-            $output->writeln($address . ':');
+            $output->writeln($address.':');
             foreach ($groups as $group) {
                 $marker = null !== $group['removed_at']
                     ? ' (removed)'
                     : ('0' === (string) $group['reconciled'] ? ' (pending)' : '');
-                $output->writeln('  - ' . $group['list_email'] . $marker);
+                $output->writeln('  - '.$group['list_email'].$marker);
             }
         }
 
@@ -90,7 +91,7 @@ final class AddressListCommand extends AbstractMailCommand
 
         foreach ($rows as $row) {
             $suffix = '' !== $row['description'] ? sprintf('  (%s)', $row['description']) : '';
-            $output->writeln($row['name'] . '@' . $domainBySite[$row['site_id']] . $suffix);
+            $output->writeln($row['name'].'@'.$domainBySite[$row['site_id']].$suffix);
         }
 
         return self::SUCCESS;

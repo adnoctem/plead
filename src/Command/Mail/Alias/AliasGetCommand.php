@@ -16,7 +16,8 @@ final class AliasGetCommand extends AbstractAliasCommand
     {
         $this
             ->addArgument('email', InputArgument::REQUIRED, 'Mailbox email address, e.g. user@company.com')
-            ->addLocalOption();
+            ->addLocalOption()
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -47,7 +48,7 @@ final class AliasGetCommand extends AbstractAliasCommand
             $output->writeln('Active aliases:');
             foreach ($active as $row) {
                 $marker = '0' === (string) $row['reconciled'] ? ' (pending)' : '';
-                $output->writeln('  - ' . $this->displayAlias($email, (string) $row['alias_email']) . $marker);
+                $output->writeln('  - '.$this->displayAlias($email, (string) $row['alias_email']).$marker);
             }
         } else {
             $output->writeln('Active aliases: (none)');
@@ -83,7 +84,7 @@ final class AliasGetCommand extends AbstractAliasCommand
 
         $output->writeln('Aliases:');
         foreach ($aliases as $alias) {
-            $output->writeln('  - ' . $this->displayAlias($email, $alias));
+            $output->writeln('  - '.$this->displayAlias($email, $alias));
         }
 
         return self::SUCCESS;

@@ -18,11 +18,11 @@ final class ConfigPathCommand extends AbstractPleadCommand
 
         foreach ($paths->configPaths() as $candidate) {
             $exists = is_file($candidate) ? ' (exists)' : '';
-            $output->writeln('config: ' . $candidate . $exists);
+            $output->writeln('config: '.$candidate.$exists);
         }
-        $output->writeln('data dir: ' . $paths->dataDir());
-        $output->writeln('cache dir: ' . $paths->cacheHome());
-        $output->writeln('log file: ' . $paths->logFile());
+        $output->writeln('data dir: '.$paths->dataDir());
+        $output->writeln('cache dir: '.$paths->cacheHome());
+        $output->writeln('log file: '.$paths->logFile());
 
         return self::SUCCESS;
     }

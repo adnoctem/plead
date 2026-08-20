@@ -17,8 +17,7 @@ final class MailAliasReconciler
         private readonly PleskMailGateway $gateway,
         private readonly LoggerInterface $logger,
         private readonly bool $dryRun,
-    ) {
-    }
+    ) {}
 
     /**
      * Seed the repository with the mailbox's current Plesk aliases the first
@@ -51,7 +50,7 @@ final class MailAliasReconciler
             // Read failure (e.g. server unreachable): leave the mailbox dirty
             // so the next pass retries, and record the failure in the audit
             // trail.
-            $this->syncLog->log('mail_alias', $email, 'read', 'error:' . $e->getMessage());
+            $this->syncLog->log('mail_alias', $email, 'read', 'error:'.$e->getMessage());
             $this->logger->error('Failed to read aliases for {email}: {error}', [
                 'email' => $email,
                 'error' => $e->getMessage(),
@@ -78,7 +77,7 @@ final class MailAliasReconciler
 
         $failed = false;
         if ([] !== $toAdd) {
-            $failed = !$this->apply('add', $email, $toAdd) || $failed;
+            $failed = !$this->apply('add', $email, $toAdd);
         }
 
         if ([] !== $toRemove) {
@@ -128,7 +127,7 @@ final class MailAliasReconciler
 
             return true;
         } catch (\Throwable $e) {
-            $this->syncLog->resolve($logId, 'error:' . $e->getMessage());
+            $this->syncLog->resolve($logId, 'error:'.$e->getMessage());
             $this->logger->error('Failed to {operation} aliases for {email}: {error}', [
                 'operation' => $operation,
                 'email' => $email,

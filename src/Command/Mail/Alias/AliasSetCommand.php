@@ -17,7 +17,8 @@ final class AliasSetCommand extends AbstractAliasCommand
     {
         $this
             ->addArgument('email', InputArgument::REQUIRED, 'Mailbox email address, e.g. user@company.com')
-            ->addOption('aliases', null, InputOption::VALUE_REQUIRED, 'Comma-separated alias email addresses');
+            ->addOption('aliases', null, InputOption::VALUE_REQUIRED, 'Comma-separated alias email addresses')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -43,6 +44,7 @@ final class AliasSetCommand extends AbstractAliasCommand
 
         $context = $this->context();
         $repository = $context->mailAliasRepository();
+
         try {
             $this->adoptIfNew($email);
         } catch (\Throwable $e) {

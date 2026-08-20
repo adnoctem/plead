@@ -19,7 +19,8 @@ final class DomainTrafficGetCommand extends AbstractPleadCommand
         $this
             ->addArgument('domain', InputArgument::REQUIRED, 'Domain name, e.g. delta4x4.net')
             ->addOption('from', null, InputOption::VALUE_REQUIRED, 'Start date, YYYY-MM-DD')
-            ->addOption('to', null, InputOption::VALUE_REQUIRED, 'End date, YYYY-MM-DD');
+            ->addOption('to', null, InputOption::VALUE_REQUIRED, 'End date, YYYY-MM-DD')
+        ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

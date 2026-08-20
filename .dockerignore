@@ -1,0 +1,9 @@
+.git
+.github
+.idea
+.phpunit.cache
+.php-cs-fixer.cache
+docs
+tests
+vendor
+*.md
