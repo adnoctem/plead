@@ -70,4 +70,25 @@ final class ConfigEditCommandTest extends TestCase
         self::assertNotSame(0, $this->tester->getStatusCode());
         self::assertStringContainsString('Editor exited with status 3', $this->tester->getDisplay());
     }
+
+    public function testWarnsAboutStaleSwapFile(): void
+    {
+        $configDir = $this->configDir . '/plead';
+        mkdir($configDir, 0777, true);
+        file_put_contents($configDir . '/.plead.yaml.swp', 'stale');
+
+        $this->tester->run(['command' => 'config:edit']);
+
+        self::assertStringContainsString('Stale swap file found at', $this->tester->getDisplay());
+    }
+
+    public function testMissingEditorIsReported(): void
+    {
+        putenv('EDITOR=' . dirname($this->editorScript) . '/does-not-exist');
+
+        $this->tester->run(['command' => 'config:edit']);
+
+        self::assertNotSame(0, $this->tester->getStatusCode());
+        self::assertStringContainsString('was not found on your PATH', $this->tester->getDisplay());
+    }
 }

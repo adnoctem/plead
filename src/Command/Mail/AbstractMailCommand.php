@@ -5,44 +5,55 @@ declare(strict_types=1);
 namespace App\Command\Mail;
 
 use App\Command\AbstractPleadCommand;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 abstract class AbstractMailCommand extends AbstractPleadCommand
 {
-    /** Seed the repository with current Plesk recipients on first touch. */
-    protected function adoptIfNew(string $email): void
+    protected function addLocalOption(): static
     {
-        $this->context()->reconcilerMail()->adopt($email);
+        // Read commands default to the live Plesk server; --local reads the
+        // local SQLite state (desired state / audit trail) instead.
+        $this->addOption('local', null, InputOption::VALUE_NONE, 'Read from the local SQLite state instead of the live Plesk server');
+
+        return $this;
     }
 
-    protected function applyAndReport(OutputInterface $output, string $email): void
+    protected function isLocal(InputInterface $input): bool
     {
+        return (bool) $input->getOption('local');
+    }
+
+    /**
+     * Audit-first mailbox mutation: record the intent in the sync log before
+     * the RPC, then finalize it. Mailbox operations are one-shot - unlike
+     * auto-replies and group recipients they have no desired-state row, so
+     * the sync log is their only local record.
+     */
+    protected function mutateAddress(
+        OutputInterface $output,
+        string $email,
+        string $action,
+        callable $mutation,
+        string $doneMessage,
+        string $dryRunMessage,
+    ): int {
         $context = $this->context();
-        $context->reconcilerMail()->reconcile($email);
+        $logId = $context->syncLogRepository()->logPending('mail_address', $email, $action);
 
-        if ($context->dryRun()) {
-            $output->writeln(sprintf('Recipients for <info>%s</info> would be updated (dry-run).', $email));
+        try {
+            $mutation($email);
 
-            return;
+            $context->syncLogRepository()->resolve($logId, $context->dryRun() ? 'dry-run' : 'ok');
+            $output->writeln($context->dryRun() ? sprintf($dryRunMessage, $email) : sprintf($doneMessage, $email));
+
+            return self::SUCCESS;
+        } catch (\Throwable $e) {
+            $context->syncLogRepository()->resolve($logId, 'error:' . $e->getMessage());
+            $output->writeln(sprintf('<error>%s</error>', $e->getMessage()));
+
+            return self::FAILURE;
         }
-
-        $output->writeln(sprintf('Recipients for <info>%s</info> reconciled with the Plesk server.', $email));
-    }
-
-    /** @return string[] */
-    protected function parseRecipients(string $value): array
-    {
-        $recipients = array_values(array_filter(
-            array_map('trim', explode(',', $value)),
-            static fn (string $recipient): bool => '' !== $recipient,
-        ));
-
-        foreach ($recipients as $recipient) {
-            if (!str_contains($recipient, '@')) {
-                throw new \InvalidArgumentException(sprintf('Not a valid recipient email address: "%s"', $recipient));
-            }
-        }
-
-        return $recipients;
     }
 }

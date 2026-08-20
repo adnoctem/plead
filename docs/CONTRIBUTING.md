@@ -30,10 +30,11 @@ The test suite uses [PHPUnit](https://phpunit.de/):
 vendor/bin/phpunit
 ```
 
-Run a single test file:
+Run a single test class or method:
 
 ```bash
-vendor/bin/phpunit tests/Command/AutoReply/AutoReplySetCommandTest.php
+vendor/bin/phpunit --filter AutoresponderCommandsTest
+vendor/bin/phpunit --filter testSetUpdatesDescription
 ```
 
 Tests live in [`tests/`](../tests), mirroring the `src/` layout. New behavior is expected to ship with tests —
@@ -44,7 +45,8 @@ the reconciler (the safety-critical convergence logic) and the config merge prec
 There is no separate linter for application code; PHP's built-in syntax check covers the basics:
 
 ```bash
-find src bin -name '*.php' -o -name 'plead' | xargs -n1 php -l
+find src tests bin -name '*.php' -print0 | xargs -0 -n1 php -l
+php -l bin/plead
 ```
 
 ### Pre-Commit Hooks
@@ -59,18 +61,23 @@ pre-commit install
 
 ## 🗂️ Repository Layout
 
-| Path              | Purpose                                                                                         |
-| ----------------- | ----------------------------------------------------------------------------------------------- |
-| `bin/plead`       | CLI entrypoint                                                                                  |
-| `src/`            | Application code (PSR-4, `App\` namespace)                                                      |
-| `src/Command/`    | Symfony Console commands (`auto-reply:*`, `config:*`)                                           |
-| `src/Reconciler/` | Convergence logic shared by one-shot commands and watchers                                      |
-| `src/Gateway/`    | Thin wrapper over the Plesk XML-RPC client                                                      |
-| `src/Repository/` | SQLite repositories (scheduled auto-replies, audit trail)                                       |
-| `config/`         | SQLite schema                                                                                   |
-| `templates/`      | Twig templates (auto-reply message rendering, autoescape off)                                   |
-| `tests/`          | PHPUnit tests                                                                                   |
-| `secrets/`        | **Gitignored.** Project-internal planning documents. Never commit anything from this directory. |
+| Path                  | Purpose                                                                                                                                 |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `bin/plead`           | CLI entrypoint                                                                                                                          |
+| `src/`                | Application code (PSR-4, `App\` namespace)                                                                                              |
+| `src/Command/`        | Symfony Console commands (`mail:group:*`, `mail:address:*`, `mail:autoresponder:*`, `domain:*`, `config:*`, `db:*`)                     |
+| `src/Command/Mail/`   | `AbstractMailCommand` (shared `--local` option), `AbstractWatchCommand` (spinner loop)                                                  |
+| `src/Reconciler/`     | Convergence logic shared by one-shot commands and watchers                                                                              |
+| `src/Gateway/`        | Thin wrapper over the Plesk XML-RPC client (the only code that talks to Plesk)                                                          |
+| `src/Repository/`     | SQLite repositories (desired state + audit trail)                                                                                       |
+| `src/Util/`           | `Spinner`, `InteractiveProcessLauncher`, `DateNormalizer`                                                                               |
+| `src/Logging/`        | Monolog formatter                                                                                                                       |
+| `src/Config/`         | Config discovery/merge (YAML/JSON), path providers per OS                                                                               |
+| `config/`             | SQLite schema                                                                                                                           |
+| `templates/`          | Twig templates (auto-reply message rendering, autoescape off)                                                                           |
+| `tests/`              | PHPUnit tests (mirrors `src/`)                                                                                                          |
+| `docs/`               | `AGENTS.md` (agent instructions, symlinked to repo root), `plesk-xml-api-notes.md`, `CONTRIBUTING.md`, `ACKNOWLEDGEMENTS.md`, `TODO.md` |
+| `secrets/`            | **Gitignored.** Project-internal planning documents. Never commit anything from this directory.                                         |
 
 ## ℹ️ Commit Message Format
 
@@ -209,6 +216,8 @@ repository in separate PRs.
 - Autoloading follows PSR-4 (`App\` maps to `src/`, `App\Tests\` maps to `tests/`)
 - New behavior must be covered by PHPUnit tests
 - Mutating commands must route through the shared reconcilers and respect `--dry-run`
+- Live list paths must use the gateway's bulk methods (one batched HTTP POST, never N+1 round trips)
+- New gateway mutation packets must be validated against the live server before shipping — see the workflow in [`docs/AGENTS.md`](AGENTS.md) and the empirically-verified shapes in [`docs/plesk-xml-api-notes.md`](plesk-xml-api-notes.md)
 - Never commit credentials, secrets, or anything from `secrets/` (gitignored)
 - Pass `pre-commit` hooks with no findings
 

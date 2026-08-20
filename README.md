@@ -1,9 +1,14 @@
 <p align="center">
+    <!-- plead -->
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/adnoctem/artwork/blob/38866111fd02fab46ce80117372240815d7dbf27/projects/plead/white/plead-icon-white.png?raw=true">
+      <img src="https://github.com/adnoctem/artwork/blob/38866111fd02fab46ce80117372240815d7dbf27/projects/plead/white/plead-icon-white.png?raw=true" width="225" alt="plead">
+    </picture>&nbsp;&nbsp;&nbsp;
+    <!-- Plesk -->
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://upload.wikimedia.org/wikipedia/commons/8/80/Logo_Plesk.svg">
       <img src="https://upload.wikimedia.org/wikipedia/commons/8/80/Logo_Plesk.svg" width="225" alt="Plesk">
     </picture>
-    <!-- plead -->
 </p>
 
 [![License](https://img.shields.io/github/license/adnoctem/plead?label=License)][license]
@@ -19,10 +24,20 @@
 
 Two things are currently automated:
 
-- **Auto-replies with a scheduled start time.** Plesk supports `end_date` natively, but `start_date` does not exist as a Plesk concept. `plead` enforces it: you schedule a reply with a start and end date, and the `auto-reply:watch` daemon pushes it to Plesk the moment the start time is reached.
-- **Mail distribution groups** (e.g. `all@company.com`) — add/remove recipients without hand-editing Plesk's forwarding UI. A `mail:watch` daemon continuously converges the server state toward what `plead` has been told.
+- **Auto-replies with a scheduled start time.** Plesk supports `end_date` natively, but `start_date` does not exist as a Plesk concept. `plead` enforces it: you schedule a reply with a start and end date, and the `mail:autoresponder:watch` daemon pushes it to Plesk the moment the start time is reached.
+- **Mail distribution groups** (e.g. `all@company.com`) — add/remove recipients without hand-editing Plesk's forwarding UI. A `mail:group:watch` daemon continuously converges the server state toward what `plead` has been told.
 
 `plead` runs entirely off the Plesk box and talks to Plesk exclusively over HTTPS XML-RPC (port 8443) using a secret key or administrator credentials. It is safe to run against production mail infrastructure: development follows read-before-write, `--dry-run` is enforced structurally in the gateway, reconciliation is idempotent, and every action lands in a local SQLite audit trail.
+
+### The audit-trail model
+
+The local SQLite database is the **desired state**; the Plesk server holds the **live state**. Every mutation follows the same three steps:
+
+1. **Record the intent locally first** — the change lands in SQLite (and the `sync_log` table gains a `pending` entry) *before* anything touches the network.
+2. **Apply to Plesk** (or `--dry-run`).
+3. **Finalize** — on success the entry is marked `reconciled` and the log entry resolves to `ok`; on failure the entry stays `pending` (the watcher retries) and the log entry carries `error:<message>`.
+
+Rows are never deleted: auto-replies carry a `status` (`scheduled`/`disabled`) and recipients are soft-deleted, so the database doubles as a full audit trail of every intent, even months later. Read commands show the **live server state by default**; pass `--local` to inspect the desired state instead.
 
 ## ✨ TL;DR
 
@@ -37,51 +52,77 @@ plead config:view
 plead config:path
 
 # schedule an auto-reply (message file is rendered as a Twig template)
-plead auto-reply:set user@company.com \
+plead mail:autoresponder:set user@company.com \
     --message-file=~/vacation.txt \
     --start-date="2026-08-20 08:00" \
     --end-date="2026-08-30 18:00"
 
 # dry-run first — no network calls are made at all
-plead auto-reply:set user@company.com --message-file=~/vacation.txt \
+plead mail:autoresponder:set user@company.com --message-file=~/vacation.txt \
     --start-date="2026-08-20 08:00" --end-date="2026-08-30 18:00" --dry-run
 
 # what is configured live on the server vs. what plead intends to converge toward
-plead auto-reply:get user@company.com
-plead auto-reply:list user@company.com
+plead mail:autoresponder:get user@company.com
+plead mail:autoresponder:get user@company.com --local
+
+# disable an auto-reply again (kept in the audit trail)
+plead mail:autoresponder:set user@company.com --enabled=false
 
 # continuously apply scheduled auto-replies as their start time is reached
-plead auto-reply:watch --interval=60
+plead mail:autoresponder:watch --interval=60
 
 # manage a mail distribution group
-plead mail:add group@company.com newhire@company.com
-plead mail:remove group@company.com leaver@company.com
-plead mail:set group@company.com --recipients=a@company.com,b@company.com
-plead mail:get group@company.com    # live state on the Plesk server
-plead mail:list group@company.com   # local desired state + removal history
-plead mail:watch --interval=60      # continuously converge server state
+plead mail:group:add group@company.com newhire@company.com
+plead mail:group:remove group@company.com leaver@company.com
+plead mail:group:set group@company.com --recipients=a@company.com,b@company.com
+plead mail:group:get group@company.com          # live state on the Plesk server
+plead mail:group:get group@company.com --local  # desired state + history
+plead mail:group:watch --interval=60            # continuously converge server state
+
+# mailbox operations
+plead mail:address:list --domain=company.com
+plead mail:address:set user@company.com --description="Holiday replacement"
+plead mail:address:password user@company.com --generate
+
+# domains
+plead domain:list
+plead domain:get delta4x4.net
+plead domain:set delta4x4.net --description="Main company domain"
 ```
 
 ## 🧰 Commands
 
-| Command                           | Purpose                                                                    |
-| --------------------------------- | -------------------------------------------------------------------------- |
-| `auto-reply:get <email>`          | Live read of the autoresponder configured on the Plesk server              |
-| `auto-reply:list <email>`         | Locally scheduled auto-reply for an email (from the SQLite database)       |
-| `auto-reply:set <email>`          | Schedule an auto-reply with `--message-file`, `--start-date`, `--end-date` |
-| `auto-reply:watch`                | Continuously apply scheduled auto-replies (`--interval` seconds)           |
-| `mail:get <email>`                | Live read of the forwarding recipients on the Plesk server                 |
-| `mail:list <email>`               | Locally managed recipients (from SQLite, including removal history)        |
-| `mail:set <email>`                | Replace the full recipient list (`--recipients=a@b,c@d`)                   |
-| `mail:add <email> <recipient>`    | Add one recipient                                                          |
-| `mail:remove <email> <recipient>` | Remove one recipient (soft-delete, keeps history)                          |
-| `mail:watch`                      | Continuously converge server state toward the managed recipient lists      |
-| `config:get <dotted.key>`         | Show the resolved value of one configuration key                           |
-| `config:set <dotted.key> <value>` | Write a configuration key to the user config file                          |
-| `config:list`                     | Show the resolved configuration with secrets masked                        |
-| `config:view`                     | Show the full resolved configuration (post-merge, including secrets)       |
-| `config:edit`                     | Open the user config file in `$EDITOR` and validate it afterwards          |
-| `config:path`                     | Show where plead stores configuration, data, and logs                      |
+Read commands query the **live Plesk server** by default; add `--local` to read the SQLite desired state instead.
+
+| Command                                 | Purpose                                                                                                            |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `mail:group:list`                       | List mail groups (live: mailnames with forwarding; `--local`: managed)                                             |
+| `mail:group:get <group>`                | Recipients of a group (`--local` adds desired state + removal history)                                             |
+| `mail:group:set <group>`                | Replace the full recipient list (`--recipients=a@b,c@d`)                                                           |
+| `mail:group:add <group> <recipient>`    | Add one recipient                                                                                                  |
+| `mail:group:remove <group> <recipient>` | Remove one recipient (soft-delete, keeps history)                                                                  |
+| `mail:group:watch`                      | Converge server state toward desired state (`--interval`, `--full`)                                                |
+| `mail:address:list`                     | List all mail addresses (`--domain=`, `--local`)                                                                   |
+| `mail:address:get <email>`              | Mailbox, forwarding and auto-reply state of an address                                                             |
+| `mail:address:set <email>`              | Set properties: `--description=` (mailbox state/quota are not exposed by the Plesk XML API for existing mailboxes) |
+| `mail:address:delete <email>`           | Delete the mail address                                                                                            |
+| `mail:address:password <email>`         | Set (`--password=`) or rotate (`--generate`) the mailbox password                                                  |
+| `mail:address:export`                   | Export all addresses (`--format=csv\|json`, `-o/--output`, `--domain=`)                                            |
+| `mail:autoresponder:list`               | All addresses with an enabled auto-reply (`--local`: scheduled)                                                    |
+| `mail:autoresponder:get <email>`        | Auto-reply of an address (`--local`: desired state)                                                                |
+| `mail:autoresponder:set <email>`        | Enable/schedule (`--message-file`, `--start-date`, `--end-date`) or disable (`--enabled=false`)                    |
+| `mail:autoresponder:watch`              | Apply scheduled auto-replies and pending disables (`--interval`, `--full`)                                         |
+| `domain:list`                           | List all domains on the server                                                                                     |
+| `domain:get <domain>`                   | Everything plead can read about a domain (hosting, limits, mail count)                                             |
+| `domain:set <domain>`                   | Set properties (`--description=`; `--status=` reserved, not yet supported)                                         |
+| `config:get <dotted.key>`               | Show the resolved value of one configuration key                                                                   |
+| `config:set <dotted.key> <value>`       | Write a configuration key to the user config file                                                                  |
+| `config:list`                           | Show the resolved configuration with secrets masked                                                                |
+| `config:view`                           | Show the full resolved configuration (post-merge, including secrets)                                               |
+| `config:edit`                           | Open the user config file in `$EDITOR` and validate it afterwards                                                  |
+| `config:path`                           | Show where plead stores configuration, data, and logs                                                              |
+| `db:path`                               | Show the location of the SQLite database                                                                           |
+| `db:query`                              | Open an interactive `sqlite3` shell on the database                                                                |
 
 Global options (available on every command):
 
@@ -109,7 +150,14 @@ Configuration is discovered from per-user and system-wide locations, in most-spe
 - `PLEAD_PLESK_LOGIN` / `PLEAD_PLESK_PASSWORD` — administrator credentials (alternative to secret key)
 - `PLEAD_DATA_DIR` — overrides the data directory (used by the containerized deployment, e.g. `/data`)
 
-Data (SQLite database and log file) lives under the platform data directory — on Linux `~/.local/share/plead/`. The SQLite database is the authoritative record of scheduled auto-replies.
+Data (SQLite database and log file) lives under the platform data directory — on Linux `~/.local/share/plead/`. The SQLite database is the authoritative record of the desired state and the full audit trail.
+
+## 📚 Documentation
+
+- [`docs/plesk-xml-api-notes.md`](docs/plesk-xml-api-notes.md) — empirically-verified Plesk XML API facts (packet shapes, quirks, batching) collected against Obsidian 18.0.80
+- [`docs/AGENTS.md`](docs/AGENTS.md) — agent/contributor cheat sheet (symlinked to the repo root as `AGENTS.md`)
+- [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) — commit format, PR process, repository layout
+- [`docs/ACKNOWLEDGEMENTS.md`](docs/ACKNOWLEDGEMENTS.md) — sources the project learned from
 
 ## 🔃 Contributing
 
@@ -123,7 +171,7 @@ This project is owned and maintained by [Ad Noctem Collective](https://github.co
 the [`AUTHORS`][authors] or [`CODEOWNERS`][owners] for more information. You may also use the linked
 contact details to reach out directly.
 
-## ©️ Copyright
+## ©️Copyright
 
 *Licensed under the [MIT][license] license.*
 

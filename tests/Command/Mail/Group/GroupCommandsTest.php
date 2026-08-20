@@ -2,21 +2,21 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Command\Mail;
+namespace App\Tests\Command\Mail\Group;
 
 use App\Application\RuntimeContext;
 use App\Command\AbstractPleadCommand;
-use App\Command\Mail\MailAddCommand;
-use App\Command\Mail\MailGetCommand;
-use App\Command\Mail\MailListCommand;
-use App\Command\Mail\MailRemoveCommand;
-use App\Command\Mail\MailSetCommand;
+use App\Command\Mail\Group\GroupAddCommand;
+use App\Command\Mail\Group\GroupListCommand;
+use App\Command\Mail\Group\GroupRemoveCommand;
+use App\Command\Mail\Group\GroupSetCommand;
+use App\Command\Mail\Group\GroupGetCommand;
 use App\Config\PathProvider\PathProviderInterface;
 use App\Tests\Support\RecordingGateway;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
 
-final class MailCommandsTest extends TestCase
+final class GroupCommandsTest extends TestCase
 {
     private string $base;
     private RecordingGateway $gateway;
@@ -85,27 +85,27 @@ final class MailCommandsTest extends TestCase
         return $tester;
     }
 
-    public function testAddAndGetRoundtrip(): void
+    public function testAddAndShowRoundtrip(): void
     {
-        $tester = $this->tester(new MailAddCommand());
+        $tester = $this->tester(new GroupAddCommand());
         $tester->execute(['email' => 'group@company.com', 'recipient' => 'alice@company.com']);
 
         self::assertSame(0, $tester->getStatusCode());
         self::assertSame(['alice@company.com'], $this->gateway->forwarding['group@company.com']);
 
-        $get = $this->tester(new MailGetCommand());
-        $get->execute(['email' => 'group@company.com']);
+        $show = $this->tester(new GroupGetCommand());
+        $show->execute(['email' => 'group@company.com']);
 
-        self::assertSame(0, $get->getStatusCode());
-        self::assertStringContainsString('alice@company.com', $get->getDisplay());
+        self::assertSame(0, $show->getStatusCode());
+        self::assertStringContainsString('alice@company.com', $show->getDisplay());
     }
 
     public function testRemoveReconcilesServerState(): void
     {
-        $tester = $this->tester(new MailAddCommand());
+        $tester = $this->tester(new GroupAddCommand());
         $tester->execute(['email' => 'group@company.com', 'recipient' => 'alice@company.com']);
 
-        $tester = $this->tester(new MailRemoveCommand());
+        $tester = $this->tester(new GroupRemoveCommand());
         $tester->execute(['email' => 'group@company.com', 'recipient' => 'alice@company.com']);
 
         self::assertSame(0, $tester->getStatusCode());
@@ -117,7 +117,7 @@ final class MailCommandsTest extends TestCase
     {
         $this->gateway->forwarding['group@company.com'] = ['legacy@company.com'];
 
-        $tester = $this->tester(new MailSetCommand());
+        $tester = $this->tester(new GroupSetCommand());
         $tester->execute([
             'email' => 'group@company.com',
             '--recipients' => 'alice@company.com,bob@company.com',
@@ -129,36 +129,36 @@ final class MailCommandsTest extends TestCase
 
     public function testSetWithInvalidRecipientFails(): void
     {
-        $tester = $this->tester(new MailSetCommand());
+        $tester = $this->tester(new GroupSetCommand());
         $tester->execute(['email' => 'group@company.com', '--recipients' => 'not-an-address']);
 
         self::assertNotSame(0, $tester->getStatusCode());
         self::assertStringContainsString('Not a valid recipient', $tester->getDisplay());
     }
 
-    public function testListShowsLocalStateAndHistory(): void
+    public function testShowLocalStateAndHistory(): void
     {
-        $tester = $this->tester(new MailAddCommand());
+        $tester = $this->tester(new GroupAddCommand());
         $tester->execute(['email' => 'group@company.com', 'recipient' => 'alice@company.com']);
         $tester->execute(['email' => 'group@company.com', 'recipient' => 'leaver@company.com']);
 
-        $tester = $this->tester(new MailRemoveCommand());
+        $tester = $this->tester(new GroupRemoveCommand());
         $tester->execute(['email' => 'group@company.com', 'recipient' => 'leaver@company.com']);
 
-        $list = $this->tester(new MailListCommand());
-        $list->execute(['email' => 'group@company.com']);
+        $show = $this->tester(new GroupGetCommand());
+        $show->execute(['email' => 'group@company.com', '--local' => true]);
 
-        self::assertSame(0, $list->getStatusCode());
-        self::assertStringContainsString('alice@company.com', $list->getDisplay());
-        self::assertStringContainsString('leaver@company.com', $list->getDisplay());
-        self::assertStringContainsString('Removed (history)', $list->getDisplay());
+        self::assertSame(0, $show->getStatusCode());
+        self::assertStringContainsString('alice@company.com', $show->getDisplay());
+        self::assertStringContainsString('leaver@company.com', $show->getDisplay());
+        self::assertStringContainsString('Removed (history)', $show->getDisplay());
     }
 
     public function testAddOnFreshListAdoptsExistingRecipients(): void
     {
         $this->gateway->forwarding['group@company.com'] = ['admin@company.com', 'boss@company.com'];
 
-        $tester = $this->tester(new MailAddCommand());
+        $tester = $this->tester(new GroupAddCommand());
         $tester->execute(['email' => 'group@company.com', 'recipient' => 'newhire@company.com']);
 
         self::assertSame(0, $tester->getStatusCode());
@@ -168,12 +168,54 @@ final class MailCommandsTest extends TestCase
         );
     }
 
-    public function testGetShowsNoneWhenEmpty(): void
+    public function testShowLiveNoneWhenEmpty(): void
     {
-        $get = $this->tester(new MailGetCommand());
-        $get->execute(['email' => 'group@company.com']);
+        $show = $this->tester(new GroupGetCommand());
+        $show->execute(['email' => 'group@company.com']);
 
-        self::assertSame(0, $get->getStatusCode());
-        self::assertStringContainsString('(none)', $get->getDisplay());
+        self::assertSame(0, $show->getStatusCode());
+        self::assertStringContainsString('(none)', $show->getDisplay());
+    }
+
+    public function testListLocalShowsIndexWithCounts(): void
+    {
+        $tester = $this->tester(new GroupAddCommand());
+        $tester->execute(['email' => 'group@company.com', 'recipient' => 'alice@company.com']);
+
+        $list = $this->tester(new GroupListCommand());
+        $list->execute(['--local' => true]);
+
+        self::assertSame(0, $list->getStatusCode());
+        self::assertStringContainsString('group@company.com', $list->getDisplay());
+        self::assertStringContainsString('1', $list->getDisplay());
+    }
+
+    public function testFailureKeepsListPendingAndReports(): void
+    {
+        $this->gateway->failFor = ['group@company.com'];
+
+        $tester = $this->tester(new GroupAddCommand());
+        $tester->execute(['email' => 'group@company.com', 'recipient' => 'alice@company.com']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('could not be reconciled', $tester->getDisplay());
+        self::assertSame(['group@company.com'], $this->context->mailGroupRepository()->unreconciledLists());
+
+        $results = array_column($this->context->syncLogRepository()->recent(), 'result');
+        self::assertContains('error:boom', $results);
+    }
+
+    public function testFailedAddIsRetriedByReconcile(): void
+    {
+        $this->gateway->failFor = ['group@company.com'];
+
+        $tester = $this->tester(new GroupAddCommand());
+        $tester->execute(['email' => 'group@company.com', 'recipient' => 'alice@company.com']);
+
+        $this->gateway->failFor = [];
+        $this->context->reconcilerMail()->reconcileAll();
+
+        self::assertSame(['alice@company.com'], $this->gateway->forwarding['group@company.com']);
+        self::assertSame([], $this->context->mailGroupRepository()->unreconciledLists());
     }
 }

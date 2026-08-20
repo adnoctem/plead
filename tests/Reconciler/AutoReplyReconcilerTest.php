@@ -32,7 +32,7 @@ final class AutoReplyReconcilerTest extends TestCase
         return new AutoReplyReconciler($this->repository, $this->syncLog, $this->gateway, new Logger('test'), $dryRun);
     }
 
-    public function testAppliesDueEntriesAndMarksApplied(): void
+    public function testAppliesDueEntriesAndMarksReconciled(): void
     {
         $this->repository->upsert('due@company.com', 'msg', '2020-01-01T08:00:00+02:00', '2020-01-02T08:00:00+02:00');
         $this->repository->upsert('future@company.com', 'msg', '2099-01-01T08:00:00+02:00', '2099-01-02T08:00:00+02:00');
@@ -41,8 +41,8 @@ final class AutoReplyReconcilerTest extends TestCase
 
         self::assertSame(1, $applied);
         self::assertSame(['due@company.com'], $this->gateway->calls);
-        self::assertNotNull($this->repository->find('due@company.com')['applied_at']);
-        self::assertNull($this->repository->find('future@company.com')['applied_at']);
+        self::assertSame('1', (string) $this->repository->find('due@company.com')['reconciled']);
+        self::assertSame('0', (string) $this->repository->find('future@company.com')['reconciled']);
     }
 
     public function testDoesNotReapplyAfterSuccess(): void
@@ -66,24 +66,49 @@ final class AutoReplyReconcilerTest extends TestCase
         $applied = $this->reconciler()->reconcileAll();
 
         self::assertSame(1, $applied);
-        self::assertNull($this->repository->find('bad@company.com')['applied_at']);
-        self::assertNotNull($this->repository->find('good@company.com')['applied_at']);
+        self::assertSame('0', (string) $this->repository->find('bad@company.com')['reconciled']);
+        self::assertSame('1', (string) $this->repository->find('good@company.com')['reconciled']);
 
         $results = array_column($this->syncLog->recent(), 'result');
         self::assertContains('error:boom', $results);
         self::assertContains('ok', $results);
     }
 
-    public function testDryRunDoesNotMarkApplied(): void
+    public function testDryRunDoesNotMarkReconciled(): void
     {
         $this->repository->upsert('due@company.com', 'msg', '2020-01-01T08:00:00+02:00', '2020-01-02T08:00:00+02:00');
 
         $applied = $this->reconciler(true)->reconcileAll();
 
         self::assertSame(0, $applied);
-        self::assertNull($this->repository->find('due@company.com')['applied_at']);
+        self::assertSame('0', (string) $this->repository->find('due@company.com')['reconciled']);
 
         $results = array_column($this->syncLog->recent(), 'result');
         self::assertContains('dry-run', $results);
+    }
+
+    public function testDisabledEntriesArePushedAsDisable(): void
+    {
+        $this->repository->upsert('user@company.com', 'msg', '2020-01-01T08:00:00+02:00', '2020-01-02T08:00:00+02:00');
+        $this->repository->markReconciled('user@company.com', '2020-01-01T08:00:00+02:00');
+        $this->repository->disable('user@company.com');
+
+        $applied = $this->reconciler()->reconcileAll();
+
+        self::assertSame(1, $applied);
+        self::assertSame(['user@company.com'], $this->gateway->calls);
+        self::assertFalse($this->gateway->autoresponders['user@company.com']);
+        self::assertSame('1', (string) $this->repository->find('user@company.com')['reconciled']);
+    }
+
+    public function testFullSweepReappliesReconciledEntries(): void
+    {
+        $this->repository->upsert('user@company.com', 'msg', '2020-01-01T08:00:00+02:00', '2020-01-02T08:00:00+02:00');
+        $this->repository->markReconciled('user@company.com', '2020-01-01T08:00:00+02:00');
+
+        $applied = $this->reconciler()->reconcileAll(true);
+
+        self::assertSame(1, $applied);
+        self::assertCount(1, $this->gateway->calls);
     }
 }

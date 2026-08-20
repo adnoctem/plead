@@ -32,7 +32,7 @@ final class MailGroupReconcilerTest extends TestCase
         return new MailGroupReconciler($this->repository, $this->syncLog, $this->gateway, new Logger('test'), $dryRun);
     }
 
-    public function testAddsMissingRecipients(): void
+    public function testAddsMissingRecipientsAndMarksListReconciled(): void
     {
         $this->repository->upsertActive('group@company.com', 'alice@company.com');
 
@@ -40,6 +40,7 @@ final class MailGroupReconcilerTest extends TestCase
 
         self::assertTrue($changed);
         self::assertSame(['alice@company.com'], $this->gateway->forwarding['group@company.com']);
+        self::assertSame([], $this->repository->unreconciledLists());
     }
 
     public function testRemovesUndeclaredRecipientsAndRecordsHistory(): void
@@ -60,7 +61,7 @@ final class MailGroupReconcilerTest extends TestCase
         self::assertSame('leaver@company.com', $removed[array_key_first($removed)]['recipient_email']);
     }
 
-    public function testNoChangesWhenInSync(): void
+    public function testNoChangesWhenInSyncClearsPendingFlag(): void
     {
         $this->repository->upsertActive('group@company.com', 'alice@company.com');
         $this->gateway->forwarding['group@company.com'] = ['alice@company.com'];
@@ -68,22 +69,37 @@ final class MailGroupReconcilerTest extends TestCase
         $changed = $this->reconciler()->reconcile('group@company.com');
 
         self::assertFalse($changed);
+        self::assertSame([], $this->repository->unreconciledLists());
         self::assertSame([], $this->syncLog->recent());
     }
 
-    public function testReconcileAllCoversEveryManagedList(): void
+    public function testReconcileAllCoversOnlyDirtyLists(): void
     {
         $this->repository->upsertActive('group@company.com', 'a@company.com');
         $this->repository->upsertActive('all@company.com', 'b@company.com');
+        $this->repository->markListReconciled('all@company.com');
 
         $changed = $this->reconciler()->reconcileAll();
+
+        self::assertSame(1, $changed);
+        self::assertSame(['a@company.com'], $this->gateway->forwarding['group@company.com']);
+        self::assertArrayNotHasKey('all@company.com', $this->gateway->forwarding);
+    }
+
+    public function testFullSweepCoversEveryManagedList(): void
+    {
+        $this->repository->upsertActive('group@company.com', 'a@company.com');
+        $this->repository->upsertActive('all@company.com', 'b@company.com');
+        $this->repository->markListReconciled('all@company.com');
+
+        $changed = $this->reconciler()->reconcileAll(true);
 
         self::assertSame(2, $changed);
         self::assertSame(['a@company.com'], $this->gateway->forwarding['group@company.com']);
         self::assertSame(['b@company.com'], $this->gateway->forwarding['all@company.com']);
     }
 
-    public function testFailureIsIsolatedPerOperation(): void
+    public function testFailureKeepsListDirtyForRetry(): void
     {
         $this->repository->upsertActive('group@company.com', 'alice@company.com');
         $this->repository->upsertActive('all@company.com', 'bob@company.com');
@@ -91,13 +107,28 @@ final class MailGroupReconcilerTest extends TestCase
 
         $changed = $this->reconciler()->reconcileAll();
 
-        self::assertSame(2, $changed);
-        self::assertArrayNotHasKey('group@company.com', $this->gateway->forwarding);
+        self::assertSame(1, $changed);
+        self::assertSame(['group@company.com'], $this->repository->unreconciledLists());
         self::assertSame(['bob@company.com'], $this->gateway->forwarding['all@company.com']);
 
         $results = array_column($this->syncLog->recent(), 'result');
         self::assertContains('error:boom', $results);
         self::assertContains('ok', $results);
+    }
+
+    public function testRetryAfterFailureCompletesTheDiff(): void
+    {
+        $this->repository->upsertActive('group@company.com', 'alice@company.com');
+        $this->gateway->failFor = ['group@company.com'];
+
+        $reconciler = $this->reconciler();
+        self::assertFalse($reconciler->reconcile('group@company.com'));
+        self::assertSame(['group@company.com'], $this->repository->unreconciledLists());
+
+        $this->gateway->failFor = [];
+        self::assertTrue($reconciler->reconcile('group@company.com'));
+        self::assertSame(['alice@company.com'], $this->gateway->forwarding['group@company.com']);
+        self::assertSame([], $this->repository->unreconciledLists());
     }
 
     public function testAdoptSeedsRepositoryFromPleskOnlyOnFirstTouch(): void
@@ -143,5 +174,6 @@ final class MailGroupReconcilerTest extends TestCase
         $results = array_column($this->syncLog->recent(), 'result');
         self::assertContains('dry-run', $results);
         self::assertSame(['alice@company.com'], $this->repository->activeRecipients('group@company.com'));
+        self::assertSame(['group@company.com'], $this->repository->unreconciledLists());
     }
 }

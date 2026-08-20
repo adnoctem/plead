@@ -1,0 +1,90 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Command\Mail\Group;
+
+use Symfony\Component\Console\Attribute\AsCommand;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
+
+#[AsCommand(name: 'mail:group:list', description: 'List mail groups (live Plesk state; --local shows managed groups)')]
+final class GroupListCommand extends AbstractGroupCommand
+{
+    protected function configure(): void
+    {
+        $this->addLocalOption();
+    }
+
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        return $this->isLocal($input) ? $this->listLocal($output) : $this->listLive($output);
+    }
+
+    private function listLocal(OutputInterface $output): int
+    {
+        $rows = $this->context()->mailGroupRepository()->index();
+
+        if ([] === $rows) {
+            $output->writeln('No groups managed by plead yet.');
+
+            return self::SUCCESS;
+        }
+
+        $output->writeln(sprintf('%-45s %8s %8s %8s', 'Group', 'Active', 'Removed', 'Pending'));
+        foreach ($rows as $row) {
+            $output->writeln(sprintf(
+                '%-45s %8d %8d %8d',
+                $row['list_email'],
+                (int) $row['active_count'],
+                (int) $row['removed_count'],
+                (int) $row['pending_count'],
+            ));
+        }
+
+        return self::SUCCESS;
+    }
+
+    private function listLive(OutputInterface $output): int
+    {
+        // A "group" in Plesk terms is a mailname with at least one forwarding
+        // recipient. The domain and mailname lookups run as ONE batched
+        // request each (two HTTP round trips), then forwarding is batched too.
+        $gateway = $this->context()->gateway();
+
+        try {
+            $rows = $gateway->listMailnamesBulk(array_column($gateway->listDomains(), 'id'));
+            $emails = array_map(
+                static fn (array $row): string => $row['name'] . '@' . $gateway->domainNameForSite((int) $row['site_id']),
+                $rows,
+            );
+            $forwarding = $gateway->getForwardingBulk($emails);
+        } catch (\Throwable $e) {
+            $output->writeln(sprintf('<error>%s</error>', $e->getMessage()));
+
+            return self::FAILURE;
+        }
+
+        $found = false;
+        foreach ($emails as $index => $email) {
+            $recipients = $forwarding[$email] ?? [];
+            if ([] === $recipients) {
+                continue;
+            }
+
+            $found = true;
+            $output->writeln(sprintf(
+                '%s (%d recipient%s)',
+                $email,
+                count($recipients),
+                1 === count($recipients) ? '' : 's',
+            ));
+        }
+
+        if (!$found) {
+            $output->writeln('No mail groups (mailnames with forwarding) found on the server.');
+        }
+
+        return self::SUCCESS;
+    }
+}

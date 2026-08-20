@@ -21,11 +21,16 @@ final class AutoReplyReconciler
     ) {
     }
 
-    /** @return int number of entries applied this pass */
-    public function reconcileAll(): int
+    /**
+     * @return int number of entries applied this pass
+     */
+    public function reconcileAll(bool $full = false): int
     {
+        $now = new \DateTimeImmutable();
+        $rows = $full ? $this->repository->dueAll($now) : $this->repository->pending($now);
+
         $applied = 0;
-        foreach ($this->repository->due(new \DateTimeImmutable()) as $row) {
+        foreach ($rows as $row) {
             $applied += (int) $this->reconcileEntry($row);
         }
 
@@ -40,7 +45,7 @@ final class AutoReplyReconciler
             throw new \RuntimeException(sprintf('No scheduled auto-reply for %s.', $email));
         }
 
-        if (new \DateTimeImmutable($row['start_date']) > new \DateTimeImmutable()) {
+        if ('disabled' !== $row['status'] && new \DateTimeImmutable($row['start_date']) > new \DateTimeImmutable()) {
             return false;
         }
 
@@ -52,23 +57,39 @@ final class AutoReplyReconciler
     {
         $email = (string) $row['email'];
 
+        // Audit first: record the intent before the RPC, so the trail shows
+        // what was attempted even if the server is unreachable.
+        $logId = $this->syncLog->logPending('auto_reply', $email, 'apply');
+
         try {
-            $this->gateway->setAutoresponder($email, (string) $row['message'], (string) $row['end_date']);
+            if ('disabled' === $row['status']) {
+                $this->gateway->disableAutoresponder($email);
+            } else {
+                $this->gateway->setAutoresponder($email, (string) $row['message'], (string) $row['end_date']);
+            }
 
             if ($this->dryRun) {
-                $this->syncLog->log('auto_reply', $email, 'apply', 'dry-run');
-                $this->logger->info('DRY-RUN: would mark {email} as applied', ['email' => $email]);
+                $this->syncLog->resolve($logId, 'dry-run');
+                $this->logger->info('DRY-RUN: would {action} auto-reply for {email}', [
+                    'action' => 'disabled' === $row['status'] ? 'disable' : 'apply',
+                    'email' => $email,
+                ]);
 
                 return false;
             }
 
-            $this->repository->markApplied($email, DateNormalizer::now());
-            $this->syncLog->log('auto_reply', $email, 'apply', 'ok');
-            $this->logger->info('Applied auto-reply for {email}', ['email' => $email]);
+            $this->repository->markReconciled($email, DateNormalizer::now());
+            $this->syncLog->resolve($logId, 'ok');
+            $this->logger->info(
+                'disabled' === $row['status'] ? 'Disabled auto-reply for {email}' : 'Applied auto-reply for {email}',
+                ['email' => $email],
+            );
 
             return true;
         } catch (\Throwable $e) {
-            $this->syncLog->log('auto_reply', $email, 'apply', 'error:' . $e->getMessage());
+            // Keep the entry dirty (reconciled = 0) so the watcher retries;
+            // the error text lands in the audit trail.
+            $this->syncLog->resolve($logId, 'error:' . $e->getMessage());
             $this->logger->error('Failed to apply auto-reply for {email}: {error}', [
                 'email' => $email,
                 'error' => $e->getMessage(),

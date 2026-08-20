@@ -69,9 +69,14 @@ final class RuntimeContext
         return $this->config ??= $this->configLoader()->load($this->explicitConfigPath);
     }
 
+    public function databaseFile(): string
+    {
+        return $this->paths->dataDir() . '/plead.sqlite';
+    }
+
     public function connection(): Connection
     {
-        return $this->connection ??= new Connection($this->paths->dataDir() . '/plead.sqlite');
+        return $this->connection ??= new Connection($this->databaseFile());
     }
 
     public function autoReplyRepository(): AutoReplyRepository

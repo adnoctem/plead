@@ -5,22 +5,33 @@ declare(strict_types=1);
 namespace App\Application;
 
 use App\Command\AbstractPleadCommand;
-use App\Command\AutoReply\AutoReplyGetCommand;
-use App\Command\AutoReply\AutoReplyListCommand;
-use App\Command\AutoReply\AutoReplySetCommand;
-use App\Command\AutoReply\AutoReplyWatchCommand;
-use App\Command\Config\ConfigGetCommand;
 use App\Command\Config\ConfigEditCommand;
+use App\Command\Config\ConfigGetCommand;
 use App\Command\Config\ConfigListCommand;
 use App\Command\Config\ConfigPathCommand;
 use App\Command\Config\ConfigSetCommand;
 use App\Command\Config\ConfigViewCommand;
-use App\Command\Mail\MailAddCommand;
-use App\Command\Mail\MailGetCommand;
-use App\Command\Mail\MailListCommand;
-use App\Command\Mail\MailRemoveCommand;
-use App\Command\Mail\MailSetCommand;
-use App\Command\Mail\MailWatchCommand;
+use App\Command\Db\DbPathCommand;
+use App\Command\Db\DbQueryCommand;
+use App\Command\Domain\DomainGetCommand;
+use App\Command\Domain\DomainListCommand;
+use App\Command\Domain\DomainSetCommand;
+use App\Command\Mail\Address\AddressDeleteCommand;
+use App\Command\Mail\Address\AddressExportCommand;
+use App\Command\Mail\Address\AddressGetCommand;
+use App\Command\Mail\Address\AddressListCommand;
+use App\Command\Mail\Address\AddressPasswordCommand;
+use App\Command\Mail\Address\AddressSetCommand;
+use App\Command\Mail\Autoresponder\AutoresponderGetCommand;
+use App\Command\Mail\Autoresponder\AutoresponderListCommand;
+use App\Command\Mail\Autoresponder\AutoresponderSetCommand;
+use App\Command\Mail\Autoresponder\AutoresponderWatchCommand;
+use App\Command\Mail\Group\GroupAddCommand;
+use App\Command\Mail\Group\GroupGetCommand;
+use App\Command\Mail\Group\GroupListCommand;
+use App\Command\Mail\Group\GroupRemoveCommand;
+use App\Command\Mail\Group\GroupSetCommand;
+use App\Command\Mail\Group\GroupWatchCommand;
 use App\Config\PathProvider\PathProviderFactory;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Command\Command;
@@ -41,22 +52,33 @@ final class PleadApplication extends Application
         parent::__construct(self::NAME, self::VERSION);
         $this->setAutoExit(false);
         $this->addCommands([
-            new AutoReplyGetCommand(),
-            new AutoReplyListCommand(),
-            new AutoReplySetCommand(),
-            new AutoReplyWatchCommand(),
+            new ConfigEditCommand(),
             new ConfigGetCommand(),
-            new ConfigSetCommand(),
             new ConfigListCommand(),
             new ConfigPathCommand(),
+            new ConfigSetCommand(),
             new ConfigViewCommand(),
-            new ConfigEditCommand(),
-            new MailGetCommand(),
-            new MailListCommand(),
-            new MailSetCommand(),
-            new MailAddCommand(),
-            new MailRemoveCommand(),
-            new MailWatchCommand(),
+            new DbPathCommand(),
+            new DbQueryCommand(),
+            new DomainGetCommand(),
+            new DomainListCommand(),
+            new DomainSetCommand(),
+            new GroupAddCommand(),
+            new GroupGetCommand(),
+            new GroupListCommand(),
+            new GroupRemoveCommand(),
+            new GroupSetCommand(),
+            new GroupWatchCommand(),
+            new AddressDeleteCommand(),
+            new AddressExportCommand(),
+            new AddressGetCommand(),
+            new AddressListCommand(),
+            new AddressPasswordCommand(),
+            new AddressSetCommand(),
+            new AutoresponderGetCommand(),
+            new AutoresponderListCommand(),
+            new AutoresponderSetCommand(),
+            new AutoresponderWatchCommand(),
         ]);
     }
 
