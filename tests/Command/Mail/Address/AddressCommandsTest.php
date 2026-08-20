@@ -6,11 +6,12 @@ namespace App\Tests\Command\Mail\Address;
 
 use App\Application\RuntimeContext;
 use App\Command\AbstractPleadCommand;
-use App\Command\Mail\Address\AddressDeleteCommand;
+use App\Command\Mail\Address\AddressRemoveCommand;
 use App\Command\Mail\Address\AddressExportCommand;
 use App\Command\Mail\Address\AddressGetCommand;
 use App\Command\Mail\Address\AddressListCommand;
 use App\Command\Mail\Address\AddressPasswordCommand;
+use App\Command\Mail\Address\AddressRenameCommand;
 use App\Command\Mail\Address\AddressSetCommand;
 use App\Config\PathProvider\PathProviderInterface;
 use App\Tests\Support\RecordingGateway;
@@ -33,7 +34,13 @@ final class AddressCommandsTest extends TestCase
             "plesk:\n    host: fake.local\n    secret_key: test-key\n",
         );
 
-        $paths = new class($this->base) implements PathProviderInterface {
+        $this->gateway = new RecordingGateway();
+        $this->context = new RuntimeContext($this->contextPaths(), null, false, null, 0, gateway: $this->gateway);
+    }
+
+    private function contextPaths(): PathProviderInterface
+    {
+        return new class($this->base) implements PathProviderInterface {
             public function __construct(private readonly string $base)
             {
             }
@@ -73,9 +80,6 @@ final class AddressCommandsTest extends TestCase
                 return $this->base . '/data/plead.log';
             }
         };
-
-        $this->gateway = new RecordingGateway();
-        $this->context = new RuntimeContext($paths, null, false, null, 0, gateway: $this->gateway);
     }
 
     private function tester(AbstractPleadCommand $command): CommandTester
@@ -139,7 +143,7 @@ final class AddressCommandsTest extends TestCase
         ]);
         self::assertSame('Holiday replacement', $this->gateway->mailboxes['user@company.com']['description']);
 
-        $this->tester(new AddressDeleteCommand())->execute(['email' => 'user@company.com']);
+        $this->tester(new AddressRemoveCommand())->execute(['email' => 'user@company.com']);
         self::assertArrayNotHasKey('user@company.com', $this->gateway->mailboxes);
     }
 
@@ -150,6 +154,203 @@ final class AddressCommandsTest extends TestCase
 
         self::assertNotSame(0, $tester->getStatusCode());
         self::assertStringContainsString('Provide --description', $tester->getDisplay());
+    }
+
+    public function testSetOutgoingLimitUpdatesMailbox(): void
+    {
+        $this->gateway->mailboxes['user@company.com'] = [
+            'name' => 'user',
+            'description' => '',
+            'mailbox_enabled' => true,
+            'forwarding' => [],
+            'autoresponder_enabled' => false,
+        ];
+
+        $tester = $this->tester(new AddressSetCommand());
+        $tester->execute(['email' => 'user@company.com', '--outgoing-limit' => '250']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertSame('250', $this->gateway->mailboxes['user@company.com']['outgoing-messages-mbox-limit']);
+    }
+
+    public function testSetWithBothOptionsUpdatesBothInOneCall(): void
+    {
+        $this->gateway->mailboxes['user@company.com'] = [
+            'name' => 'user',
+            'description' => '',
+            'mailbox_enabled' => true,
+            'forwarding' => [],
+            'autoresponder_enabled' => false,
+        ];
+
+        $tester = $this->tester(new AddressSetCommand());
+        $tester->execute(['email' => 'user@company.com', '--description' => 'New desc', '--outgoing-limit' => '0']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertSame('New desc', $this->gateway->mailboxes['user@company.com']['description']);
+        self::assertSame('0', $this->gateway->mailboxes['user@company.com']['outgoing-messages-mbox-limit']);
+    }
+
+    public function testSetLogsOriginalAndNewValues(): void
+    {
+        $this->gateway->mailboxes['user@company.com'] = [
+            'name' => 'user',
+            'description' => 'Old description',
+            'mailbox_enabled' => true,
+            'mailbox_quota' => 268435456,
+            'forwarding' => [],
+            'autoresponder_enabled' => false,
+        ];
+
+        $tester = $this->tester(new AddressSetCommand());
+        $tester->execute(['email' => 'user@company.com', '--description' => 'New description', '--quota' => '512']);
+
+        self::assertSame(0, $tester->getStatusCode());
+
+        $details = (string) $this->context->syncLogRepository()->recent(1)[0]['details'];
+        self::assertStringContainsString('"old":{"description":"Old description","quota_mib":256', $details);
+        self::assertStringContainsString('"new":{"description":"New description","quota_mib":512}', $details);
+    }
+
+    public function testSetRejectsNonNumericOutgoingLimit(): void
+    {
+        $tester = $this->tester(new AddressSetCommand());
+        $tester->execute(['email' => 'user@company.com', '--outgoing-limit' => 'many']);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('non-negative integer', $tester->getDisplay());
+    }
+
+    public function testSetQuotaConvertsMiBToBytes(): void
+    {
+        $this->gateway->mailboxes['user@company.com'] = [
+            'name' => 'user',
+            'description' => '',
+            'mailbox_enabled' => true,
+            'forwarding' => [],
+            'autoresponder_enabled' => false,
+        ];
+
+        $tester = $this->tester(new AddressSetCommand());
+        $tester->execute(['email' => 'user@company.com', '--quota' => '512']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertSame(536870912, $this->gateway->mailboxes['user@company.com']['quota']);
+    }
+
+    public function testSetWithDescriptionAndQuotaMakesBothCalls(): void
+    {
+        $this->gateway->mailboxes['user@company.com'] = [
+            'name' => 'user',
+            'description' => '',
+            'mailbox_enabled' => true,
+            'forwarding' => [],
+            'autoresponder_enabled' => false,
+        ];
+
+        $tester = $this->tester(new AddressSetCommand());
+        $tester->execute(['email' => 'user@company.com', '--description' => 'Desc', '--quota' => '128']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertSame('Desc', $this->gateway->mailboxes['user@company.com']['description']);
+        self::assertSame(134217728, $this->gateway->mailboxes['user@company.com']['quota']);
+    }
+
+    public function testSetRejectsZeroOrNonNumericQuota(): void
+    {
+        $tester = $this->tester(new AddressSetCommand());
+        $tester->execute(['email' => 'user@company.com', '--quota' => '0']);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('positive integer', $tester->getDisplay());
+
+        $tester = $this->tester(new AddressSetCommand());
+        $tester->execute(['email' => 'user@company.com', '--quota' => 'huge']);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('positive integer', $tester->getDisplay());
+    }
+
+    public function testSetAntivirValidatesServerEnum(): void
+    {
+        $this->gateway->mailboxes['user@company.com'] = [
+            'name' => 'user',
+            'description' => '',
+            'mailbox_enabled' => true,
+            'forwarding' => [],
+            'autoresponder_enabled' => false,
+        ];
+
+        $tester = $this->tester(new AddressSetCommand());
+        $tester->execute(['email' => 'user@company.com', '--antivir' => 'inout']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertSame('inout', $this->gateway->mailboxes['user@company.com']['antivir']);
+
+        $tester = $this->tester(new AddressSetCommand());
+        $tester->execute(['email' => 'user@company.com', '--antivir' => 'on']);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('Invalid value for --antivir', $tester->getDisplay());
+    }
+
+    public function testRenameMovesAddressOnServerAndLocally(): void
+    {
+        $this->gateway->mailboxes['user@company.com'] = [
+            'name' => 'user',
+            'description' => '',
+            'mailbox_enabled' => true,
+            'forwarding' => [],
+            'autoresponder_enabled' => false,
+        ];
+
+        // Local rows plead tracks under the old address.
+        $this->context->autoReplyRepository()->upsert('user@company.com', 'message', '2026-01-01T00:00:00+00:00', '2026-12-31T23:59:59+00:00');
+        $this->context->mailGroupRepository()->upsertActive('user@company.com', 'alice@company.com');
+        $this->context->mailAliasRepository()->upsertActive('user@company.com', 'info@company.com');
+
+        $tester = $this->tester(new AddressRenameCommand());
+        $tester->execute(['email' => 'user@company.com', 'new-name' => 'newuser']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertSame('newuser', $this->gateway->renames['user@company.com']);
+        self::assertStringContainsString('newuser@company.com', $tester->getDisplay());
+
+        $entries = $this->context->syncLogRepository()->recent(1);
+        self::assertSame('rename', $entries[0]['action']);
+        self::assertStringContainsString('"from":"user@company.com"', (string) $entries[0]['details']);
+        self::assertStringContainsString('"to":"newuser@company.com"', (string) $entries[0]['details']);
+
+        self::assertNull($this->context->autoReplyRepository()->find('user@company.com'));
+        self::assertNotNull($this->context->autoReplyRepository()->find('newuser@company.com'));
+        self::assertSame([], $this->context->mailGroupRepository()->activeRecipients('user@company.com'));
+        self::assertSame(['alice@company.com'], $this->context->mailGroupRepository()->activeRecipients('newuser@company.com'));
+        self::assertSame([], $this->context->mailAliasRepository()->activeAliases('user@company.com'));
+        self::assertSame(['info@company.com'], $this->context->mailAliasRepository()->activeAliases('newuser@company.com'));
+    }
+
+    public function testRenameRejectsFullEmailAsNewName(): void
+    {
+        $tester = $this->tester(new AddressRenameCommand());
+        $tester->execute(['email' => 'user@company.com', 'new-name' => 'newuser@company.com']);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('local part only', $tester->getDisplay());
+    }
+
+    public function testRenameDryRunDoesNotTouchServerOrLocalState(): void
+    {
+        $gateway = new RecordingGateway(dryRunMode: true);
+        $context = new RuntimeContext($this->contextPaths(), null, true, null, 0, gateway: $gateway);
+        $command = new AddressRenameCommand();
+        $command->setContext($context);
+        $tester = new CommandTester($command);
+
+        $tester->execute(['email' => 'user@company.com', 'new-name' => 'newuser']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('(dry-run)', $tester->getDisplay());
+        self::assertSame([], $gateway->renames);
     }
 
     public function testPasswordExplicitAndGenerated(): void

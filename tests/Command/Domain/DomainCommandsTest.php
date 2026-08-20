@@ -6,9 +6,14 @@ namespace App\Tests\Command\Domain;
 
 use App\Application\RuntimeContext;
 use App\Command\AbstractPleadCommand;
+use App\Command\Domain\DomainAddCommand;
+use App\Command\Domain\DomainDescriptorCommand;
 use App\Command\Domain\DomainGetCommand;
 use App\Command\Domain\DomainListCommand;
+use App\Command\Domain\DomainRemoveCommand;
 use App\Command\Domain\DomainSetCommand;
+use App\Command\Domain\DomainTrafficGetCommand;
+use App\Command\Domain\DomainTrafficSetCommand;
 use App\Config\PathProvider\PathProviderInterface;
 use App\Tests\Support\RecordingGateway;
 use PHPUnit\Framework\TestCase;
@@ -145,22 +150,29 @@ final class DomainCommandsTest extends TestCase
         self::assertSame('ok', $entries[0]['result']);
     }
 
-    public function testSetRequiresDescription(): void
+    public function testSetStatusEnablesAndDisables(): void
+    {
+        $tester = $this->tester(new DomainSetCommand());
+        $tester->execute(['domain' => 'company.com', '--status' => 'disabled']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('updated', $tester->getDisplay());
+        self::assertSame(16, $this->gateway->domainStatuses['company.com']);
+
+        $tester = $this->tester(new DomainSetCommand());
+        $tester->execute(['domain' => 'company.com', '--status' => 'enabled']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertSame(0, $this->gateway->domainStatuses['company.com']);
+    }
+
+    public function testSetRequiresDescriptionOrStatus(): void
     {
         $tester = $this->tester(new DomainSetCommand());
         $tester->execute(['domain' => 'company.com']);
 
         self::assertNotSame(0, $tester->getStatusCode());
         self::assertStringContainsString('Provide --description', $tester->getDisplay());
-    }
-
-    public function testSetStatusIsNotYetSupported(): void
-    {
-        $tester = $this->tester(new DomainSetCommand());
-        $tester->execute(['domain' => 'company.com', '--status' => 'enabled']);
-
-        self::assertNotSame(0, $tester->getStatusCode());
-        self::assertStringContainsString('not supported yet', $tester->getDisplay());
     }
 
     public function testSetRejectsInvalidStatusValue(): void
@@ -181,5 +193,137 @@ final class DomainCommandsTest extends TestCase
 
         self::assertNotSame(0, $tester->getStatusCode());
         self::assertStringContainsString('boom', $tester->getDisplay());
+    }
+
+    public function testAddCreatesVirtualHostDomain(): void
+    {
+        $tester = $this->tester(new DomainAddCommand());
+        $tester->execute([
+            'domain' => 'new.domain.com',
+            '--type' => 'virtual-host',
+            '--parent' => 'company.com',
+            '--description' => 'A new domain',
+            '--property' => ['ftp_login:user', 'ftp_password:secret'],
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('created', $tester->getDisplay());
+        self::assertSame('vrt_hst', $this->gateway->addedSites[0]['htype']);
+        self::assertSame('company.com', $this->gateway->addedSites[0]['parent']);
+
+        $entries = $this->context->syncLogRepository()->recent(1);
+        self::assertSame('domain', $entries[0]['resource_type']);
+        self::assertSame('add', $entries[0]['action']);
+        self::assertStringContainsString('"type":"virtual-host"', (string) $entries[0]['details']);
+    }
+
+    public function testAddForwardingRequiresDestUrl(): void
+    {
+        $tester = $this->tester(new DomainAddCommand());
+        $tester->execute(['domain' => 'fwd.domain.com', '--type' => 'forwarding']);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('--dest-url', $tester->getDisplay());
+
+        $tester = $this->tester(new DomainAddCommand());
+        $tester->execute(['domain' => 'fwd.domain.com', '--type' => 'forwarding', '--dest-url' => 'https://target.example']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertSame('std_fwd', $this->gateway->addedSites[0]['htype']);
+    }
+
+    public function testAddRejectsUnknownTypeAndBadProperty(): void
+    {
+        $tester = $this->tester(new DomainAddCommand());
+        $tester->execute(['domain' => 'x.domain.com', '--type' => 'ftp']);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('virtual-host, forwarding', $tester->getDisplay());
+
+        $tester = $this->tester(new DomainAddCommand());
+        $tester->execute(['domain' => 'x.domain.com', '--type' => 'virtual-host', '--property' => ['nocolon']]);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('name:value', $tester->getDisplay());
+    }
+
+    public function testRemoveDeletesDomain(): void
+    {
+        $tester = $this->tester(new DomainRemoveCommand());
+        $tester->execute(['domain' => 'old.domain.com']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertSame(['old.domain.com'], $this->gateway->removedSites);
+
+        $entries = $this->context->syncLogRepository()->recent(1);
+        self::assertSame('remove', $entries[0]['action']);
+        self::assertSame('ok', $entries[0]['result']);
+    }
+
+    public function testTrafficGetDisplaysRowsAndValidatesDates(): void
+    {
+        $this->gateway->traffic['company.com'] = [[
+            'date' => '2026-08-19',
+            'http_in' => '100',
+            'http_out' => '200',
+            'ftp_in' => '10',
+            'ftp_out' => '20',
+            'smtp_in' => '5',
+            'smtp_out' => '6',
+            'pop3_imap_in' => '7',
+            'pop3_imap_out' => '8',
+        ]];
+
+        $tester = $this->tester(new DomainTrafficGetCommand());
+        $tester->execute(['domain' => 'company.com', '--from' => '2026-08-01', '--to' => '2026-08-20']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('2026-08-19', $tester->getDisplay());
+        self::assertStringContainsString('100', $tester->getDisplay());
+
+        $tester = $this->tester(new DomainTrafficGetCommand());
+        $tester->execute(['domain' => 'company.com', '--from' => 'not-a-date']);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('YYYY-MM-DD', $tester->getDisplay());
+    }
+
+    public function testTrafficSetRecordsCountersAndValidates(): void
+    {
+        $tester = $this->tester(new DomainTrafficSetCommand());
+        $tester->execute(['domain' => 'company.com', '--date' => '2026-08-19', '--smtp-in' => '5', '--smtp-out' => '6']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertSame(['smtp_in' => 5, 'smtp_out' => 6], $this->gateway->trafficSets['company.com']['counters']);
+
+        $entries = $this->context->syncLogRepository()->recent(1);
+        self::assertSame('traffic:set', $entries[0]['action']);
+        self::assertStringContainsString('"date":"2026-08-19"', (string) $entries[0]['details']);
+
+        $tester = $this->tester(new DomainTrafficSetCommand());
+        $tester->execute(['domain' => 'company.com', '--date' => 'yesterday']);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('YYYY-MM-DD', $tester->getDisplay());
+
+        $tester = $this->tester(new DomainTrafficSetCommand());
+        $tester->execute(['domain' => 'company.com', '--date' => '2026-08-19']);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('at least one counter', $tester->getDisplay());
+    }
+
+    public function testDescriptorShowsProperties(): void
+    {
+        $this->gateway->descriptors['company.com'] = [
+            ['name' => 'ftp_login', 'type' => 'string', 'default' => 'user', 'label' => 'FTP login'],
+        ];
+
+        $tester = $this->tester(new DomainDescriptorCommand());
+        $tester->execute(['domain' => 'company.com']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('ftp_login', $tester->getDisplay());
+        self::assertStringContainsString('FTP login', $tester->getDisplay());
     }
 }

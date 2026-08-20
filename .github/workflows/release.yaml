@@ -1,0 +1,56 @@
+name: "Release"
+
+on:
+    workflow_dispatch:
+    repository_dispatch:
+        types: [release]
+
+permissions:
+    contents: write
+    pull-requests: write
+
+defaults:
+    run:
+        shell: bash
+
+concurrency:
+    group: "${{ github.workflow }}@${{ github.ref }}"
+
+jobs:
+    release:
+        runs-on: ubuntu-latest
+        env:
+            GITHUB_TOKEN: ${{ secrets.D4X4_GITHUB_TOKEN }}
+        outputs:
+            published: ${{ steps.semantic-release.outputs.new_release_published }}
+            new_version: ${{ steps.semantic-release.outputs.new_release_version }}
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+              with:
+                  fetch-depth: 0
+                  persist-credentials: false
+
+            - name: "Install PHP with extensions"
+              uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+              with:
+                  coverage: none
+                  extensions: "intl, mbstring, pdo_sqlite, zip, pcntl"
+                  php-version: 8.5
+                  tools: composer:v2
+
+            - name: Semantic Release
+              id: semantic-release
+              uses: cycjimmy/semantic-release-action@b12c8f6015dc215fe37bc154d4ad456dd3833c90
+              with:
+                  semantic_version: 24
+                  branches: |
+                      [
+                        'main',
+                        'next'
+                      ]
+                  extra_plugins: |
+                      @semantic-release/changelog@6.0.3
+                      @semantic-release/exec@7.0.3
+                      @semantic-release/git@10.0.1
+                      conventional-changelog-conventionalcommits@8.0.0

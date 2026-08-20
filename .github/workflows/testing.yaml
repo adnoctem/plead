@@ -1,0 +1,168 @@
+name: "Testing"
+
+on: ["push", "pull_request"]
+
+permissions: {}
+
+env:
+    fail-fast: true
+    PHPUNIT_FLAGS: "-v tests"
+    SYMFONY_PHPUNIT_DIR: "$HOME/symfony-bridge/.phpunit"
+    SYMFONY_DEPRECATIONS_HELPER: "max[indirect]=52"
+
+jobs:
+    php-cs-fixer:
+        name: PHP-CS-Fixer
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        steps:
+            - name: Checkout
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+              with:
+                  persist-credentials: false
+
+            - name: PHP-CS-Fixer
+              uses: docker://oskarstark/php-cs-fixer-ga@sha256:e1ecd59fdc0d097399955966d6b4c5e067be83c9bbea771f446dd3cfcdb53ee7
+              with:
+                  args: --diff --dry-run
+
+    lint:
+        name: Lint PHP
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        steps:
+            - name: Checkout
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+              with:
+                  persist-credentials: false
+
+            - name: "Install PHP with extensions"
+              uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+              with:
+                  coverage: none
+                  extensions: intl
+                  php-version: 8.5
+                  tools: composer:v2
+
+            - name: "Set composer cache directory"
+              id: composer-cache
+              run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+            - name: "Cache composer"
+              uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+              with:
+                  path: ${{ steps.composer-cache.outputs.dir }}
+                  key: ${{ runner.os }}-composer-${{ hashFiles('composer.lock') }}
+                  restore-keys: ${{ runner.os }}-composer-
+
+            - name: "Install dependencies"
+              run: composer install --ansi --no-interaction --no-progress
+
+            - name: Install PHPUnit
+              id: install
+              run: vendor/bin/simple-phpunit install
+
+            - name: Lint YAML files
+              if: always() && steps.install.outcome == 'success'
+              run: ./bin/console lint:yaml config --parse-tags
+
+            - name: Lint Parameters and Services
+              if: always() && steps.install.outcome == 'success'
+              run: ./bin/console lint:container --no-debug
+
+            - name: Lint Composer config
+              if: always() && steps.install.outcome == 'success'
+              run: composer validate --strict
+
+            - name: Check if any dependencies are compromised
+              if: always() && steps.install.outcome == 'success'
+              run: composer audit
+
+            - name: Run PHPStan
+              if: always() && steps.install.outcome == 'success'
+              run: ./vendor/bin/phpstan analyze
+
+    test:
+        name: "${{ matrix.operating-system }} / PHP ${{ matrix.php-version }}"
+        runs-on: ${{ matrix.operating-system }}
+        continue-on-error: false
+        strategy:
+            matrix:
+                operating-system: ["ubuntu-latest", "macos-latest", "windows-latest"]
+                php-version: ["8.4", "8.5"]
+        permissions:
+            contents: read
+        steps:
+            - name: Checkout
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+              with:
+                  persist-credentials: false
+
+            - name: "Install PHP with extensions"
+              uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+              with:
+                  coverage: none
+                  extensions: "intl, mbstring, pdo_sqlite, zip"
+                  php-version: ${{ matrix.php-version }}
+                  tools: composer:v2
+
+            - name: "Add PHPUnit matcher"
+              run: echo "::add-matcher::${{ runner.tool_cache }}/phpunit.json"
+
+            - name: "Set composer cache directory"
+              id: composer-cache
+              run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+              shell: bash
+
+            - name: "Cache composer"
+              uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+              with:
+                  path: ${{ steps.composer-cache.outputs.dir }}
+                  key: ${{ runner.os }}-composer-${{ hashFiles('composer.lock') }}
+                  restore-keys: ${{ runner.os }}-composer-
+
+            - name: "Install dependencies"
+              run: composer install --ansi --no-interaction --no-progress
+
+            - name: "Install PHPUnit"
+              run: vendor/bin/simple-phpunit install
+
+            - name: "PHPUnit version"
+              run: vendor/bin/simple-phpunit --version
+
+            - name: "Run tests"
+              run: vendor/bin/simple-phpunit ${{ env.PHPUNIT_FLAGS }}
+
+#    dispatch:
+#        runs-on: ubuntu-latest
+#        env:
+#            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#        needs: [php-cs-fixer, lint, test]
+#        permissions:
+#            contents: write
+#            pull-requests: write
+#        steps:
+#            - name: Dispatch a release workflow run
+#                # release only after every platform in the test matrix succeeded
+#                # ref: https://github.com/actions/runner/issues/1251
+#              if: ${{ github.event_name == 'push' && always() && !contains(join(needs.*.result, ','), 'failure') }}
+#              uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+#              with:
+#                  github-token: "${{ env.GITHUB_TOKEN }}"
+#                  script: |
+#                      const payload = {
+#                        run_id: "${{ github.run_id }}",
+#                        sha: "${{ github.sha }}"
+#                      }
+#
+#                      console.log("Sending event payload", JSON.stringify(payload, null, 2));
+#
+#                      const { owner, repo } = context.repo;
+#                      await github.rest.repos.createDispatchEvent({
+#                        owner,
+#                        repo,
+#                        event_type: 'release',
+#                        client_payload: payload
+#                      });

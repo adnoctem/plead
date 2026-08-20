@@ -42,7 +42,7 @@ final class GroupAddCommand extends AbstractGroupCommand
         }
 
         // Audit first: the local mutation below is the intent.
-        $logId = $context->syncLogRepository()->logPending('mail_group', $email, 'add');
+        $logId = $context->syncLogRepository()->logPending('mail_group', $email, 'add', ['recipient' => $recipient]);
         $context->mailGroupRepository()->upsertActive($email, $recipient);
 
         $this->applyAndReport($output, $email);

@@ -19,11 +19,22 @@ CREATE TABLE IF NOT EXISTS mail_recipients (
   PRIMARY KEY (list_email, recipient_email)
 );
 
+CREATE TABLE IF NOT EXISTS mail_aliases (
+  email TEXT NOT NULL,            -- the mailbox whose alias this is
+  alias_email TEXT NOT NULL,      -- additional address delivering into that mailbox
+  removed_at TEXT,                -- soft-delete; preserves history for the audit trail
+  reconciled INTEGER NOT NULL DEFAULT 0,     -- 0 = intent recorded but not yet confirmed on Plesk
+  reconciled_at TEXT,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (email, alias_email)
+);
+
 CREATE TABLE IF NOT EXISTS sync_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  resource_type TEXT NOT NULL,    -- 'auto_reply' | 'mail_group' | 'mail_address'
+  resource_type TEXT NOT NULL,    -- 'auto_reply' | 'mail_group' | 'mail_address' | 'mail_alias' | 'domain' | 'server_session' | 'server_service'
   resource_id TEXT NOT NULL,
   action TEXT NOT NULL,
   result TEXT NOT NULL,           -- 'pending' | 'ok' | 'dry-run' | 'error:<message>'
+  details TEXT,                   -- JSON with the values involved, e.g. {"from": "a@b", "to": "c@b"} for renames
   occurred_at TEXT NOT NULL
 );

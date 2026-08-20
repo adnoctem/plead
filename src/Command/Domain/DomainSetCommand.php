@@ -11,7 +11,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-#[AsCommand(name: 'domain:set', description: 'Set properties of a domain (--description)')]
+#[AsCommand(name: 'domain:set', description: 'Set properties of a domain (--description, --status)')]
 final class DomainSetCommand extends AbstractPleadCommand
 {
     protected function configure(): void
@@ -19,7 +19,7 @@ final class DomainSetCommand extends AbstractPleadCommand
         $this
             ->addArgument('domain', InputArgument::REQUIRED, 'Domain name, e.g. delta4x4.net')
             ->addOption('description', null, InputOption::VALUE_REQUIRED, 'New description for the domain')
-            ->addOption('status', null, InputOption::VALUE_REQUIRED, 'Domain status: enabled|disabled (not yet supported)');
+            ->addOption('status', null, InputOption::VALUE_REQUIRED, 'Domain status: enabled|disabled (0/16 via gen_setup, validated live)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -27,6 +27,7 @@ final class DomainSetCommand extends AbstractPleadCommand
         $domain = (string) $input->getArgument('domain');
         $context = $this->context();
 
+        $status = null;
         if (null !== $input->getOption('status')) {
             $status = strtolower((string) $input->getOption('status'));
             if (!in_array($status, ['enabled', 'disabled'], true)) {
@@ -37,27 +38,55 @@ final class DomainSetCommand extends AbstractPleadCommand
 
                 return self::FAILURE;
             }
-
-            // TODO: implement status toggling once the webspace status packet
-            // (status 0/16 via gen_setup) has been validated against a live
-            // server. The flag stays in the API surface so callers do not
-            // break when it lands.
-            $output->writeln('<error>--status is not supported yet.</error>');
-
-            return self::FAILURE;
         }
 
-        if (null === $input->getOption('description')) {
-            $output->writeln('<error>Provide --description.</error>');
+        if (null === $input->getOption('description') && null === $status) {
+            $output->writeln('<error>Provide --description and/or --status.</error>');
 
             return self::FAILURE;
         }
 
         $gateway = $context->gateway();
-        $logId = $context->syncLogRepository()->logPending('domain', $domain, 'set');
+
+        // Audit the change with the ORIGINAL values: read the current state
+        // first. A read failure does not block the mutation.
+        $old = [];
+        try {
+            $info = $gateway->getDomain($domain);
+            if (null !== $info) {
+                if (null !== $input->getOption('description')) {
+                    $old['description'] = (string) ($info['description'] ?? '');
+                }
+                if (null !== $status) {
+                    $old['status'] = '0' === (string) ($info['status'] ?? '0') ? 'enabled' : 'disabled';
+                }
+            }
+        } catch (\Throwable) {
+            // Ignore: the mutation below will surface connectivity problems.
+        }
+
+        $new = [];
+        if (null !== $input->getOption('description')) {
+            $new['description'] = (string) $input->getOption('description');
+        }
+        if (null !== $status) {
+            $new['status'] = $status;
+        }
+        $details = ['new' => $new];
+        if ([] !== $old) {
+            $details['old'] = $old;
+        }
+
+        $logId = $context->syncLogRepository()->logPending('domain', $domain, 'set', $details);
 
         try {
-            $gateway->updateDomain($domain, (string) $input->getOption('description'));
+            if (null !== $input->getOption('description')) {
+                $gateway->updateDomain($domain, (string) $input->getOption('description'));
+            }
+
+            if (null !== $status) {
+                $gateway->setDomainStatus($domain, 'enabled' === $status ? 0 : 16);
+            }
 
             $context->syncLogRepository()->resolve($logId, $context->dryRun() ? 'dry-run' : 'ok');
             $output->writeln($context->dryRun()

@@ -17,19 +17,23 @@ final class SyncLogRepository
      * Record an intent BEFORE the mutation reaches Plesk. The returned id is
      * passed to resolve() once the outcome is known, so the audit trail
      * always captures what was attempted - even if the RPC never happened.
+     *
+     * @param array<string, mixed>|null $details values involved in the change
+     *                                             (e.g. rename from/to)
      */
-    public function logPending(string $resourceType, string $resourceId, string $action): int
+    public function logPending(string $resourceType, string $resourceId, string $action, ?array $details = null): int
     {
         $statement = $this->connection->pdo()->prepare(
             <<<'SQL'
-            INSERT INTO sync_log (resource_type, resource_id, action, result, occurred_at)
-            VALUES (:resource_type, :resource_id, :action, 'pending', :occurred_at)
+            INSERT INTO sync_log (resource_type, resource_id, action, result, details, occurred_at)
+            VALUES (:resource_type, :resource_id, :action, 'pending', :details, :occurred_at)
             SQL,
         );
         $statement->execute([
             'resource_type' => $resourceType,
             'resource_id' => $resourceId,
             'action' => $action,
+            'details' => null === $details ? null : json_encode($details, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
             'occurred_at' => DateNormalizer::now(),
         ]);
 
@@ -45,13 +49,17 @@ final class SyncLogRepository
         $statement->execute(['result' => $result, 'id' => $logId]);
     }
 
-    /** One-shot record for operations without a follow-up RPC (e.g. adoption). */
-    public function log(string $resourceType, string $resourceId, string $action, string $result): void
+    /**
+     * One-shot record for operations without a follow-up RPC (e.g. adoption).
+     *
+     * @param array<string, mixed>|null $details values involved in the change
+     */
+    public function log(string $resourceType, string $resourceId, string $action, string $result, ?array $details = null): void
     {
         $statement = $this->connection->pdo()->prepare(
             <<<'SQL'
-            INSERT INTO sync_log (resource_type, resource_id, action, result, occurred_at)
-            VALUES (:resource_type, :resource_id, :action, :result, :occurred_at)
+            INSERT INTO sync_log (resource_type, resource_id, action, result, details, occurred_at)
+            VALUES (:resource_type, :resource_id, :action, :result, :details, :occurred_at)
             SQL,
         );
         $statement->execute([
@@ -59,6 +67,7 @@ final class SyncLogRepository
             'resource_id' => $resourceId,
             'action' => $action,
             'result' => $result,
+            'details' => null === $details ? null : json_encode($details, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
             'occurred_at' => DateNormalizer::now(),
         ]);
     }
@@ -67,9 +76,49 @@ final class SyncLogRepository
     public function recent(int $limit = 50): array
     {
         $statement = $this->connection->pdo()->prepare(
-            'SELECT id, resource_type, resource_id, action, result, occurred_at FROM sync_log ORDER BY id DESC LIMIT :limit',
+            'SELECT id, resource_type, resource_id, action, result, details, occurred_at FROM sync_log ORDER BY id DESC LIMIT :limit',
         );
         $statement->bindValue('limit', $limit, \PDO::PARAM_INT);
+        $statement->execute();
+
+        return $statement->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Newest-first audit entries, optionally filtered by resource type and
+     * result ('pending'|'ok'|'dry-run'|'error' prefix match).
+     *
+     * @return array<int, array<string, string>>
+     */
+    public function all(?string $resourceType = null, ?string $result = null, ?int $limit = null): array
+    {
+        $sql = 'SELECT id, resource_type, resource_id, action, result, details, occurred_at FROM sync_log';
+        $where = [];
+        $params = [];
+        if (null !== $resourceType) {
+            $where[] = 'resource_type = :resource_type';
+            $params['resource_type'] = $resourceType;
+        }
+        if (null !== $result) {
+            $where[] = 'result = :result OR result LIKE :result_prefix';
+            $params['result'] = $result;
+            $params['result_prefix'] = $result . ':%';
+        }
+        if ([] !== $where) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+        $sql .= ' ORDER BY id DESC';
+        if (null !== $limit) {
+            $sql .= ' LIMIT :limit';
+        }
+
+        $statement = $this->connection->pdo()->prepare($sql);
+        foreach ($params as $name => $value) {
+            $statement->bindValue(':' . $name, $value);
+        }
+        if (null !== $limit) {
+            $statement->bindValue(':limit', $limit, \PDO::PARAM_INT);
+        }
         $statement->execute();
 
         return $statement->fetchAll(\PDO::FETCH_ASSOC);

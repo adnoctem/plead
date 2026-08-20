@@ -81,6 +81,13 @@ final class AddressGetCommand extends AbstractMailCommand
         $output->writeln(sprintf('Description:   %s', $info['description'] ?: '(none)'));
         $output->writeln(sprintf('Mailbox:       %s', $info['mailbox_enabled'] ? 'enabled' : 'disabled'));
 
+        if (!empty($info['mailbox_quota'])) {
+            $usage = !empty($info['mailbox_usage'])
+                ? sprintf(' (used %s)', self::bytesToMiB((int) $info['mailbox_usage']))
+                : '';
+            $output->writeln(sprintf('Quota:         %s%s', self::bytesToMiB((int) $info['mailbox_quota']), $usage));
+        }
+
         $output->writeln('Forwarding:');
         if ([] === $info['forwarding']) {
             $output->writeln('  (none)');
@@ -93,5 +100,10 @@ final class AddressGetCommand extends AbstractMailCommand
         $output->writeln(sprintf('Auto-reply:    %s', $info['autoresponder_enabled'] ? 'enabled' : 'disabled'));
 
         return self::SUCCESS;
+    }
+
+    private static function bytesToMiB(int $bytes): string
+    {
+        return sprintf('%.1f MiB', $bytes / 1048576);
     }
 }

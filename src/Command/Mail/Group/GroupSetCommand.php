@@ -51,7 +51,7 @@ final class GroupSetCommand extends AbstractGroupCommand
         }
 
         // Audit first: the local mutation below is the intent.
-        $logId = $context->syncLogRepository()->logPending('mail_group', $email, 'set');
+        $logId = $context->syncLogRepository()->logPending('mail_group', $email, 'set', ['recipients' => $recipients]);
 
         foreach ($recipients as $recipient) {
             $repository->upsertActive($email, $recipient);

@@ -43,7 +43,7 @@ final class GroupRemoveCommand extends AbstractGroupCommand
 
         // Audit first: the soft-delete below is the intent; the row is kept
         // so the removal stays visible in the audit trail.
-        $logId = $context->syncLogRepository()->logPending('mail_group', $email, 'remove');
+        $logId = $context->syncLogRepository()->logPending('mail_group', $email, 'remove', ['recipient' => $recipient]);
         $context->mailGroupRepository()->remove($email, $recipient);
 
         $this->applyAndReport($output, $email);

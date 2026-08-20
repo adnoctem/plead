@@ -55,6 +55,12 @@ final class Connection
             $pdo->exec('UPDATE mail_recipients SET reconciled = 1');
         });
 
+        // sync_log gained a details column for the values involved in each
+        // audit entry (e.g. the old address of a rename).
+        $this->ensureColumns('sync_log', [
+            'details TEXT',
+        ]);
+
         // Legacy databases tracked the applied state in applied_at; fold it
         // into reconciled/reconciled_at and drop the column (guarded so the
         // migration is idempotent).

@@ -22,6 +22,7 @@ php bin/plead list               # see all commands
 ## Architecture in one screen
 
 - **Audit-first mutations.** Every mutation follows: (1) write the intent to SQLite (`reconciled = 0` + a `pending` `sync_log` entry), (2) RPC to Plesk (or `--dry-run`), (3) finalize: `reconciled = 1` + resolve log to `ok`/`error:<msg>`. Failures stay dirty for the watcher. See `src/Reconciler/*`, `src/Repository/*`.
+- **Audit entries carry `details`** (JSON): the values involved in a change, e.g. `{"from": "a@b", "to": "c@b"}` for renames or `{"old": {...}, "new": {...}}` for property sets (read-first for old values). Never store passwords there.
 - **Rows are never deleted.** `auto_replies.status` (`scheduled`/`disabled`), `mail_recipients.removed_at` soft-delete. The DB is the audit trail.
 - **Reads default to LIVE Plesk; `--local` reads SQLite.** `AbstractMailCommand::addLocalOption()`/`isLocal()`.
 - **Watchers** (`src/Command/Mail/AbstractWatchCommand.php`): dirty-only by default (`reconciled = 0` / `unreconciledLists()`), `--full` sweeps everything. `Spinner` (braille frames, CR+`ESC[2K`) animates the wait; only when stdout is a TTY.
@@ -32,10 +33,14 @@ php bin/plead list               # see all commands
 Uniform verbs per namespace: `list` (enumerate), `get <target>` (single resource), `set` (mutate). No mixed verbs, no `show`/`enable`/`update` — those were deliberately unified away.
 
 - `src/Command/Mail/Group/` — `mail:group:list|get|set|add|remove|watch` (forwarding recipients)
-- `src/Command/Mail/Address/` — `mail:address:list|get|set|delete|password|export` (mailboxes)
+- `src/Command/Mail/Alias/` — `mail:alias:list|get|set|add|remove` (additional mailbox addresses; modeled on Group, no watch yet)
+- `src/Command/Mail/Address/` — `mail:address:list|get|set|remove|password|rename|export` (mailboxes)
 - `src/Command/Mail/Autoresponder/` — `mail:autoresponder:list|get|set|watch` (auto-replies; `set --enabled=false` disables)
-- `src/Command/Domain/` — `domain:list|get|set` (webspaces; `--status` accepted but errors "not supported yet" — TODO in code)
-- `src/Command/Config/`, `src/Command/Db/` — local-only commands
+- `src/Command/Domain/` — `domain:list|get|set|add|remove|traffic:get|traffic:set|descriptor` (webspaces/sites; `--status=enabled|disabled` via gen_setup 0/16; `--type=virtual-host|forwarding|frame-forwarding|none` maps to htype vrt_hst/std_fwd/frm_fwd/none)
+- `src/Command/Server/` — `server:info` (server/get gen_info+stat+updates); `server:session:list|get|terminate` (session operator; get = list filtered client-side); `server:admin` (server/get admin); `server:service:status|start|stop|restart` (services_state read + `srv_man`; special verbs are deliberate here — lifecycle ops do not map onto list/get/set); `server:ip:list|get|add|set|remove`
+  (`<ip>` operator; get = list filtered client-side); `server:components:list|install` (server/get components read; install uses the docs-only `updater/install-component` shape — NOT in the 1.6.9.1 schema, validate before relying on it); `server:extension:list|get|install|uninstall|call` (`<extension>` operator; git ops documented: get/create/update/remove/deploy/fetch); `server:ref [id]` +
+  `server:exec <id> <args...>` (REST CLI-gate via `PleskRestGateway` — X-API-Key auth, covers ApiCli-only extensions like sslit that the XML ApiRpc hook does not)
+- `src/Command/Config/`, `src/Command/Db/`, `src/Command/Audit/` — local-only commands (`audit:trail` = TUI pager over sync_log with plain-table fallback, `audit:export` = JSON/YAML dump)
 
 ## Plesk XML API hard truths (all empirically validated)
 
@@ -43,7 +48,9 @@ Full detail: `docs/plesk-xml-api-notes.md`. The short version an agent must not 
 
 - **Enumerate WEBSPACES, not sites.** On Obsidian-with-subscriptions setups an unfiltered `site-get` returns zero results; domains live at the webspace level and the main site shares the webspace id. `listDomains()` uses `<webspace><get>` with a site fallback.
 - **Packet shape rules.** `<filter>` first, `<dataset>` after. An **empty `<dataset/>` makes the server omit ids** — always request `<dataset><gen_info/></dataset>`. Never send a site/webspace id of `0` (schema rejects it) — skip id-less results.
-- **`mail-update set` allowed properties** (verbatim): `forwarding, alias, autoresponder, password, user-guid, antivir, outgoing-messages-mbox-limit, description`. **`mailbox` is NOT settable** on existing mailboxes (create-time only) — `mail:address:set` has no `--enabled`/`--quota` because of this. `enable`/`disable` toggle the whole site's mail service (site-id only), not one mailbox.
+- **`mail-update set` allowed properties** (verbatim): `forwarding, alias, autoresponder, password, user-guid, antivir, outgoing-messages-mbox-limit, description`. `mailbox{quota}` is ALSO settable (nested `<mailbox><quota>N</quota></mailbox>`, bytes) — validated live. `mailbox{enabled}` is NOT settable on existing mailboxes (and the GUI has no per-mailbox disable anyway) — `enable`/`disable`
+  toggle the whole site's mail service (site-id only), not one mailbox.
+  - NOTE: the published XSD (1.6.9.1) allows `mailbox{enabled,quota}` in `mailnameUpdateType` — server behavior differs on `enabled` only; the server wins (see `docs/plesk-xml-api-notes.md`).
 - **Password shape:** `<password><value>…</value><type>plain|crypt</type></password>` inside `update/set`. There is no `set-password` operation.
 - **Not-found semantics:** a read of a non-existent mailname throws `PleskX\Api\Exception: mail does not exist` (the lib's `verifyResponse`). `PleskMailGateway::requestOrNull()` maps that ("does not exist|not found") to `null`; genuine errors rethrow.
 - **`multiRequest` returns plain `\SimpleXMLElement` per op** (NOT `XmlResponse`) — type batch handlers accordingly, and per-op errors do NOT throw (must be checked via `okResults()`).

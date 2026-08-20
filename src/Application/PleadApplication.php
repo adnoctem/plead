@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Application;
 
 use App\Command\AbstractPleadCommand;
+use App\Command\Audit\AuditExportCommand;
+use App\Command\Audit\AuditTrailCommand;
 use App\Command\Config\ConfigEditCommand;
 use App\Command\Config\ConfigGetCommand;
 use App\Command\Config\ConfigListCommand;
@@ -13,15 +15,26 @@ use App\Command\Config\ConfigSetCommand;
 use App\Command\Config\ConfigViewCommand;
 use App\Command\Db\DbPathCommand;
 use App\Command\Db\DbQueryCommand;
+use App\Command\Domain\DomainAddCommand;
+use App\Command\Domain\DomainDescriptorCommand;
 use App\Command\Domain\DomainGetCommand;
 use App\Command\Domain\DomainListCommand;
+use App\Command\Domain\DomainRemoveCommand;
 use App\Command\Domain\DomainSetCommand;
-use App\Command\Mail\Address\AddressDeleteCommand;
+use App\Command\Domain\DomainTrafficGetCommand;
+use App\Command\Domain\DomainTrafficSetCommand;
 use App\Command\Mail\Address\AddressExportCommand;
 use App\Command\Mail\Address\AddressGetCommand;
 use App\Command\Mail\Address\AddressListCommand;
 use App\Command\Mail\Address\AddressPasswordCommand;
+use App\Command\Mail\Address\AddressRemoveCommand;
+use App\Command\Mail\Address\AddressRenameCommand;
 use App\Command\Mail\Address\AddressSetCommand;
+use App\Command\Mail\Alias\AliasAddCommand;
+use App\Command\Mail\Alias\AliasGetCommand;
+use App\Command\Mail\Alias\AliasListCommand;
+use App\Command\Mail\Alias\AliasRemoveCommand;
+use App\Command\Mail\Alias\AliasSetCommand;
 use App\Command\Mail\Autoresponder\AutoresponderGetCommand;
 use App\Command\Mail\Autoresponder\AutoresponderListCommand;
 use App\Command\Mail\Autoresponder\AutoresponderSetCommand;
@@ -32,6 +45,29 @@ use App\Command\Mail\Group\GroupListCommand;
 use App\Command\Mail\Group\GroupRemoveCommand;
 use App\Command\Mail\Group\GroupSetCommand;
 use App\Command\Mail\Group\GroupWatchCommand;
+use App\Command\Server\ServerAdminCommand;
+use App\Command\Server\ServerExecCommand;
+use App\Command\Server\ServerInfoCommand;
+use App\Command\Server\ServerRefCommand;
+use App\Command\Server\Components\ComponentsInstallCommand;
+use App\Command\Server\Components\ComponentsListCommand;
+use App\Command\Server\Extension\ExtensionCallCommand;
+use App\Command\Server\Extension\ExtensionGetCommand;
+use App\Command\Server\Extension\ExtensionInstallCommand;
+use App\Command\Server\Extension\ExtensionListCommand;
+use App\Command\Server\Extension\ExtensionUninstallCommand;
+use App\Command\Server\Ip\IpAddCommand;
+use App\Command\Server\Ip\IpGetCommand;
+use App\Command\Server\Ip\IpListCommand;
+use App\Command\Server\Ip\IpRemoveCommand;
+use App\Command\Server\Ip\IpSetCommand;
+use App\Command\Server\Service\ServiceRestartCommand;
+use App\Command\Server\Service\ServiceStartCommand;
+use App\Command\Server\Service\ServiceStatusCommand;
+use App\Command\Server\Service\ServiceStopCommand;
+use App\Command\Server\Session\SessionGetCommand;
+use App\Command\Server\Session\SessionListCommand;
+use App\Command\Server\Session\SessionTerminateCommand;
 use App\Config\PathProvider\PathProviderFactory;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Command\Command;
@@ -52,6 +88,8 @@ final class PleadApplication extends Application
         parent::__construct(self::NAME, self::VERSION);
         $this->setAutoExit(false);
         $this->addCommands([
+            new AuditExportCommand(),
+            new AuditTrailCommand(),
             new ConfigEditCommand(),
             new ConfigGetCommand(),
             new ConfigListCommand(),
@@ -60,25 +98,59 @@ final class PleadApplication extends Application
             new ConfigViewCommand(),
             new DbPathCommand(),
             new DbQueryCommand(),
+            new DomainAddCommand(),
+            new DomainDescriptorCommand(),
             new DomainGetCommand(),
             new DomainListCommand(),
+            new DomainRemoveCommand(),
             new DomainSetCommand(),
+            new DomainTrafficGetCommand(),
+            new DomainTrafficSetCommand(),
             new GroupAddCommand(),
             new GroupGetCommand(),
             new GroupListCommand(),
             new GroupRemoveCommand(),
             new GroupSetCommand(),
             new GroupWatchCommand(),
-            new AddressDeleteCommand(),
+            new AddressRemoveCommand(),
             new AddressExportCommand(),
             new AddressGetCommand(),
             new AddressListCommand(),
             new AddressPasswordCommand(),
+            new AddressRenameCommand(),
             new AddressSetCommand(),
+            new AliasAddCommand(),
+            new AliasGetCommand(),
+            new AliasListCommand(),
+            new AliasRemoveCommand(),
+            new AliasSetCommand(),
             new AutoresponderGetCommand(),
             new AutoresponderListCommand(),
             new AutoresponderSetCommand(),
             new AutoresponderWatchCommand(),
+            new ServerInfoCommand(),
+            new ServerAdminCommand(),
+            new ServerExecCommand(),
+            new ServerRefCommand(),
+            new ComponentsInstallCommand(),
+            new ComponentsListCommand(),
+            new ExtensionCallCommand(),
+            new ExtensionGetCommand(),
+            new ExtensionInstallCommand(),
+            new ExtensionListCommand(),
+            new ExtensionUninstallCommand(),
+            new IpAddCommand(),
+            new IpGetCommand(),
+            new IpListCommand(),
+            new IpRemoveCommand(),
+            new IpSetCommand(),
+            new SessionGetCommand(),
+            new SessionListCommand(),
+            new SessionTerminateCommand(),
+            new ServiceStartCommand(),
+            new ServiceStopCommand(),
+            new ServiceRestartCommand(),
+            new ServiceStatusCommand(),
         ]);
     }
 

@@ -10,8 +10,8 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-#[AsCommand(name: 'mail:address:delete', description: 'Delete a mail address from the server')]
-final class AddressDeleteCommand extends AbstractMailCommand
+#[AsCommand(name: 'mail:address:remove', description: 'Remove a mail address from the server')]
+final class AddressRemoveCommand extends AbstractMailCommand
 {
     protected function configure(): void
     {

@@ -114,7 +114,9 @@ final class MailGroupReconciler
     private function apply(string $operation, string $listEmail, array $addresses): bool
     {
         // Audit first: record the intent before the RPC.
-        $logId = $this->syncLog->logPending('mail_group', $listEmail, $operation);
+        $logId = $this->syncLog->logPending('mail_group', $listEmail, $operation, [
+            'recipients' => $addresses,
+        ]);
 
         try {
             if ('add' === $operation) {
