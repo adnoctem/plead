@@ -21,6 +21,7 @@ final class MailGroupRepositoryTest extends TestCase
     {
         $this->repository = new MailGroupRepository(
             new Connection(sys_get_temp_dir().'/plead-mail-repo-test-'.bin2hex(random_bytes(4)).'/plead.sqlite'),
+            'fake.local',
         );
     }
 

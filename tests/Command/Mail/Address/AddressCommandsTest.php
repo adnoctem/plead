@@ -36,7 +36,7 @@ final class AddressCommandsTest extends TestCase
         mkdir($this->base.'/data', 0o777, true);
         file_put_contents(
             $this->base.'/config/plead.yaml',
-            "plesk:\n    host: fake.local\n    secret_key: test-key\n",
+            "servers:\n    - host: fake.local\n      secret_key: test-key\n",
         );
 
         $this->gateway = new RecordingGateway();

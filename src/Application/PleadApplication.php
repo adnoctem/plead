@@ -38,13 +38,11 @@ use App\Command\Mail\Alias\AliasSetCommand;
 use App\Command\Mail\Autoresponder\AutoresponderGetCommand;
 use App\Command\Mail\Autoresponder\AutoresponderListCommand;
 use App\Command\Mail\Autoresponder\AutoresponderSetCommand;
-use App\Command\Mail\Autoresponder\AutoresponderWatchCommand;
 use App\Command\Mail\Group\GroupAddCommand;
 use App\Command\Mail\Group\GroupGetCommand;
 use App\Command\Mail\Group\GroupListCommand;
 use App\Command\Mail\Group\GroupRemoveCommand;
 use App\Command\Mail\Group\GroupSetCommand;
-use App\Command\Mail\Group\GroupWatchCommand;
 use App\Command\Server\Components\ComponentsInstallCommand;
 use App\Command\Server\Components\ComponentsListCommand;
 use App\Command\Server\Extension\ExtensionCallCommand;
@@ -68,6 +66,7 @@ use App\Command\Server\Service\ServiceStopCommand;
 use App\Command\Server\Session\SessionGetCommand;
 use App\Command\Server\Session\SessionListCommand;
 use App\Command\Server\Session\SessionTerminateCommand;
+use App\Command\WatchCommand;
 use App\Config\PathProvider\PathProviderFactory;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Command\Command;
@@ -88,6 +87,7 @@ final class PleadApplication extends Application
         parent::__construct(self::NAME, self::VERSION);
         $this->setAutoExit(false);
         $this->addCommands([
+            new WatchCommand(),
             new AuditExportCommand(),
             new AuditTrailCommand(),
             new ConfigEditCommand(),
@@ -111,7 +111,6 @@ final class PleadApplication extends Application
             new GroupListCommand(),
             new GroupRemoveCommand(),
             new GroupSetCommand(),
-            new GroupWatchCommand(),
             new AddressRemoveCommand(),
             new AddressExportCommand(),
             new AddressGetCommand(),
@@ -127,7 +126,6 @@ final class PleadApplication extends Application
             new AutoresponderGetCommand(),
             new AutoresponderListCommand(),
             new AutoresponderSetCommand(),
-            new AutoresponderWatchCommand(),
             new ServerInfoCommand(),
             new ServerAdminCommand(),
             new ServerExecCommand(),
@@ -179,6 +177,12 @@ final class PleadApplication extends Application
             'Log mutations without performing them on the server.',
         ));
         $definition->addOption(new InputOption(
+            'server',
+            null,
+            InputOption::VALUE_REQUIRED,
+            'Plesk server to operate on (host or index from the servers list); defaults to the first configured server.',
+        ));
+        $definition->addOption(new InputOption(
             'log-level',
             null,
             InputOption::VALUE_REQUIRED,
@@ -199,6 +203,7 @@ final class PleadApplication extends Application
                 (bool) $input->getOption('dry-run'),
                 $input->getOption('log-level') ?: null,
                 $output->getVerbosity(),
+                $input->getOption('server') ?: null,
             );
         }
 

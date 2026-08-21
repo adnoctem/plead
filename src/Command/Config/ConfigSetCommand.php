@@ -15,10 +15,10 @@ use Symfony\Component\Console\Output\OutputInterface;
 final class ConfigSetCommand extends AbstractPleadCommand
 {
     private const WRITABLE_KEYS = [
-        'plesk.host',
-        'plesk.secret_key',
-        'plesk.login',
-        'plesk.password',
+        'servers.0.host',
+        'servers.0.secret_key',
+        'servers.0.login',
+        'servers.0.password',
         'template.auto_reply_path',
         'log_level',
     ];
@@ -26,7 +26,7 @@ final class ConfigSetCommand extends AbstractPleadCommand
     protected function configure(): void
     {
         $this
-            ->addArgument('key', InputArgument::REQUIRED, 'Dotted configuration key')
+            ->addArgument('key', InputArgument::REQUIRED, 'Dotted configuration key (mail.group entries are edited via config:edit)')
             ->addArgument('value', InputArgument::REQUIRED, 'Value to store')
         ;
     }
@@ -36,7 +36,9 @@ final class ConfigSetCommand extends AbstractPleadCommand
         $key = (string) $input->getArgument('key');
         $value = (string) $input->getArgument('value');
 
-        if (!in_array($key, self::WRITABLE_KEYS, true)) {
+        // Allow any servers.<index>.<field> key, not just the literal first
+        // server - the whitelist above only demonstrates the common case.
+        if (!in_array($key, self::WRITABLE_KEYS, true) && !$this->isServerKey($key)) {
             $output->writeln(sprintf(
                 '<error>Key "%s" is not writable. Valid keys: %s</error>',
                 $key,
@@ -69,5 +71,10 @@ final class ConfigSetCommand extends AbstractPleadCommand
             $current = &$current[$segment];
         }
         $current = $value;
+    }
+
+    private function isServerKey(string $key): bool
+    {
+        return 1 === preg_match('/^servers\.\d+\.(host|secret_key|login|password)$/', $key);
     }
 }

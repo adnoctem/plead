@@ -1,6 +1,6 @@
 {
     "name": "adnoctem/plead",
-    "description": "CLI for managing Plesk-hosted mail resources (scheduled auto-replies) over XML-RPC",
+    "description": "A command-line application to manage Plesk mail servers over XML-RPC or HTTP REST with numerous feature enhancements",
     "type": "project",
     "license": "MIT",
     "minimum-stability": "stable",
@@ -27,6 +27,19 @@
         "phpunit/phpunit": "^11.5.56"
     },
     "scripts": {
+        "tests": [
+            "@tests:phpunit"
+        ],
+        "lint": [
+            "@lint:phpstan",
+            "@lint:php-cs-fixer"
+        ],
+        "build": [
+            "@build:docker"
+        ],
+        "tests:phpunit": "vendor/bin/phpunit",
+        "lint:phpstan": "vendor/bin/phpstan analyse",
+        "lint:php-cs-fixer": "vendor/bin/php-cs-fixer fix --diff",
         "build:docker": "docker buildx bake -f docker/docker-bake.hcl"
     },
     "config": {

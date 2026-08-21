@@ -9,7 +9,10 @@ use App\Util\DateNormalizer;
 
 final class SyncLogRepository
 {
-    public function __construct(private readonly Connection $connection) {}
+    public function __construct(
+        private readonly Connection $connection,
+        private readonly string $server,
+    ) {}
 
     /**
      * Record an intent BEFORE the mutation reaches Plesk. The returned id is
@@ -23,11 +26,12 @@ final class SyncLogRepository
     {
         $statement = $this->connection->pdo()->prepare(
             <<<'SQL'
-                INSERT INTO sync_log (resource_type, resource_id, action, result, details, occurred_at)
-                VALUES (:resource_type, :resource_id, :action, 'pending', :details, :occurred_at)
+                INSERT INTO sync_log (server, resource_type, resource_id, action, result, details, occurred_at)
+                VALUES (:server, :resource_type, :resource_id, :action, 'pending', :details, :occurred_at)
                 SQL,
         );
         $statement->execute([
+            'server' => $this->server,
             'resource_type' => $resourceType,
             'resource_id' => $resourceId,
             'action' => $action,
@@ -56,11 +60,12 @@ final class SyncLogRepository
     {
         $statement = $this->connection->pdo()->prepare(
             <<<'SQL'
-                INSERT INTO sync_log (resource_type, resource_id, action, result, details, occurred_at)
-                VALUES (:resource_type, :resource_id, :action, :result, :details, :occurred_at)
+                INSERT INTO sync_log (server, resource_type, resource_id, action, result, details, occurred_at)
+                VALUES (:server, :resource_type, :resource_id, :action, :result, :details, :occurred_at)
                 SQL,
         );
         $statement->execute([
+            'server' => $this->server,
             'resource_type' => $resourceType,
             'resource_id' => $resourceId,
             'action' => $action,
@@ -74,8 +79,10 @@ final class SyncLogRepository
     public function recent(int $limit = 50): array
     {
         $statement = $this->connection->pdo()->prepare(
-            'SELECT id, resource_type, resource_id, action, result, details, occurred_at FROM sync_log ORDER BY id DESC LIMIT :limit',
+            'SELECT id, resource_type, resource_id, action, result, details, occurred_at
+             FROM sync_log WHERE server = :server ORDER BY id DESC LIMIT :limit',
         );
+        $statement->bindValue('server', $this->server);
         $statement->bindValue('limit', $limit, \PDO::PARAM_INT);
         $statement->execute();
 
@@ -90,9 +97,9 @@ final class SyncLogRepository
      */
     public function all(?string $resourceType = null, ?string $result = null, ?int $limit = null): array
     {
-        $sql = 'SELECT id, resource_type, resource_id, action, result, details, occurred_at FROM sync_log';
+        $sql = 'SELECT id, resource_type, resource_id, action, result, details, occurred_at FROM sync_log WHERE server = :server';
         $where = [];
-        $params = [];
+        $params = ['server' => $this->server];
         if (null !== $resourceType) {
             $where[] = 'resource_type = :resource_type';
             $params['resource_type'] = $resourceType;
@@ -103,7 +110,7 @@ final class SyncLogRepository
             $params['result_prefix'] = $result.':%';
         }
         if ([] !== $where) {
-            $sql .= ' WHERE '.implode(' AND ', $where);
+            $sql .= ' AND '.implode(' AND ', $where);
         }
         $sql .= ' ORDER BY id DESC';
         if (null !== $limit) {

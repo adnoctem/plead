@@ -30,7 +30,7 @@ final class AuditCommandsTest extends TestCase
         mkdir($this->base.'/data', 0o777, true);
         file_put_contents(
             $this->base.'/config/plead.yaml',
-            "plesk:\n    host: fake.local\n    secret_key: test-key\n",
+            "servers:\n    - host: fake.local\n      secret_key: test-key\n",
         );
 
         $paths = new class($this->base) implements PathProviderInterface {
@@ -140,7 +140,7 @@ final class AuditCommandsTest extends TestCase
         mkdir($fresh.'/data', 0o777, true);
         file_put_contents(
             $fresh.'/config/plead.yaml',
-            "plesk:\n    host: fake.local\n    secret_key: test-key\n",
+            "servers:\n    - host: fake.local\n      secret_key: test-key\n",
         );
         $emptyContext = new RuntimeContext(
             new class($fresh) implements PathProviderInterface {

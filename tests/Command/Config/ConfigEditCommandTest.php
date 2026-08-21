@@ -46,8 +46,8 @@ final class ConfigEditCommandTest extends TestCase
 
     public function testEditCreatesMissingFileAndValidates(): void
     {
-        $this->tester->run(['command' => 'config:set', 'key' => 'plesk.host', 'value' => 'mail.example.com']);
-        $this->tester->run(['command' => 'config:set', 'key' => 'plesk.secret_key', 'value' => 'k']);
+        $this->tester->run(['command' => 'config:set', 'key' => 'servers.0.host', 'value' => 'mail.example.com']);
+        $this->tester->run(['command' => 'config:set', 'key' => 'servers.0.secret_key', 'value' => 'k']);
         $this->tester->run(['command' => 'config:edit']);
 
         self::assertSame(0, $this->tester->getStatusCode());

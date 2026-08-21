@@ -22,7 +22,7 @@ final class AutoReplyRepositoryTest extends TestCase
     protected function setUp(): void
     {
         $this->connection = new Connection(sys_get_temp_dir().'/plead-repo-test-'.bin2hex(random_bytes(4)).'/plead.sqlite');
-        $this->repository = new AutoReplyRepository($this->connection);
+        $this->repository = new AutoReplyRepository($this->connection, 'fake.local');
     }
 
     public function testUpsertInsertsAndResetsReconciledState(): void
@@ -71,7 +71,7 @@ final class AutoReplyRepositoryTest extends TestCase
 
         $emails = array_column($this->repository->pending($now), 'email');
 
-        self::assertSame(['due@company.com', 'disabled@company.com'], $emails);
+        self::assertSame(['disabled@company.com', 'due@company.com'], $emails);
     }
 
     public function testPendingComparesInstantsNotLexicographically(): void
@@ -100,7 +100,7 @@ final class AutoReplyRepositoryTest extends TestCase
 
     public function testSyncLogPendingAndResolve(): void
     {
-        $syncLog = new SyncLogRepository($this->connection);
+        $syncLog = new SyncLogRepository($this->connection, 'fake.local');
         $id = $syncLog->logPending('auto_reply', 'user@company.com', 'apply');
         $syncLog->resolve($id, 'ok');
         $syncLog->logPending('auto_reply', 'user@company.com', 'apply');

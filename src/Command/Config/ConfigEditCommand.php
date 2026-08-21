@@ -63,9 +63,11 @@ final class ConfigEditCommand extends AbstractPleadCommand
     private function create(string $target): void
     {
         ConfigFile::write($target, [
-            'plesk' => [
-                'host' => null,
-                'secret_key' => null,
+            'servers' => [
+                [
+                    'host' => null,
+                    'secret_key' => null,
+                ],
             ],
             'log_level' => 'info',
         ]);

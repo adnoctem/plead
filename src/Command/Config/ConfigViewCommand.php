@@ -21,8 +21,8 @@ final class ConfigViewCommand extends AbstractPleadCommand
         } catch (InvalidConfigurationException $e) {
             $output->writeln('<error>No complete configuration found.</error>');
             $output->writeln('Set the required keys first, e.g.:');
-            $output->writeln('  plead config:set plesk.host mail.company.com');
-            $output->writeln('  plead config:set plesk.secret_key <secret-key>');
+            $output->writeln('  plead config:set servers.0.host mail.company.com');
+            $output->writeln('  plead config:set servers.0.secret_key <secret-key>');
 
             return self::FAILURE;
         }

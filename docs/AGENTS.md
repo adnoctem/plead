@@ -24,18 +24,30 @@ php bin/plead list               # see all commands
 - **Audit-first mutations.** Every mutation follows: (1) write the intent to SQLite (`reconciled = 0` + a `pending` `sync_log` entry), (2) RPC to Plesk (or `--dry-run`), (3) finalize: `reconciled = 1` + resolve log to `ok`/`error:<msg>`. Failures stay dirty for the watcher. See `src/Reconciler/*`, `src/Repository/*`.
 - **Audit entries carry `details`** (JSON): the values involved in a change, e.g. `{"from": "a@b", "to": "c@b"}` for renames or `{"old": {...}, "new": {...}}` for property sets (read-first for old values). Never store passwords there.
 - **Rows are never deleted.** `auto_replies.status` (`scheduled`/`disabled`), `mail_recipients.removed_at` soft-delete. The DB is the audit trail.
+- **Every row is scoped to a server** (`server` column = `servers[].host`); repositories take the host in their constructor. The single SQLite + log file hold all servers; `--server`/`PLEAD_SERVER` selects (default: first configured server). Config is `servers:` + general `mail:` overlaid with per-server sections keyed by host (see `src/Config/`).
 - **Reads default to LIVE Plesk; `--local` reads SQLite.** `AbstractMailCommand::addLocalOption()`/`isLocal()`.
-- **Watchers** (`src/Command/Mail/AbstractWatchCommand.php`): dirty-only by default (`reconciled = 0` / `unreconciledLists()`), `--full` sweeps everything. `Spinner` (braille frames, CR+`ESC[2K`) animates the wait; only when stdout is a TTY.
+- **One watcher for everything.** `watch` (`src/Command/WatchCommand.php` + `src/Util/WatchLoop.php`):
+  dirty-only by default (`reconciled = 0` / `unreconciledLists()`), `--full` sweeps everything,
+  `-d/--detached` re-execs itself with stdio on the log file (pcntl fork+exec; pid file
+  `plead-<host>.watch.pid`). Each pass: rule engine first (derives desired recipients of `mail.group`
+  entries from live addresses, writes intents), then autoresponder/group/alias reconcilers push.
+  `Spinner` (braille frames, CR+`ESC[2K`) animates the wait; only when stdout is a TTY.
+- **Rule-driven groups.** `src/Rule/` — `GroupRule` (address/domain + XOR pattern|recipients,
+  `GroupPattern::compile()` adds `~…~` delimiters when missing), `GroupRuleSet` (config → rules),
+  `GroupRuleEngine` (live `listAddresses()` → diff → intents; no-op passes record nothing). The list's
+  own address is never its own recipient; rule-driven lists are authoritative (no adoption, non-matching
+  recipients purged).
 - **Batching.** The Plesk API has no cross-domain mail listing, so live list commands batch N queries into one HTTP POST via `PleskMailGateway::*Bulk()` + `Client::multiRequest` → `mail:address:list` = 2 round trips, group/autoresponder/export = 3.
 
 ## Command structure
 
 Uniform verbs per namespace: `list` (enumerate), `get <target>` (single resource), `set` (mutate). No mixed verbs, no `show`/`enable`/`update` — those were deliberately unified away.
 
-- `src/Command/Mail/Group/` — `mail:group:list|get|set|add|remove|watch` (forwarding recipients)
-- `src/Command/Mail/Alias/` — `mail:alias:list|get|set|add|remove` (additional mailbox addresses; modeled on Group, no watch yet)
+- `src/Command/Mail/Group/` — `mail:group:list|get|set|add|remove` (forwarding recipients; `set` takes `--recipients` XOR `--rule`, else the configured `mail.group` entry)
+- `src/Command/Mail/Alias/` — `mail:alias:list|get|set|add|remove` (additional mailbox addresses; modeled on Group)
 - `src/Command/Mail/Address/` — `mail:address:list|get|set|remove|password|rename|export` (mailboxes)
-- `src/Command/Mail/Autoresponder/` — `mail:autoresponder:list|get|set|watch` (auto-replies; `set --enabled=false` disables)
+- `src/Command/Mail/Autoresponder/` — `mail:autoresponder:list|get|set` (auto-replies; `set --enabled=false` disables)
+- `src/Command/` — root `watch` (the one watcher: `--interval`, `--full`, `-d/--detached`; see `src/Rule/`, `src/Util/WatchLoop.php`)
 - `src/Command/Domain/` — `domain:list|get|set|add|remove|traffic:get|traffic:set|descriptor` (webspaces/sites; `--status=enabled|disabled` via gen_setup 0/16; `--type=virtual-host|forwarding|frame-forwarding|none` maps to htype vrt_hst/std_fwd/frm_fwd/none)
 - `src/Command/Server/` — `server:info` (server/get gen_info+stat+updates); `server:session:list|get|terminate` (session operator; get = list filtered client-side); `server:admin` (server/get admin); `server:service:status|start|stop|restart` (services_state read + `srv_man`; special verbs are deliberate here — lifecycle ops do not map onto list/get/set); `server:ip:list|get|add|set|remove`
   (`<ip>` operator; get = list filtered client-side); `server:components:list|install` (server/get components read; install uses the docs-only `updater/install-component` shape — NOT in the 1.6.9.1 schema, validate before relying on it); `server:extension:list|get|install|uninstall|call` (`<extension>` operator; git ops documented: get/create/update/remove/deploy/fetch); `server:ref [id]` +
@@ -61,11 +73,11 @@ Full detail: `docs/plesk-xml-api-notes.md`. The short version an agent must not 
 - `tests/Gateway/PleskMailGatewayTest.php` — `FakeClient` (extends `PleskX\Api\Client`) asserts packet shapes and canned responses at the XML level. Its `multiRequest()` override must return plain `SimpleXMLElement` (mirroring the lib).
 - `tests/Support/RecordingGateway.php` — in-memory fake used by command tests (no XML, no network). Command tests build a fake `PathProviderInterface` + `RuntimeContext` and run `CommandTester`.
 - **Never hit the real Plesk server from tests.** Isolate via `HOME`/`XDG_*`/`PLEAD_*` env vars to scratch temp dirs.
-- New repository/reconciler behavior: extend `tests/Repository/*`, `tests/Reconciler/*` (the reconcilers are the safety-critical convergence logic).
+- New repository/reconciler behavior: extend `tests/Repository/*`, `tests/Reconciler/*` (the reconcilers are the safety-critical convergence logic). Rule-engine behavior: `tests/Rule/*`.
 
 ## Live server workflow (when the user asks to verify)
 
-- Real credentials live in `~/.config/plead/plead.yaml` (`plesk.host`, `plesk.secret_key`). **Never print the key**; probe scripts read it from config or env.
+- Real credentials live in `~/.config/plead/plead.yaml` (`servers[].host`, `servers[].secret_key`; select with `--server`). **Never print the key**; probe scripts read it from config or env.
 - Read-only commands (`*:list`, `*:get`, `domain:get`, `db:*`) are safe to run against the live server.
 - **Mutation probes require explicit user confirmation first** and should target a designated disposable resource (e.g. `probe@delta4x4.net`, `4x4d.de` description). Revert afterwards. The server is the user's production mail infrastructure.
 - `--dry-run` skips all RPCs structurally in the gateway — use it for mutation dry checks.
@@ -75,7 +87,7 @@ Full detail: `docs/plesk-xml-api-notes.md`. The short version an agent must not 
 - **Spawn mechanics:** `InteractiveProcessLauncher` (used by `config:edit`, `db:query`) must use fork + `pcntl_exec` (no `/bin/sh`): the `sh -c` wrapper breaks TUIs on WSL2/Windows Terminal (ConPTY). Falls back to `passthru` without pcntl. Terminal-mode reset sequences (mouse/focus reporting) around the spawn.
 - **Terminal control sequences** (spinner, reset, cursor) must be gated on `stream_isatty(STDOUT)` + non-Windows — they corrupt piped output otherwise.
 - On WSL/ConPTY, remember `reset` (or a fresh tab) after a hard-killed TUI.
-- SQLite schema changes go in `config/schema.sql` **plus** guarded `ALTER TABLE` steps in `Connection::migrate()` (existing DBs upgrade in place; backfill idempotently).
+- Pre-production: `config/schema.sql` is the single source of truth and `Connection::migrate()` only runs it — databases from older layouts are discarded, not migrated. `watch -d` re-execs via fork+`pcntl_exec` (same rule as the TUI launcher: no `/bin/sh`).
 
 ## Docs map
 

@@ -19,6 +19,7 @@ use App\Repository\MailAddressRepository;
 use App\Repository\MailAliasRepository;
 use App\Repository\MailGroupRepository;
 use App\Repository\SyncLogRepository;
+use App\Rule\GroupRuleEngine;
 use App\Template\AutoReplyRenderer;
 use Monolog\Handler\StreamHandler;
 use Monolog\Level;
@@ -43,6 +44,7 @@ final class RuntimeContext
     private ?AutoReplyReconciler $reconciler = null;
     private ?MailGroupReconciler $reconcilerMail = null;
     private ?MailAliasReconciler $reconcilerAlias = null;
+    private ?GroupRuleEngine $groupRuleEngine = null;
     private ?AutoReplyRenderer $renderer = null;
     private ?LoggerInterface $logger = null;
 
@@ -52,6 +54,7 @@ final class RuntimeContext
         private readonly bool $dryRun,
         private readonly ?string $logLevelOption,
         private readonly int $verbosity,
+        private readonly ?string $serverOption = null,
         ?PleskMailGateway $gateway = null,
         ?PleskRestGateway $restGateway = null,
         ?AutoReplyRepository $autoReplyRepository = null,
@@ -81,7 +84,13 @@ final class RuntimeContext
     /** @return array<string, mixed> */
     public function config(): array
     {
-        return $this->config ??= $this->configLoader()->load($this->explicitConfigPath);
+        return $this->config ??= $this->configLoader()->load($this->explicitConfigPath, $this->serverOption);
+    }
+
+    /** The host of the server selected via --server/PLEAD_SERVER (first by default). */
+    public function serverHost(): string
+    {
+        return (string) $this->config()['server']['host'];
     }
 
     public function databaseFile(): string
@@ -96,27 +105,27 @@ final class RuntimeContext
 
     public function autoReplyRepository(): AutoReplyRepository
     {
-        return $this->autoReplyRepository ??= new AutoReplyRepository($this->connection());
+        return $this->autoReplyRepository ??= new AutoReplyRepository($this->connection(), $this->serverHost());
     }
 
     public function mailGroupRepository(): MailGroupRepository
     {
-        return $this->mailGroupRepository ??= new MailGroupRepository($this->connection());
+        return $this->mailGroupRepository ??= new MailGroupRepository($this->connection(), $this->serverHost());
     }
 
     public function mailAliasRepository(): MailAliasRepository
     {
-        return $this->mailAliasRepository ??= new MailAliasRepository($this->connection());
+        return $this->mailAliasRepository ??= new MailAliasRepository($this->connection(), $this->serverHost());
     }
 
     public function mailAddressRepository(): MailAddressRepository
     {
-        return $this->mailAddressRepository ??= new MailAddressRepository($this->connection());
+        return $this->mailAddressRepository ??= new MailAddressRepository($this->connection(), $this->serverHost());
     }
 
     public function syncLogRepository(): SyncLogRepository
     {
-        return $this->syncLogRepository ??= new SyncLogRepository($this->connection());
+        return $this->syncLogRepository ??= new SyncLogRepository($this->connection(), $this->serverHost());
     }
 
     public function gateway(): PleskMailGateway
@@ -164,6 +173,17 @@ final class RuntimeContext
     {
         return $this->reconcilerAlias ??= new MailAliasReconciler(
             $this->mailAliasRepository(),
+            $this->syncLogRepository(),
+            $this->gateway(),
+            $this->logger(),
+            $this->dryRun,
+        );
+    }
+
+    public function groupRuleEngine(): GroupRuleEngine
+    {
+        return $this->groupRuleEngine ??= new GroupRuleEngine(
+            $this->mailGroupRepository(),
             $this->syncLogRepository(),
             $this->gateway(),
             $this->logger(),

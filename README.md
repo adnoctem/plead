@@ -22,12 +22,17 @@
 
 `plead` is an open-source [MIT][license]-licensed [PHP][php] command-line tool written and maintained by the [Ad Noctem Collective][org] for managing Plesk-hosted mail resources that Plesk's own UI and XML-API don't handle natively.
 
-Two things are currently automated:
+Three things are currently automated:
 
-- **Auto-replies with a scheduled start time.** Plesk supports `end_date` natively, but `start_date` does not exist as a Plesk concept. `plead` enforces it: you schedule a reply with a start and end date, and the `mail:autoresponder:watch` daemon pushes it to Plesk the moment the start time is reached.
-- **Mail distribution groups** (e.g. `all@company.com`) — add/remove recipients without hand-editing Plesk's forwarding UI. A `mail:group:watch` daemon continuously converges the server state toward what `plead` has been told.
+- **Auto-replies with a scheduled start time.** Plesk supports `end_date` natively, but `start_date` does not exist as a Plesk concept. `plead` enforces it: you schedule a reply with a start and end date, and the `watch` daemon pushes it to Plesk the moment the start time is reached.
+- **Mail distribution groups** (e.g. `all@company.com`) — add/remove recipients without hand-editing Plesk's forwarding UI. A `watch` daemon continuously converges the server state toward what `plead` has been told.
+- **Rule-driven groups** — a group's recipients can be derived from a regex over the domain's addresses
+  (`mail.group` config or `mail:group:set --rule`). The watcher re-derives the list every pass, so new
+  mailboxes join automatically while `info@`, `pbx@` and friends stay out.
 
 `plead` runs entirely off the Plesk box and talks to Plesk exclusively over HTTPS XML-RPC (port 8443) using a secret key or administrator credentials. It is safe to run against production mail infrastructure: development follows read-before-write, `--dry-run` is enforced structurally in the gateway, reconciliation is idempotent, and every action lands in a local SQLite audit trail.
+
+One installation can manage several Plesk servers; a global `--server` flag picks one (default: the first configured).
 
 ### The audit-trail model
 
@@ -43,8 +48,8 @@ Rows are never deleted: auto-replies carry a `status` (`scheduled`/`disabled`) a
 
 ```bash
 # configure once (either works)
-plead config:set plesk.host mail.company.com
-plead config:set plesk.secret_key <secret-key>
+plead config:set servers.0.host mail.company.com
+plead config:set servers.0.secret_key <secret-key>
 plead config:edit          # open the config file in $EDITOR instead
 
 # see the resolved configuration (post-merge) and where files live
@@ -68,16 +73,20 @@ plead mail:autoresponder:get user@company.com --local
 # disable an auto-reply again (kept in the audit trail)
 plead mail:autoresponder:set user@company.com --enabled=false
 
-# continuously apply scheduled auto-replies as their start time is reached
-plead mail:autoresponder:watch --interval=60
-
 # manage a mail distribution group
 plead mail:group:add group@company.com newhire@company.com
 plead mail:group:remove group@company.com leaver@company.com
 plead mail:group:set group@company.com --recipients=a@company.com,b@company.com
+plead mail:group:set all@company.com --rule='^(1und1|info|support|noreply|pbx)@'
 plead mail:group:get group@company.com          # live state on the Plesk server
 plead mail:group:get group@company.com --local  # desired state + history
-plead mail:group:watch --interval=60            # continuously converge server state
+
+# one watcher for everything: auto-replies, groups, aliases and rule-driven lists
+plead watch --interval=60            # foreground
+plead watch -d                       # detached: releases the terminal prompt
+
+# target a specific server when several are configured
+plead --server prod.example.com mail:group:list
 
 # mailbox operations
 plead mail:address:list --domain=company.com
@@ -107,10 +116,9 @@ Read commands query the **live Plesk server** by default; add `--local` to read 
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `mail:group:list`                       | List mail groups (live: mailnames with forwarding; `--local`: managed)                                                                |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `mail:group:set <group>`                | Replace the full recipient list (`--recipients=a@b,c@d`)                                                                              |
+| `mail:group:set <group>`                | Replace the full recipient list (`--recipients=a@b,c@d` or `--rule=<pcre>`; neither falls back to the configured `mail.group` entry)  |
 | `mail:group:add <group> <recipient>`    | Add one recipient                                                                                                                     |
 | `mail:group:remove <group> <recipient>` | Remove one recipient (soft-delete, keeps history)                                                                                     |
-| `mail:group:watch`                      | Converge server state toward desired state (`--interval`, `--full`)                                                                   |
 | `mail:address:list`                     | List all mail addresses (`--domain=`, `--local`)                                                                                      |
 | `mail:address:get <email>`              | Mailbox, forwarding and auto-reply state of an address                                                                                |
 | `mail:address:set <email>`              | Set properties: `--description=`, `--outgoing-limit=`, `--quota=` (MiB)                                                               |
@@ -126,7 +134,7 @@ Read commands query the **live Plesk server** by default; add `--local` to read 
 | `mail:autoresponder:list`               | All addresses with an enabled auto-reply (`--local`: scheduled)                                                                       |
 | `mail:autoresponder:get <email>`        | Auto-reply of an address (`--local`: desired state)                                                                                   |
 | `mail:autoresponder:set <email>`        | Enable/schedule (`--message-file`, `--start-date`, `--end-date`) or disable (`--enabled=false`)                                       |
-| `mail:autoresponder:watch`              | Apply scheduled auto-replies and pending disables (`--interval`, `--full`)                                                            |
+| `watch`                                 | Continuously converge everything (auto-replies, groups, aliases, rule-driven lists; `--interval`, `--full`, `-d/--detached`)          |
 | `domain:list`                           | List all domains on the server                                                                                                        |
 | `domain:get <domain>`                   | Everything plead can read about a domain (hosting, limits, mail count)                                                                |
 | `domain:set <domain>`                   | Set properties (`--description=`, `--status=enabled or disabled`)                                                                     |
@@ -171,12 +179,13 @@ Read commands query the **live Plesk server** by default; add `--local` to read 
 
 Global options (available on every command):
 
-| Flag           | Behavior                                                              |
-| -------------- | --------------------------------------------------------------------- |
-| `-c, --config` | Load only this config file; skip discovery and merging                |
-| `--dry-run`    | Log mutations without performing them - no network calls at all       |
-| `--log-level`  | Baseline file log level (default `info`); `-v/-vv/-vvv` also raise it |
-| `-v/-vv/-vvv`  | Console verbosity (drives both console output and file log level)     |
+| Flag            | Behavior                                                                   |
+| --------------- | -------------------------------------------------------------------------- |
+| `-c, --config`  | Load only this config file; skip discovery and merging                     |
+| `--server`      | Operate on this server (host or index; default: the first)                 |
+| `--dry-run`     | Log mutations without performing them - no network calls at all            |
+| `--log-level`   | Baseline file log level (default `info`); `-v/-vv/-vvv` also raise it      |
+| `-v/-vv/-vvv`   | Console verbosity (drives both console output and file log level)          |
 
 ## ⚙️ Configuration
 
@@ -188,14 +197,53 @@ Configuration is discovered from per-user and system-wide locations, in most-spe
 | macOS   | `~/Library/Application Support/plead`     | `/Library/Application Support/plead` |
 | Windows | `%LOCALAPPDATA%\plead`, `%APPDATA%\plead` | `%ProgramData%\plead`                |
 
-`plead.yaml` and `plead.json` are both supported (YAML preferred). Environment variables override everything:
+`plead.yaml` and `plead.json` are both supported (YAML preferred). One installation can manage several Plesk servers; `servers` is a list, a per-server section (named by host) overrides the general `mail` config for that server, and the **first server is the default** unless `--server` says otherwise.
 
-- `PLEAD_PLESK_HOST` — Plesk host (bare hostname, or with scheme/port, e.g. `https://mail.company.com:8443`)
-- `PLEAD_PLESK_SECRET_KEY` — Plesk secret key (alternative to credentials)
-- `PLEAD_PLESK_LOGIN` / `PLEAD_PLESK_PASSWORD` — administrator credentials (alternative to secret key)
+```yaml
+servers:
+  - host: dellius.delta4x4.net
+    secret_key: <key>
+  - host: prod.example.com
+    login: admin        # or credentials instead of a secret key
+    password: <password>
+
+# general config applying to every server
+mail:
+  defaults:
+    quota: 512MB        # parsed to bytes; also accepts 1GB, 2 GB, 1048576
+    antivirus: off
+  group:
+    - address: all@delta4x4.net
+      pattern: '^(1und1|payments|info|support|shop|noreply|marketing|bestellungen)@'
+    - address: group2@delta4x4.net
+      recipients:
+        - user1@example.com
+        - user2@example.com
+
+# per-server overrides: this section only applies to dellius.delta4x4.net
+dellius.delta4x4.net:
+  mail:
+    group:
+      - address: group@delta4x4.net
+        pattern: '^(info|support)@'
+```
+
+Group entries define the **desired recipients** of a mail group:
+
+- `pattern` — a PCRE (delimiters optional) of addresses to **exclude** from the list. The list always holds every mailbox on its domain except those matching, and the list itself is never its own recipient. Entries with a domain-less address need an explicit `domain:`.
+- `recipients` — a fixed recipient list, enforced by the watcher just like manually-set groups.
+- An entry with both, or neither, is a configuration error.
+
+`watch` re-derives every configured group every pass: new mailboxes join `all@…` automatically, disabled ones drop out, and `pbx@…`-style addresses never get in. The same rules can be applied once via `mail:group:set <email> --rule='…'` (mutually exclusive with `--recipients`; with neither, the configured entry for that address is used).
+
+Environment variables override everything:
+
+- `PLEAD_SERVER` — selects the server (same as `--server`; host or index)
+- `PLEAD_PLESK_SECRET_KEY` — overrides the selected server's secret key
+- `PLEAD_PLESK_LOGIN` / `PLEAD_PLESK_PASSWORD` — override the selected server's credentials
 - `PLEAD_DATA_DIR` — overrides the data directory (used by the containerized deployment, e.g. `/data`)
 
-Data (SQLite database and log file) lives under the platform data directory — on Linux `~/.local/share/plead/`. The SQLite database is the authoritative record of the desired state and the full audit trail.
+Data (SQLite database and log file) lives under the platform data directory — on Linux `~/.local/share/plead/`. Every row in the database is scoped to its server (`server` column), so the desired state and audit trail of multiple servers coexist without collisions. The SQLite database is the authoritative record of the desired state and the full audit trail.
 
 ## 📚 Documentation
 

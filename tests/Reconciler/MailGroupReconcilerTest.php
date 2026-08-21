@@ -27,8 +27,8 @@ final class MailGroupReconcilerTest extends TestCase
     protected function setUp(): void
     {
         $this->connection = new Connection(sys_get_temp_dir().'/plead-mail-reconciler-'.bin2hex(random_bytes(4)).'/plead.sqlite');
-        $this->repository = new MailGroupRepository($this->connection);
-        $this->syncLog = new SyncLogRepository($this->connection);
+        $this->repository = new MailGroupRepository($this->connection, 'fake.local');
+        $this->syncLog = new SyncLogRepository($this->connection, 'fake.local');
         $this->gateway = new RecordingGateway();
     }
 

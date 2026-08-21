@@ -174,6 +174,35 @@ class PleskMailGateway
     }
 
     /**
+     * Every full mail address ("name@domain") on the server, optionally
+     * restricted to one domain. Two HTTP round trips regardless of the number
+     * of domains (one webspace get + one batched mail get_info).
+     *
+     * @return string[] lowercased, sorted addresses
+     */
+    public function listAddresses(?string $domainFilter = null): array
+    {
+        $domains = $this->listDomains();
+        $domainBySite = [];
+        $siteIds = [];
+        foreach ($domains as $domain) {
+            $domainBySite[(int) $domain['id']] = (string) $domain['name'];
+            if (null !== $domainFilter && $domainFilter !== $domain['name']) {
+                continue;
+            }
+            $siteIds[] = (int) $domain['id'];
+        }
+
+        $addresses = [];
+        foreach ($this->listMailnamesBulk($siteIds) as $row) {
+            $addresses[] = strtolower($row['name'].'@'.$domainBySite[$row['site_id']]);
+        }
+        sort($addresses);
+
+        return $addresses;
+    }
+
+    /**
      * Fetch everything about one domain. webspace-get is used because the
      * enumeration (listDomains) is webspace-based on this server; on other
      * setups domains resolve through the site fallback instead.

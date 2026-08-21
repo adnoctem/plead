@@ -4,26 +4,7 @@ on: ["push", "pull_request"]
 
 permissions: {}
 
-env:
-    PHPUNIT_FLAGS: "-v tests"
-
 jobs:
-    php-cs-fixer:
-        name: PHP-CS-Fixer
-        runs-on: ubuntu-latest
-        permissions:
-            contents: read
-        steps:
-            - name: Checkout
-              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-              with:
-                  persist-credentials: false
-
-            - name: PHP-CS-Fixer
-              uses: docker://oskarstark/php-cs-fixer-ga@sha256:e1ecd59fdc0d097399955966d6b4c5e067be83c9bbea771f446dd3cfcdb53ee7
-              with:
-                  args: --diff --dry-run
-
     lint:
         name: Lint PHP
         runs-on: ubuntu-latest
@@ -35,26 +16,26 @@ jobs:
               with:
                   persist-credentials: false
 
-            - name: "Install PHP with extensions"
+            - name: Install PHP with extensions
               uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
               with:
-                  coverage: none
-                  extensions: pdo_sqlite, sqlite3, xml, yaml
-                  php-version: 8.4
-                  tools: composer:v2
+                coverage: none
+                extensions: "intl, mbstring, pdo_sqlite, zip, pcntl"
+                php-version: 8.5
+                tools: composer:v2
 
-            - name: "Set composer cache directory"
+            - name: Set composer cache directory
               id: composer-cache
               run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
 
-            - name: "Cache composer"
+            - name: Cache composer
               uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
               with:
                   path: ${{ steps.composer-cache.outputs.dir }}
                   key: ${{ runner.os }}-composer-${{ hashFiles('composer.lock') }}
                   restore-keys: ${{ runner.os }}-composer-
 
-            - name: "Install dependencies"
+            - name: Install dependencies
               run: composer install --ansi --no-interaction --no-progress
 
             - name: Lint Composer config
@@ -63,8 +44,8 @@ jobs:
             - name: Check if any dependencies are compromised
               run: composer audit
 
-            - name: Run PHPStan
-              run: ./vendor/bin/phpstan analyze
+            - name: Run PHPStan and PHP-CS-Fixer
+              run: composer run lint
 
     test:
         name: "${{ matrix.operating-system }} / PHP ${{ matrix.php-version }}"
@@ -82,37 +63,37 @@ jobs:
               with:
                   persist-credentials: false
 
-            - name: "Install PHP with extensions"
+            - name: Install PHP with extensions
               uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
               with:
-                  coverage: none
-                  extensions: pdo_sqlite, sqlite3, xml, yaml
-                  php-version: ${{ matrix.php-version }}
-                  tools: composer:v2
+                coverage: none
+                extensions: "intl, mbstring, pdo_sqlite, zip, pcntl"
+                php-version: ${{ matrix.php-version }}
+                tools: composer:v2
 
-            - name: "Add PHPUnit matcher"
+            - name: Add PHPUnit matcher
               run: echo "::add-matcher::${{ runner.tool_cache }}/phpunit.json"
 
-            - name: "Set composer cache directory"
+            - name: Set composer cache directory
               id: composer-cache
               run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
               shell: bash
 
-            - name: "Cache composer"
+            - name: Cache composer
               uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
               with:
                   path: ${{ steps.composer-cache.outputs.dir }}
                   key: ${{ runner.os }}-composer-${{ hashFiles('composer.lock') }}
                   restore-keys: ${{ runner.os }}-composer-
 
-            - name: "Install dependencies"
+            - name: Install dependencies
               run: composer install --ansi --no-interaction --no-progress
 
-            - name: "PHPUnit version"
+            - name: PHPUnit version
               run: vendor/bin/phpunit --version
 
-            - name: "Run tests"
-              run: vendor/bin/phpunit ${{ env.PHPUNIT_FLAGS }}
+            - name: Run tests
+              run: composer run tests
 
 #    dispatch:
 #        runs-on: ubuntu-latest

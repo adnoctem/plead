@@ -34,7 +34,7 @@ final class GroupCommandsTest extends TestCase
         mkdir($this->base.'/data', 0o777, true);
         file_put_contents(
             $this->base.'/config/plead.yaml',
-            "plesk:\n    host: fake.local\n    secret_key: test-key\n",
+            "servers:\n    - host: fake.local\n      secret_key: test-key\n",
         );
 
         $paths = new class($this->base) implements PathProviderInterface {
@@ -212,6 +212,106 @@ final class GroupCommandsTest extends TestCase
 
         self::assertSame(['alice@company.com'], $this->gateway->forwarding['group@company.com']);
         self::assertSame([], $this->context->mailGroupRepository()->unreconciledLists());
+    }
+
+    public function testSetRuleComputesRecipientsFromLiveDomain(): void
+    {
+        $this->gateway->domains = [['id' => 1, 'name' => 'company.com']];
+        $this->gateway->mailnames = [
+            ['id' => 10, 'name' => 'alice', 'description' => ''],
+            ['id' => 11, 'name' => 'info', 'description' => ''],
+            ['id' => 12, 'name' => 'pbx', 'description' => ''],
+            ['id' => 13, 'name' => 'all', 'description' => ''],
+        ];
+
+        $tester = $this->tester(new GroupSetCommand());
+        $tester->execute(['email' => 'all@company.com', '--rule' => '^(info|pbx)@']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertSame(['alice@company.com'], $this->gateway->forwarding['all@company.com']);
+        self::assertSame([], $this->context->mailGroupRepository()->unreconciledLists());
+    }
+
+    public function testSetRulePurgesExistingRecipientsThatDoNotMatch(): void
+    {
+        $this->gateway->domains = [['id' => 1, 'name' => 'company.com']];
+        $this->gateway->mailnames = [
+            ['id' => 10, 'name' => 'alice', 'description' => ''],
+            ['id' => 11, 'name' => 'info', 'description' => ''],
+        ];
+        $this->gateway->forwarding['all@company.com'] = ['info@company.com', 'leaver@company.com'];
+
+        $tester = $this->tester(new GroupSetCommand());
+        $tester->execute(['email' => 'all@company.com', '--rule' => '^(info)@']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertSame(['alice@company.com'], $this->gateway->forwarding['all@company.com']);
+    }
+
+    public function testSetRuleAndRecipientsAreMutuallyExclusive(): void
+    {
+        $tester = $this->tester(new GroupSetCommand());
+        $tester->execute([
+            'email' => 'all@company.com',
+            '--rule' => '^(info)@',
+            '--recipients' => 'alice@company.com',
+        ]);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('mutually exclusive', $tester->getDisplay());
+        self::assertSame([], $this->context->mailGroupRepository()->activeRecipients('all@company.com'));
+    }
+
+    public function testSetRuleWithoutOptionsAndConfigFails(): void
+    {
+        $tester = $this->tester(new GroupSetCommand());
+        $tester->execute(['email' => 'all@company.com']);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('Provide --recipients or --rule', $tester->getDisplay());
+    }
+
+    public function testSetRuleFallsBackToConfigEntry(): void
+    {
+        $this->gateway->domains = [['id' => 1, 'name' => 'company.com']];
+        $this->gateway->mailnames = [
+            ['id' => 10, 'name' => 'alice', 'description' => ''],
+            ['id' => 11, 'name' => 'info', 'description' => ''],
+        ];
+        file_put_contents($this->base.'/config/plead.yaml', implode("\n", [
+            'servers:',
+            '    - host: fake.local',
+            '      secret_key: test-key',
+            'mail:',
+            '    group:',
+            '        - address: all@company.com',
+            "          pattern: '^(info)@'",
+        ]));
+
+        $tester = $this->tester(new GroupSetCommand());
+        $tester->execute(['email' => 'all@company.com']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertSame(['alice@company.com'], $this->gateway->forwarding['all@company.com']);
+    }
+
+    public function testSetRuleReportsNoopWhenAlreadyInSync(): void
+    {
+        $this->gateway->domains = [['id' => 1, 'name' => 'company.com']];
+        $this->gateway->mailnames = [
+            ['id' => 10, 'name' => 'alice', 'description' => ''],
+            ['id' => 11, 'name' => 'info', 'description' => ''],
+        ];
+
+        $first = $this->tester(new GroupSetCommand());
+        $first->execute(['email' => 'all@company.com', '--rule' => '^(info)@']);
+
+        $second = $this->tester(new GroupSetCommand());
+        $second->execute(['email' => 'all@company.com', '--rule' => '^(info)@']);
+
+        self::assertSame(0, $second->getStatusCode());
+        self::assertStringContainsString('already match the rule', $second->getDisplay());
+        self::assertSame(['alice@company.com'], $this->gateway->forwarding['all@company.com']);
     }
 
     private function tester(AbstractPleadCommand $command): CommandTester

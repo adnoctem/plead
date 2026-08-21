@@ -34,7 +34,7 @@ final class AutoresponderCommandsTest extends TestCase
         mkdir($this->base.'/data', 0o777, true);
         file_put_contents(
             $this->base.'/config/plead.yaml',
-            "plesk:\n    host: fake.local\n    secret_key: test-key\n",
+            "servers:\n    - host: fake.local\n      secret_key: test-key\n",
         );
         $this->messageFile = $this->base.'/message.txt';
         file_put_contents($this->messageFile, 'Bin im Urlaub & Grüße');

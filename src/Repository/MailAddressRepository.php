@@ -13,7 +13,10 @@ use App\Database\Connection;
  */
 final class MailAddressRepository
 {
-    public function __construct(private readonly Connection $connection) {}
+    public function __construct(
+        private readonly Connection $connection,
+        private readonly string $server,
+    ) {}
 
     /**
      * Move every local record of an address to its new name. Only rows that
@@ -23,18 +26,18 @@ final class MailAddressRepository
     public function renameLocal(string $oldEmail, string $newEmail): void
     {
         $statement = $this->connection->pdo()->prepare(
-            'UPDATE auto_replies SET email = :new_email WHERE email = :old_email',
+            'UPDATE auto_replies SET email = :new_email WHERE server = :server AND email = :old_email',
         );
-        $statement->execute(['new_email' => $newEmail, 'old_email' => $oldEmail]);
+        $statement->execute(['new_email' => $newEmail, 'server' => $this->server, 'old_email' => $oldEmail]);
 
         $statement = $this->connection->pdo()->prepare(
-            'UPDATE mail_aliases SET email = :new_email WHERE email = :old_email',
+            'UPDATE mail_aliases SET email = :new_email WHERE server = :server AND email = :old_email',
         );
-        $statement->execute(['new_email' => $newEmail, 'old_email' => $oldEmail]);
+        $statement->execute(['new_email' => $newEmail, 'server' => $this->server, 'old_email' => $oldEmail]);
 
         $statement = $this->connection->pdo()->prepare(
-            'UPDATE mail_recipients SET list_email = :new_email WHERE list_email = :old_email',
+            'UPDATE mail_recipients SET list_email = :new_email WHERE server = :server AND list_email = :old_email',
         );
-        $statement->execute(['new_email' => $newEmail, 'old_email' => $oldEmail]);
+        $statement->execute(['new_email' => $newEmail, 'server' => $this->server, 'old_email' => $oldEmail]);
     }
 }

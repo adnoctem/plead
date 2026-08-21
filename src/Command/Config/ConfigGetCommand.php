@@ -16,7 +16,7 @@ final class ConfigGetCommand extends AbstractPleadCommand
 {
     protected function configure(): void
     {
-        $this->addArgument('key', InputArgument::REQUIRED, 'Dotted configuration key, e.g. plesk.host');
+        $this->addArgument('key', InputArgument::REQUIRED, 'Dotted configuration key, e.g. servers.0.host');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

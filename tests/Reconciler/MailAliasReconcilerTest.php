@@ -27,8 +27,8 @@ final class MailAliasReconcilerTest extends TestCase
     protected function setUp(): void
     {
         $this->connection = new Connection(sys_get_temp_dir().'/plead-alias-reconciler-'.bin2hex(random_bytes(4)).'/plead.sqlite');
-        $this->repository = new MailAliasRepository($this->connection);
-        $this->syncLog = new SyncLogRepository($this->connection);
+        $this->repository = new MailAliasRepository($this->connection, 'fake.local');
+        $this->syncLog = new SyncLogRepository($this->connection, 'fake.local');
         $this->gateway = new RecordingGateway();
     }
 

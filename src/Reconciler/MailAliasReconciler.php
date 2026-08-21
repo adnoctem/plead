@@ -41,6 +41,23 @@ final class MailAliasReconciler
         return true;
     }
 
+    /**
+     * @return int number of mailboxes changed this pass
+     */
+    public function reconcileAll(bool $full = false): int
+    {
+        // Default: only mailboxes with unreconciled intents. --full sweeps
+        // every managed mailbox to catch drift introduced on the server side.
+        $emails = $full ? $this->repository->managedLists() : $this->repository->unreconciledLists();
+
+        $changed = 0;
+        foreach ($emails as $email) {
+            $changed += (int) $this->reconcile($email);
+        }
+
+        return $changed;
+    }
+
     /** @return bool true if the mailbox was changed on the Plesk side */
     public function reconcile(string $email): bool
     {

@@ -9,7 +9,10 @@ use App\Util\DateNormalizer;
 
 final class AutoReplyRepository
 {
-    public function __construct(private readonly Connection $connection) {}
+    public function __construct(
+        private readonly Connection $connection,
+        private readonly string $server,
+    ) {}
 
     public function upsert(string $email, string $message, string $startDate, string $endDate): void
     {
@@ -17,9 +20,9 @@ final class AutoReplyRepository
         // no longer matches, so the row is flagged dirty for the watcher.
         $statement = $this->connection->pdo()->prepare(
             <<<'SQL'
-                INSERT INTO auto_replies (email, message, start_date, end_date, status, reconciled, reconciled_at, updated_at)
-                VALUES (:email, :message, :start_date, :end_date, 'scheduled', 0, NULL, :updated_at)
-                ON CONFLICT(email) DO UPDATE SET
+                INSERT INTO auto_replies (server, email, message, start_date, end_date, status, reconciled, reconciled_at, updated_at)
+                VALUES (:server, :email, :message, :start_date, :end_date, 'scheduled', 0, NULL, :updated_at)
+                ON CONFLICT(server, email) DO UPDATE SET
                     message = :message,
                     start_date = :start_date,
                     end_date = :end_date,
@@ -30,6 +33,7 @@ final class AutoReplyRepository
                 SQL,
         );
         $statement->execute([
+            'server' => $this->server,
             'email' => $email,
             'message' => $message,
             'start_date' => $startDate,
@@ -52,10 +56,11 @@ final class AutoReplyRepository
                     reconciled = 0,
                     reconciled_at = NULL,
                     updated_at = :updated_at
-                WHERE email = :email
+                WHERE server = :server AND email = :email
                 SQL,
         );
         $statement->execute([
+            'server' => $this->server,
             'email' => $email,
             'updated_at' => DateNormalizer::now(),
         ]);
@@ -66,9 +71,9 @@ final class AutoReplyRepository
     {
         $statement = $this->connection->pdo()->prepare(
             'SELECT email, message, start_date, end_date, status, reconciled, reconciled_at, updated_at
-             FROM auto_replies WHERE email = :email',
+             FROM auto_replies WHERE server = :server AND email = :email',
         );
-        $statement->execute(['email' => $email]);
+        $statement->execute(['server' => $this->server, 'email' => $email]);
         $row = $statement->fetch(\PDO::FETCH_ASSOC);
 
         return false === $row ? null : $row;
@@ -82,12 +87,13 @@ final class AutoReplyRepository
      */
     public function pending(\DateTimeImmutable $now): array
     {
-        $rows = $this->connection->pdo()
-            ->query('SELECT email, message, start_date, end_date, status, reconciled, reconciled_at, updated_at FROM auto_replies WHERE reconciled = 0')
-            ->fetchAll(\PDO::FETCH_ASSOC)
-        ;
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT email, message, start_date, end_date, status, reconciled, reconciled_at, updated_at
+             FROM auto_replies WHERE server = :server AND reconciled = 0 ORDER BY email',
+        );
+        $statement->execute(['server' => $this->server]);
 
-        return $this->dueRows($rows, $now);
+        return $this->dueRows($statement->fetchAll(\PDO::FETCH_ASSOC), $now);
     }
 
     /**
@@ -98,29 +104,34 @@ final class AutoReplyRepository
      */
     public function dueAll(\DateTimeImmutable $now): array
     {
-        $rows = $this->connection->pdo()
-            ->query('SELECT email, message, start_date, end_date, status, reconciled, reconciled_at, updated_at FROM auto_replies')
-            ->fetchAll(\PDO::FETCH_ASSOC)
-        ;
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT email, message, start_date, end_date, status, reconciled, reconciled_at, updated_at
+             FROM auto_replies WHERE server = :server ORDER BY email',
+        );
+        $statement->execute(['server' => $this->server]);
 
-        return $this->dueRows($rows, $now);
+        return $this->dueRows($statement->fetchAll(\PDO::FETCH_ASSOC), $now);
     }
 
     public function markReconciled(string $email, string $reconciledAt): void
     {
         $statement = $this->connection->pdo()->prepare(
-            'UPDATE auto_replies SET reconciled = 1, reconciled_at = :reconciled_at WHERE email = :email',
+            'UPDATE auto_replies SET reconciled = 1, reconciled_at = :reconciled_at
+             WHERE server = :server AND email = :email',
         );
-        $statement->execute(['reconciled_at' => $reconciledAt, 'email' => $email]);
+        $statement->execute(['reconciled_at' => $reconciledAt, 'server' => $this->server, 'email' => $email]);
     }
 
     /** @return array<int, array<string, mixed>> */
     public function allEntries(): array
     {
-        return $this->connection->pdo()
-            ->query('SELECT email, message, start_date, end_date, status, reconciled, reconciled_at, updated_at FROM auto_replies ORDER BY email')
-            ->fetchAll(\PDO::FETCH_ASSOC)
-        ;
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT email, message, start_date, end_date, status, reconciled, reconciled_at, updated_at
+             FROM auto_replies WHERE server = :server ORDER BY email',
+        );
+        $statement->execute(['server' => $this->server]);
+
+        return $statement->fetchAll(\PDO::FETCH_ASSOC);
     }
 
     /**

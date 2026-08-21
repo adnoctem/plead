@@ -39,6 +39,28 @@ abstract class AbstractGroupCommand extends AbstractMailCommand
         $output->writeln(sprintf('Recipients for <info>%s</info> reconciled with the Plesk server.', $email));
     }
 
+    /**
+     * The merged mail.group entry defining a list, if any. Entries with a
+     * domain-less address are matched by their composed address.
+     *
+     * @return null|array<string, mixed>
+     */
+    protected function configGroupEntry(string $email): ?array
+    {
+        $email = strtolower($email);
+        foreach ($this->context()->config()['mail']['group'] ?? [] as $entry) {
+            $address = strtolower((string) $entry['address']);
+            $full = str_contains($address, '@')
+                ? $address
+                : $address.'@'.strtolower((string) ($entry['domain'] ?? ''));
+            if ($full === $email) {
+                return $entry;
+            }
+        }
+
+        return null;
+    }
+
     /** @return string[] */
     protected function parseRecipients(string $value): array
     {
