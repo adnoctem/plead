@@ -282,7 +282,7 @@ final class ConfigLoaderTest extends TestCase
         $this->loader->load();
     }
 
-    public function testPatternAndRecipientsAreExclusive(): void
+    public function testPatternAndRecipientsMayCombine(): void
     {
         file_put_contents($this->userDir.'/plead.yaml', implode("\n", [
             'servers:',
@@ -292,13 +292,14 @@ final class ConfigLoaderTest extends TestCase
             '    group:',
             '        - address: all@example.com',
             "          pattern: '^(info)@'",
-            '          recipients: [a@example.com]',
+            '          recipients: [consultant@external.com]',
         ]));
 
-        $this->expectException(InvalidConfigurationException::class);
-        $this->expectExceptionMessage('cannot set both');
+        $groups = $this->loader->load()['mail']['group'];
 
-        $this->loader->load();
+        self::assertCount(1, $groups);
+        self::assertSame('^(info)@', $groups[0]['pattern']);
+        self::assertSame(['consultant@external.com'], $groups[0]['recipients']);
     }
 
     public function testPatternOrRecipientsRequired(): void

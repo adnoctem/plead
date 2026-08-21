@@ -90,6 +90,41 @@ final class GroupRuleEngineTest extends TestCase
         self::assertSame(['alice@company.com', 'bob@company.com'], $this->repository->activeRecipients('team@company.com'));
     }
 
+    public function testStaticRuleSecondApplyIsNoop(): void
+    {
+        $rule = GroupRule::fromConfigEntry([
+            'address' => 'team@company.com',
+            'recipients' => ['bob@company.com', 'alice@company.com'],
+        ]);
+
+        self::assertTrue($this->engine->apply($rule));
+        self::assertFalse($this->engine->apply($rule));
+        self::assertCount(1, $this->syncLog->all('mail_group'));
+    }
+
+    public function testManualRecipientsAppendToPatternFilteredSet(): void
+    {
+        $this->seedAddresses();
+        $rule = GroupRule::fromConfigEntry([
+            'address' => 'all@company.com',
+            'pattern' => '^(info|noreply)@',
+            'recipients' => ['consultant@external.com', 'info@company.com', 'alice@company.com'],
+        ]);
+
+        self::assertTrue($this->engine->apply($rule));
+
+        // Pattern-derived set (minus the list itself) plus the manual
+        // recipients, deduplicated and sorted. Manual entries win over the
+        // exclusion pattern: info@company.com is listed explicitly, so it is
+        // appended despite matching the pattern.
+        self::assertSame([
+            'alice@company.com',
+            'bob@company.com',
+            'consultant@external.com',
+            'info@company.com',
+        ], $this->repository->activeRecipients('all@company.com'));
+    }
+
     public function testApplyAllCountsChangedLists(): void
     {
         $this->seedAddresses();

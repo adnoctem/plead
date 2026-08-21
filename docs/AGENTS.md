@@ -32,18 +32,17 @@ php bin/plead list               # see all commands
   `plead-<host>.watch.pid`). Each pass: rule engine first (derives desired recipients of `mail.group`
   entries from live addresses, writes intents), then autoresponder/group/alias reconcilers push.
   `Spinner` (braille frames, CR+`ESC[2K`) animates the wait; only when stdout is a TTY.
-- **Rule-driven groups.** `src/Rule/` — `GroupRule` (address/domain + XOR pattern|recipients,
+- **Rule-driven groups.** `src/Rule/` — `GroupRule` (address/domain + `pattern` and/or `recipients`,
   `GroupPattern::compile()` adds `~…~` delimiters when missing), `GroupRuleSet` (config → rules),
-  `GroupRuleEngine` (live `listAddresses()` → diff → intents; no-op passes record nothing). The list's
-  own address is never its own recipient; rule-driven lists are authoritative (no adoption, non-matching
-  recipients purged).
+  `GroupRuleEngine` (live `listAddresses()` → filtered set, manual recipients appended verbatim — foreign
+  addresses allowed; no-op passes record nothing). The list's own address is never derived into the group;
+  rule-driven lists are authoritative (no adoption, non-matching recipients purged).
 - **Batching.** The Plesk API has no cross-domain mail listing, so live list commands batch N queries into one HTTP POST via `PleskMailGateway::*Bulk()` + `Client::multiRequest` → `mail:address:list` = 2 round trips, group/autoresponder/export = 3.
 
 ## Command structure
 
 Uniform verbs per namespace: `list` (enumerate), `get <target>` (single resource), `set` (mutate). No mixed verbs, no `show`/`enable`/`update` — those were deliberately unified away.
 
-- `src/Command/Mail/Group/` — `mail:group:list|get|set|add|remove` (forwarding recipients; `set` takes `--recipients` XOR `--rule`, else the configured `mail.group` entry)
 - `src/Command/Mail/Alias/` — `mail:alias:list|get|set|add|remove` (additional mailbox addresses; modeled on Group)
 - `src/Command/Mail/Address/` — `mail:address:list|get|set|remove|password|rename|export` (mailboxes)
 - `src/Command/Mail/Autoresponder/` — `mail:autoresponder:list|get|set` (auto-replies; `set --enabled=false` disables)

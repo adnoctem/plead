@@ -27,8 +27,8 @@ Three things are currently automated:
 - **Auto-replies with a scheduled start time.** Plesk supports `end_date` natively, but `start_date` does not exist as a Plesk concept. `plead` enforces it: you schedule a reply with a start and end date, and the `watch` daemon pushes it to Plesk the moment the start time is reached.
 - **Mail distribution groups** (e.g. `all@company.com`) — add/remove recipients without hand-editing Plesk's forwarding UI. A `watch` daemon continuously converges the server state toward what `plead` has been told.
 - **Rule-driven groups** — a group's recipients can be derived from a regex over the domain's addresses
-  (`mail.group` config or `mail:group:set --rule`). The watcher re-derives the list every pass, so new
-  mailboxes join automatically while `info@`, `pbx@` and friends stay out.
+  (`mail.group` config or `mail:group:set --rule`), with manual recipients appended (even foreign addresses).
+  The watcher re-derives the list every pass, so new mailboxes join automatically while `info@`, `pbx@` and friends stay out.
 
 `plead` runs entirely off the Plesk box and talks to Plesk exclusively over HTTPS XML-RPC (port 8443) using a secret key or administrator credentials. It is safe to run against production mail infrastructure: development follows read-before-write, `--dry-run` is enforced structurally in the gateway, reconciliation is idempotent, and every action lands in a local SQLite audit trail.
 
@@ -78,6 +78,7 @@ plead mail:group:add group@company.com newhire@company.com
 plead mail:group:remove group@company.com leaver@company.com
 plead mail:group:set group@company.com --recipients=a@company.com,b@company.com
 plead mail:group:set all@company.com --rule='^(1und1|info|support|noreply|pbx)@'
+plead mail:group:set all@company.com --rule='^(info|noreply)@' --recipients=consultant@external.com
 plead mail:group:get group@company.com          # live state on the Plesk server
 plead mail:group:get group@company.com --local  # desired state + history
 
@@ -116,7 +117,7 @@ Read commands query the **live Plesk server** by default; add `--local` to read 
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `mail:group:list`                       | List mail groups (live: mailnames with forwarding; `--local`: managed)                                                                |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `mail:group:set <group>`                | Replace the full recipient list (`--recipients=a@b,c@d` or `--rule=<pcre>`; neither falls back to the configured `mail.group` entry)  |
+| `mail:group:set <group>`                | Replace the full recipient list (`--recipients=a@b,c@d` and/or `--rule=<pcre>`; falls back to the configured `mail.group` entry)      |
 | `mail:group:add <group> <recipient>`    | Add one recipient                                                                                                                     |
 | `mail:group:remove <group> <recipient>` | Remove one recipient (soft-delete, keeps history)                                                                                     |
 | `mail:address:list`                     | List all mail addresses (`--domain=`, `--local`)                                                                                      |
@@ -179,13 +180,14 @@ Read commands query the **live Plesk server** by default; add `--local` to read 
 
 Global options (available on every command):
 
-| Flag            | Behavior                                                                   |
-| --------------- | -------------------------------------------------------------------------- |
-| `-c, --config`  | Load only this config file; skip discovery and merging                     |
-| `--server`      | Operate on this server (host or index; default: the first)                 |
-| `--dry-run`     | Log mutations without performing them - no network calls at all            |
-| `--log-level`   | Baseline file log level (default `info`); `-v/-vv/-vvv` also raise it      |
-| `-v/-vv/-vvv`   | Console verbosity (drives both console output and file log level)          |
+| Flag            | Behavior                                                                   ||
+| --------------- | -------------------------------------------------------------------------- ||
+| `-c, --config`  | Load only this config file; skip discovery and merging                     ||
+| `--server`      | Operate on this server (host or index; default: the first)                 ||
+| `--write-config`| Persist the change to the config file (mail.group definitions)             ||
+| `--dry-run`     | Log mutations without performing them - no network calls at all            ||
+| `--log-level`   | Baseline file log level (default `info`); `-v/-vv/-vvv` also raise it      ||
+| `-v/-vv/-vvv`   | Console verbosity (drives both console output and file log level)          ||
 
 ## ⚙️ Configuration
 
@@ -230,11 +232,17 @@ dellius.delta4x4.net:
 
 Group entries define the **desired recipients** of a mail group:
 
-- `pattern` — a PCRE (delimiters optional) of addresses to **exclude** from the list. The list always holds every mailbox on its domain except those matching, and the list itself is never its own recipient. Entries with a domain-less address need an explicit `domain:`.
-- `recipients` — a fixed recipient list, enforced by the watcher just like manually-set groups.
-- An entry with both, or neither, is a configuration error.
+- `pattern` — a PCRE (delimiters optional) of addresses to **exclude** from the list. The list holds every mailbox on
+  its domain except those matching, and the list itself is never its own recipient. Entries with a domain-less
+  address need an explicit `domain:`.
+- `recipients` — manual recipients **appended** to the pattern-filtered set. They may point at any address, including
+  domains Plesk does not manage (e.g. a consultant's mailbox at an external provider) — and a manual entry wins over
+  the exclusion pattern. Without a `pattern`, the manual list is the whole set.
+- An entry with neither is a configuration error; `pattern` and `recipients` freely combine.
 
-`watch` re-derives every configured group every pass: new mailboxes join `all@…` automatically, disabled ones drop out, and `pbx@…`-style addresses never get in. The same rules can be applied once via `mail:group:set <email> --rule='…'` (mutually exclusive with `--recipients`; with neither, the configured entry for that address is used).
+`watch` re-derives every configured group every pass: new mailboxes join `all@…` automatically, disabled ones drop out, and `pbx@…`-style addresses never get in. The same definition can be applied once via `mail:group:set <email> --rule='…' --recipients=…` (both flags combine; with neither, the configured entry for that address is used).
+
+Add `--write-config` and the applied definition is written into the config file's `mail.group` (replacing an existing entry for the address), so the watcher keeps maintaining the list without a manual edit.
 
 Environment variables override everything:
 

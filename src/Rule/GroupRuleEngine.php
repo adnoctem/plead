@@ -77,19 +77,29 @@ final class GroupRuleEngine
         return $changed;
     }
 
-    /** @return string[] lowercased, sorted recipient set */
+    /**
+     * Desired recipient set: the pattern-filtered live domain addresses (when
+     * the rule has a pattern) merged with the manual recipients, lowercased,
+     * deduplicated and sorted. Manual recipients are appended verbatim - they
+     * may point at domains Plesk does not manage.
+     *
+     * @return string[] lowercased, sorted recipient set
+     */
     private function computeRecipients(GroupRule $rule): array
     {
-        if (null !== $rule->recipients()) {
-            return array_values(array_filter(
-                $rule->recipients(),
-                static fn (string $address): bool => $address !== $rule->email(),
-            ));
+        $recipients = $rule->recipients();
+
+        if ($rule->hasPattern()) {
+            $derived = array_filter(
+                $this->gateway->listAddresses($rule->domain()),
+                static fn (string $address): bool => $address !== $rule->email() && $rule->matches($address),
+            );
+            $recipients = array_merge($derived, $recipients);
         }
 
-        return array_values(array_filter(
-            $this->gateway->listAddresses($rule->domain()),
-            static fn (string $address): bool => $address !== $rule->email() && $rule->matches($address),
-        ));
+        $recipients = array_values(array_unique($recipients));
+        sort($recipients);
+
+        return $recipients;
     }
 }

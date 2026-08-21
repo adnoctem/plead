@@ -6,13 +6,16 @@ namespace App\Rule;
 
 /**
  * Desired-state definition of one mail group, from a mail.group config entry:
- * either an exclusion PCRE over the group's domain addresses ("pattern") or a
- * fixed recipient list. The list's own address is never a recipient.
+ * an exclusion PCRE over the group's domain addresses ("pattern") and/or a
+ * manual recipient list ("recipients"). With a pattern, the final set is the
+ * pattern-filtered domain addresses plus the manual recipients; with no
+ * pattern, the manual list is the whole set. The list's own address is never
+ * derived into the group (manual entries are trusted verbatim).
  */
 final class GroupRule
 {
     /**
-     * @param string[] $recipients static recipients, lowercased
+     * @param string[] $recipients manual recipients, lowercased
      */
     private function __construct(
         private readonly string $email,
@@ -57,12 +60,6 @@ final class GroupRule
             $entry['recipients'] ?? [],
         ), static fn (string $recipient): bool => '' !== $recipient)));
 
-        if (null !== $pattern && [] !== $recipients) {
-            throw new \InvalidArgumentException(sprintf(
-                'Mail group "%s" cannot set both pattern and recipients.',
-                $email,
-            ));
-        }
         if (null === $pattern && [] === $recipients) {
             throw new \InvalidArgumentException(sprintf(
                 'Mail group "%s" must set either pattern or recipients.',
@@ -83,15 +80,20 @@ final class GroupRule
         return $this->domain;
     }
 
-    /** @return null|string[] static recipients, or null for pattern rules */
-    public function recipients(): ?array
+    public function hasPattern(): bool
     {
-        return null === $this->compiledPattern ? $this->recipients : null;
+        return null !== $this->compiledPattern;
+    }
+
+    /** @return string[] manual recipients (empty when the rule is pattern-only) */
+    public function recipients(): array
+    {
+        return $this->recipients;
     }
 
     /**
-     * Whether a full address belongs in the group: it must live on the rule's
-     * domain and must not match the exclusion pattern.
+     * Whether a full address belongs to the pattern-derived set: it must live
+     * on the rule's domain and must not match the exclusion pattern.
      */
     public function matches(string $address): bool
     {

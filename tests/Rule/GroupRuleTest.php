@@ -48,16 +48,21 @@ final class GroupRuleTest extends TestCase
         ]);
     }
 
-    public function testPatternAndRecipientsExclusive(): void
+    public function testPatternAndRecipientsCompose(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('cannot set both');
-
-        GroupRule::fromConfigEntry([
+        $rule = GroupRule::fromConfigEntry([
             'address' => 'all@company.com',
             'pattern' => '^(info)@',
-            'recipients' => ['a@company.com'],
+            'recipients' => ['consultant@external.com'],
         ]);
+
+        self::assertTrue($rule->hasPattern());
+        self::assertSame(['consultant@external.com'], $rule->recipients());
+        // The pattern still filters the domain-derived set...
+        self::assertTrue($rule->matches('alice@company.com'));
+        self::assertFalse($rule->matches('info@company.com'));
+        // ...while manual recipients live outside the domain scope.
+        self::assertFalse($rule->matches('consultant@external.com'));
     }
 
     public function testNeitherPatternNorRecipientsThrows(): void
@@ -134,6 +139,18 @@ final class GroupRuleTest extends TestCase
             'pattern' => '^(info)@',
         ]);
 
-        self::assertNull($rule->recipients());
+        self::assertTrue($rule->hasPattern());
+        self::assertSame([], $rule->recipients());
+    }
+
+    public function testStaticRuleHasNoPattern(): void
+    {
+        $rule = GroupRule::fromConfigEntry([
+            'address' => 'all@company.com',
+            'recipients' => ['a@company.com'],
+        ]);
+
+        self::assertFalse($rule->hasPattern());
+        self::assertSame(['a@company.com'], $rule->recipients());
     }
 }
