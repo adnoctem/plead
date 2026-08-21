@@ -190,6 +190,65 @@ final class DomainCommandsTest extends TestCase
         self::assertStringContainsString('boom', $tester->getDisplay());
     }
 
+    public function testSetChangesHostingTypeWithDestUrl(): void
+    {
+        $tester = $this->tester(new DomainSetCommand());
+        $tester->execute([
+            'domain' => 'company.com',
+            '--type' => 'forwarding',
+            '--dest-url' => 'https://other.example',
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('updated', $tester->getDisplay());
+        self::assertSame('std_fwd', $this->gateway->domainsInfo['company.com']['htype']);
+        self::assertSame('https://other.example', $this->gateway->domainsInfo['company.com']['dest_url']);
+    }
+
+    public function testSetToVirtualHostWithProperties(): void
+    {
+        $tester = $this->tester(new DomainSetCommand());
+        $tester->execute([
+            'domain' => 'company.com',
+            '--type' => 'virtual-host',
+            '--property' => ['ftp_login:company', 'www_root:/var/www/company'],
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertSame('vrt_hst', $this->gateway->domainsInfo['company.com']['htype']);
+        self::assertSame([
+            'ftp_login' => 'company',
+            'www_root' => '/var/www/company',
+        ], $this->gateway->domainsInfo['company.com']['properties']);
+    }
+
+    public function testSetForwardingRequiresDestUrl(): void
+    {
+        $tester = $this->tester(new DomainSetCommand());
+        $tester->execute(['domain' => 'company.com', '--type' => 'forwarding']);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('Provide --dest-url', $tester->getDisplay());
+    }
+
+    public function testSetRejectsInvalidHostingType(): void
+    {
+        $tester = $this->tester(new DomainSetCommand());
+        $tester->execute(['domain' => 'company.com', '--type' => 'space-station']);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('Invalid value for --type', $tester->getDisplay());
+    }
+
+    public function testSetPropertyWithoutTypeRejected(): void
+    {
+        $tester = $this->tester(new DomainSetCommand());
+        $tester->execute(['domain' => 'company.com', '--property' => 'ftp_login:user']);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('--property requires --type', $tester->getDisplay());
+    }
+
     public function testAddCreatesVirtualHostDomain(): void
     {
         $tester = $this->tester(new DomainAddCommand());

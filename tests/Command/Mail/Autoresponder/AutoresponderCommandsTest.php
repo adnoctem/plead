@@ -9,6 +9,7 @@ use App\Command\AbstractPleadCommand;
 use App\Command\Mail\Autoresponder\AutoresponderGetCommand;
 use App\Command\Mail\Autoresponder\AutoresponderListCommand;
 use App\Command\Mail\Autoresponder\AutoresponderSetCommand;
+use App\Config\ConfigFile;
 use App\Config\PathProvider\PathProviderInterface;
 use App\Tests\Support\RecordingGateway;
 use PHPUnit\Framework\Attributes\CoversNothing;
@@ -263,11 +264,91 @@ final class AutoresponderCommandsTest extends TestCase
         self::assertStringContainsString('would be applied (dry-run)', $tester->getDisplay());
     }
 
-    private function tester(AbstractPleadCommand $command): CommandTester
+    public function testSetFallsBackToConfigEntry(): void
+    {
+        $this->configWithAutoresponder($this->messageFile);
+
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute(['email' => 'user@company.com']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        $row = $this->context->autoReplyRepository()->find('user@company.com');
+        self::assertNotNull($row);
+        self::assertSame('0', (string) $row['reconciled']);
+        self::assertSame('2099-01-01T08:00:00+02:00', $row['start_date']);
+    }
+
+    public function testSetWithoutOptionsAndConfigFails(): void
+    {
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute(['email' => 'user@company.com']);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('configure a mail.autoresponder entry', $tester->getDisplay());
+    }
+
+    public function testSetWithWriteConfigPersistsEntry(): void
+    {
+        $context = new RuntimeContext($this->paths, null, false, null, 0, writeConfig: true, gateway: $this->gateway);
+
+        $tester = $this->tester(new AutoresponderSetCommand(), $context);
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--message-file' => $this->messageFile,
+            '--start-date' => '2099-01-01T08:00:00+02:00',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('written to', $tester->getDisplay());
+
+        $raw = ConfigFile::read($this->base.'/config/plead.yaml');
+        self::assertSame([
+            [
+                'address' => 'user@company.com',
+                'message_file' => $this->messageFile,
+                'start_date' => '2099-01-01T08:00:00+02:00',
+                'end_date' => '2099-01-05T08:00:00+02:00',
+            ],
+        ], $raw['mail']['autoresponder']);
+        $this->context->configLoader()->load($this->base.'/config/plead.yaml');
+    }
+
+    public function testDisableWithWriteConfigRemovesEntry(): void
+    {
+        $this->configWithAutoresponder($this->messageFile);
+        $context = new RuntimeContext($this->paths, null, false, null, 0, writeConfig: true, gateway: $this->gateway);
+
+        $tester = $this->tester(new AutoresponderSetCommand(), $context);
+        $tester->execute(['email' => 'user@company.com', '--enabled' => 'false']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('removed from', $tester->getDisplay());
+
+        $raw = ConfigFile::read($this->base.'/config/plead.yaml');
+        self::assertArrayNotHasKey('autoresponder', $raw['mail'] ?? []);
+    }
+
+    private function tester(AbstractPleadCommand $command, ?RuntimeContext $context = null): CommandTester
     {
         $tester = new CommandTester($command);
-        $command->setContext($this->context);
+        $command->setContext($context ?? $this->context);
 
         return $tester;
+    }
+
+    private function configWithAutoresponder(string $messageFile): void
+    {
+        file_put_contents($this->base.'/config/plead.yaml', implode("\n", [
+            'servers:',
+            '    - host: fake.local',
+            '      secret_key: test-key',
+            'mail:',
+            '    autoresponder:',
+            '        - address: user@company.com',
+            '          message_file: '.$messageFile,
+            '          start_date: "2099-01-01T08:00:00+02:00"',
+            '          end_date: "2099-01-05T18:00:00+02:00"',
+        ]));
     }
 }

@@ -33,8 +33,18 @@ final class AddressSetCommand extends AbstractMailCommand
         $quota = $input->getOption('quota');
         $antivir = $input->getOption('antivir');
 
+        // Missing flags fall back to the configured mail.defaults (quota is
+        // stored in bytes and converted to the MiB unit of --quota).
+        $defaults = $this->context()->config()['mail']['defaults'] ?? [];
+        if (null === $quota && null !== ($defaults['quota'] ?? null)) {
+            $quota = (string) intdiv((int) $defaults['quota'], 1048576);
+        }
+        if (null === $antivir && null !== ($defaults['antivirus'] ?? null)) {
+            $antivir = (string) $defaults['antivirus'];
+        }
+
         if (null === $description && null === $outgoingLimit && null === $quota && null === $antivir) {
-            $output->writeln('<error>Provide --description, --outgoing-limit, --quota and/or --antivir.</error>');
+            $output->writeln('<error>Provide --description, --outgoing-limit, --quota and/or --antivir (or configure mail.defaults).</error>');
 
             return self::FAILURE;
         }

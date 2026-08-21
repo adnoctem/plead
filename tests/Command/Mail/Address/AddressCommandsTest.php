@@ -109,6 +109,33 @@ final class AddressCommandsTest extends TestCase
         self::assertStringContainsString('Provide --description', $tester->getDisplay());
     }
 
+    public function testSetAppliesConfiguredDefaults(): void
+    {
+        file_put_contents($this->base.'/config/plead.yaml', implode("\n", [
+            'servers:',
+            '    - host: fake.local',
+            '      secret_key: test-key',
+            'mail:',
+            '    defaults:',
+            '        quota: 512MB',
+            '        antivirus: inout',
+        ]));
+        $this->gateway->mailboxes['user@company.com'] = [
+            'name' => 'user',
+            'description' => '',
+            'mailbox_enabled' => true,
+            'forwarding' => [],
+            'autoresponder_enabled' => false,
+        ];
+
+        $tester = $this->tester(new AddressSetCommand());
+        $tester->execute(['email' => 'user@company.com']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertSame(536870912, $this->gateway->mailboxes['user@company.com']['quota']);
+        self::assertSame('inout', $this->gateway->mailboxes['user@company.com']['antivir']);
+    }
+
     public function testSetOutgoingLimitUpdatesMailbox(): void
     {
         $this->gateway->mailboxes['user@company.com'] = [

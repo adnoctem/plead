@@ -659,4 +659,21 @@ final class RecordingGateway extends PleskMailGateway
         }
         $this->domainsInfo[$domain]['description'] = $description;
     }
+
+    public function setSiteType(string $domain, string $htype, ?string $destUrl, array $properties = []): void
+    {
+        if ($this->dryRunMode) {
+            return;
+        }
+        if (in_array($domain, $this->failFor, true)) {
+            throw new \RuntimeException('boom');
+        }
+        $this->domainsInfo[$domain]['htype'] = $htype;
+        if (null !== $destUrl) {
+            $this->domainsInfo[$domain]['dest_url'] = $destUrl;
+        }
+        if ([] !== $properties) {
+            $this->domainsInfo[$domain]['properties'] = $properties;
+        }
+    }
 }

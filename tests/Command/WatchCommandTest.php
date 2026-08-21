@@ -132,6 +132,59 @@ final class WatchCommandTest extends TestCase
         self::assertSame(['alice@company.com', 'bob@company.com'], $this->gateway->forwarding['all@company.com']);
     }
 
+    public function testWatchUsesIntervalFromConfig(): void
+    {
+        file_put_contents($this->base.'/config/plead.yaml', implode("\n", [
+            'servers:',
+            '    - host: fake.local',
+            '      secret_key: test-key',
+            'watch:',
+            '    interval: 5',
+        ]));
+        $killer = $this->spawnKiller(2.0);
+
+        $command = new WatchCommand();
+        $command->setContext($this->context);
+        $tester = new CommandTester($command);
+        $tester->execute([]);
+
+        $this->reap($killer);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('interval 5s', $tester->getDisplay());
+    }
+
+    public function testWatchAppliesConfigDefinedAutoresponders(): void
+    {
+        $messageFile = $this->base.'/reply.txt';
+        file_put_contents($messageFile, 'Bin im Urlaub');
+        file_put_contents($this->base.'/config/plead.yaml', implode("\n", [
+            'servers:',
+            '    - host: fake.local',
+            '      secret_key: test-key',
+            'mail:',
+            '    autoresponder:',
+            '        - address: user@company.com',
+            '          message_file: '.$messageFile,
+            '          start_date: "2099-01-01T08:00:00+02:00"',
+            '          end_date: "2099-01-05T18:00:00+02:00"',
+        ]));
+        $killer = $this->spawnKiller(2.0);
+
+        $command = new WatchCommand();
+        $command->setContext($this->context);
+        $tester = new CommandTester($command);
+        $tester->execute(['--interval' => '60']);
+
+        $this->reap($killer);
+
+        self::assertSame(0, $tester->getStatusCode());
+        $row = $this->context->autoReplyRepository()->find('user@company.com');
+        self::assertNotNull($row);
+        self::assertStringContainsString('Bin im Urlaub', $row['message']);
+        self::assertSame('2099-01-01T08:00:00+02:00', $row['start_date']);
+    }
+
     /**
      * Spawn a child that SIGTERMs this process after $seconds. The watch loop
      * must already be running (handlers installed) when the signal lands, so

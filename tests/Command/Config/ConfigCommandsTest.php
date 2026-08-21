@@ -76,6 +76,28 @@ final class ConfigCommandsTest extends TestCase
         self::assertStringContainsString('is not writable', $this->tester->getDisplay());
     }
 
+    public function testWatchIntervalStoredAsInteger(): void
+    {
+        $this->tester->run(['command' => 'config:set', 'key' => 'servers.0.host', 'value' => 'mail.company.com']);
+        $this->tester->run(['command' => 'config:set', 'key' => 'servers.0.secret_key', 'value' => 'k']);
+        $this->tester->run(['command' => 'config:set', 'key' => 'watch.interval', 'value' => '90']);
+
+        self::assertSame(0, $this->tester->getStatusCode());
+
+        // The stored value must survive config validation (int, not string).
+        $this->tester->run(['command' => 'config:get', 'key' => 'watch.interval']);
+        self::assertSame(0, $this->tester->getStatusCode());
+        self::assertStringContainsString('90', $this->tester->getDisplay());
+    }
+
+    public function testWatchIntervalRejectsNonInteger(): void
+    {
+        $this->tester->run(['command' => 'config:set', 'key' => 'watch.interval', 'value' => 'abc']);
+
+        self::assertNotSame(0, $this->tester->getStatusCode());
+        self::assertStringContainsString('positive integer', $this->tester->getDisplay());
+    }
+
     public function testGetUnknownKeyFails(): void
     {
         $this->tester->run(['command' => 'config:get', 'key' => 'nope.missing']);

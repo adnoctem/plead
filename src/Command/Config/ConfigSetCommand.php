@@ -19,6 +19,8 @@ final class ConfigSetCommand extends AbstractPleadCommand
         'servers.0.secret_key',
         'servers.0.login',
         'servers.0.password',
+        'default_server',
+        'watch.interval',
         'template.auto_reply_path',
         'log_level',
     ];
@@ -48,12 +50,17 @@ final class ConfigSetCommand extends AbstractPleadCommand
             return self::FAILURE;
         }
 
+        $typed = $this->coerce($key, $value, $output);
+        if (null === $typed) {
+            return self::FAILURE;
+        }
+
         $paths = $this->context()->paths;
         $target = ConfigFile::targetFile($paths->configPaths());
 
         $raw = ConfigFile::read($target);
 
-        self::nestedSet($raw, $key, $value);
+        self::nestedSet($raw, $key, $typed);
 
         ConfigFile::write($target, $raw);
 
@@ -62,8 +69,27 @@ final class ConfigSetCommand extends AbstractPleadCommand
         return self::SUCCESS;
     }
 
+    /**
+     * config:set receives raw strings; integer-typed keys must be stored as
+     * ints or the next config load fails the schema validation.
+     */
+    private function coerce(string $key, string $value, OutputInterface $output): int|string|null
+    {
+        if ('watch.interval' !== $key) {
+            return $value;
+        }
+
+        if (!ctype_digit($value) || 0 === (int) $value) {
+            $output->writeln('<error>watch.interval must be a positive integer.</error>');
+
+            return null;
+        }
+
+        return (int) $value;
+    }
+
     /** @param array<string, mixed> $raw */
-    private static function nestedSet(array &$raw, string $key, string $value): void
+    private static function nestedSet(array &$raw, string $key, int|string $value): void
     {
         $segments = explode('.', $key);
         $current = &$raw;

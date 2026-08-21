@@ -19,6 +19,7 @@ use App\Repository\MailAddressRepository;
 use App\Repository\MailAliasRepository;
 use App\Repository\MailGroupRepository;
 use App\Repository\SyncLogRepository;
+use App\Rule\AutoReplyRuleEngine;
 use App\Rule\GroupRuleEngine;
 use App\Template\AutoReplyRenderer;
 use Monolog\Handler\StreamHandler;
@@ -45,6 +46,7 @@ final class RuntimeContext
     private ?MailGroupReconciler $reconcilerMail = null;
     private ?MailAliasReconciler $reconcilerAlias = null;
     private ?GroupRuleEngine $groupRuleEngine = null;
+    private ?AutoReplyRuleEngine $autoReplyRuleEngine = null;
     private ?AutoReplyRenderer $renderer = null;
     private ?LoggerInterface $logger = null;
 
@@ -187,6 +189,17 @@ final class RuntimeContext
             $this->mailGroupRepository(),
             $this->syncLogRepository(),
             $this->gateway(),
+            $this->logger(),
+            $this->dryRun,
+        );
+    }
+
+    public function autoReplyRuleEngine(): AutoReplyRuleEngine
+    {
+        return $this->autoReplyRuleEngine ??= new AutoReplyRuleEngine(
+            $this->autoReplyRepository(),
+            $this->syncLogRepository(),
+            $this->renderer(),
             $this->logger(),
             $this->dryRun,
         );

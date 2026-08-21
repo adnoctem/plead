@@ -84,6 +84,70 @@ final class ConfigFile
         self::write($target, $data);
     }
 
+    /**
+     * Add or replace a mail.autoresponder entry in the general mail section of
+     * the config file, matched by address.
+     *
+     * @param array<string, mixed> $entry validated entry: address + message_file + dates
+     */
+    public static function upsertMailAutoresponder(string $target, string $email, array $entry): void
+    {
+        $email = strtolower($email);
+        $data = self::read($target);
+        $entries = $data['mail']['autoresponder'] ?? [];
+        if (!is_array($entries)) {
+            $entries = [];
+        }
+
+        $replaced = false;
+        foreach ($entries as $index => $existing) {
+            if (!is_array($existing) || strtolower((string) ($existing['address'] ?? '')) !== $email) {
+                continue;
+            }
+            $entries[$index] = $entry;
+            $replaced = true;
+
+            break;
+        }
+        if (!$replaced) {
+            $entries[] = $entry;
+        }
+
+        $data['mail']['autoresponder'] = $entries;
+        self::write($target, $data);
+    }
+
+    /** Remove the mail.autoresponder entry of an address from the config file. */
+    public static function removeMailAutoresponder(string $target, string $email): void
+    {
+        $email = strtolower($email);
+        $data = self::read($target);
+        $entries = $data['mail']['autoresponder'] ?? [];
+        if (!is_array($entries)) {
+            return;
+        }
+
+        $kept = [];
+        foreach ($entries as $existing) {
+            if (!is_array($existing) || strtolower((string) ($existing['address'] ?? '')) !== $email) {
+                $kept[] = $existing;
+            }
+        }
+        if (count($kept) === count($entries)) {
+            return;
+        }
+
+        if ([] === $kept) {
+            unset($data['mail']['autoresponder']);
+            if (isset($data['mail']) && [] === $data['mail']) {
+                unset($data['mail']);
+            }
+        } else {
+            $data['mail']['autoresponder'] = $kept;
+        }
+        self::write($target, $data);
+    }
+
     /** @param array<string, mixed> $entry */
     private static function composedAddress(array $entry): string
     {

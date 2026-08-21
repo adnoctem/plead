@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Command\Mail\Autoresponder;
 
 use App\Command\Mail\AbstractMailCommand;
+use App\Config\ConfigFile;
 use App\Util\DateNormalizer;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputArgument;
@@ -42,9 +43,94 @@ final class AutoresponderSetCommand extends AbstractMailCommand
 
                 return self::FAILURE;
             }
+        } elseif (null === $input->getOption('message-file')
+            && null === $input->getOption('start-date')
+            && null === $input->getOption('end-date')) {
+            // No options at all: fall back to the configured mail.autoresponder
+            // entry for this address.
+            $entry = $this->configAutoresponderEntry($email);
+            if (null === $entry) {
+                $output->writeln(sprintf(
+                    '<error>Provide --message-file (and dates), or configure a mail.autoresponder entry for %s in the config.</error>',
+                    $email,
+                ));
+
+                return self::FAILURE;
+            }
+            $input->setOption('message-file', $entry['message_file']);
+            if (null !== ($entry['start_date'] ?? null)) {
+                $input->setOption('start-date', DateNormalizer::coerce($entry['start_date']));
+            }
+            $input->setOption('end-date', DateNormalizer::coerce($entry['end_date']));
         }
 
-        return $enabled ? $this->enable($input, $output, $email) : $this->disable($output, $email);
+        $result = $enabled ? $this->enable($input, $output, $email) : $this->disable($output, $email);
+
+        if (self::SUCCESS === $result && $context->writeConfig()) {
+            $result = $enabled
+                ? $this->persistDefinition($input, $email, $output)
+                : $this->removeDefinition($email, $output);
+        }
+
+        return $result;
+    }
+
+    /**
+     * The merged mail.autoresponder entry defining an address, if any.
+     *
+     * @return null|array<string, mixed>
+     */
+    private function configAutoresponderEntry(string $email): ?array
+    {
+        $email = strtolower($email);
+        foreach ($this->context()->config()['mail']['autoresponder'] ?? [] as $entry) {
+            if (strtolower((string) ($entry['address'] ?? '')) === $email) {
+                return $entry;
+            }
+        }
+
+        return null;
+    }
+
+    private function persistDefinition(InputInterface $input, string $email, OutputInterface $output): int
+    {
+        $entry = [
+            'address' => $email,
+            'message_file' => (string) $input->getOption('message-file'),
+            'start_date' => DateNormalizer::normalize((string) ($input->getOption('start-date') ?: DateNormalizer::now())),
+            'end_date' => (string) $input->getOption('end-date'),
+        ];
+
+        $target = ConfigFile::targetFile($this->context()->paths->configPaths());
+
+        try {
+            ConfigFile::upsertMailAutoresponder($target, $email, $entry);
+        } catch (\Throwable $e) {
+            $output->writeln(sprintf('<error>Unable to write the config file: %s</error>', $e->getMessage()));
+
+            return self::FAILURE;
+        }
+
+        $output->writeln(sprintf('mail.autoresponder entry for <info>%s</info> written to %s', $email, $target));
+
+        return self::SUCCESS;
+    }
+
+    private function removeDefinition(string $email, OutputInterface $output): int
+    {
+        $target = ConfigFile::targetFile($this->context()->paths->configPaths());
+
+        try {
+            ConfigFile::removeMailAutoresponder($target, $email);
+        } catch (\Throwable $e) {
+            $output->writeln(sprintf('<error>Unable to write the config file: %s</error>', $e->getMessage()));
+
+            return self::FAILURE;
+        }
+
+        $output->writeln(sprintf('mail.autoresponder entry for <info>%s</info> removed from %s', $email, $target));
+
+        return self::SUCCESS;
     }
 
     private function enable(InputInterface $input, OutputInterface $output, string $email): int

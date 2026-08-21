@@ -93,8 +93,10 @@ final class ConfigLoaderTest extends TestCase
 
         self::assertSame('info', $config['log_level']);
         self::assertSame('templates/auto-reply.txt.twig', $config['template']['auto_reply_path']);
-        self::assertSame('off', $config['mail']['defaults']['antivirus']);
+        self::assertNull($config['mail']['defaults']['antivirus']);
         self::assertNull($config['mail']['defaults']['quota']);
+        self::assertSame(60, $config['watch']['interval']);
+        self::assertNull($config['default_server']);
     }
 
     public function testJsonAndYamlMerge(): void
@@ -195,6 +197,118 @@ final class ConfigLoaderTest extends TestCase
         }
 
         self::assertSame('second.example.com', $config['server']['host']);
+    }
+
+    public function testDefaultServerSelectsServer(): void
+    {
+        file_put_contents($this->userDir.'/plead.yaml', implode("\n", [
+            'servers:',
+            '    - host: first.example.com',
+            '      secret_key: a',
+            '    - host: second.example.com',
+            '      secret_key: b',
+            'default_server: second.example.com',
+        ]));
+
+        self::assertSame('second.example.com', $this->loader->load()['server']['host']);
+    }
+
+    public function testCliServerBeatsDefaultServer(): void
+    {
+        file_put_contents($this->userDir.'/plead.yaml', implode("\n", [
+            'servers:',
+            '    - host: first.example.com',
+            '      secret_key: a',
+            '    - host: second.example.com',
+            '      secret_key: b',
+            'default_server: second.example.com',
+        ]));
+
+        self::assertSame('first.example.com', $this->loader->load(null, 'first.example.com')['server']['host']);
+    }
+
+    public function testWatchIntervalFromConfig(): void
+    {
+        file_put_contents($this->userDir.'/plead.yaml', implode("\n", [
+            'servers:',
+            '    - host: only.example.com',
+            '      secret_key: a',
+            'watch:',
+            '    interval: 300',
+        ]));
+
+        self::assertSame(300, $this->loader->load()['watch']['interval']);
+    }
+
+    public function testAutoresponderEntriesMergeByAddress(): void
+    {
+        file_put_contents($this->userDir.'/plead.yaml', implode("\n", [
+            'servers:',
+            '    - host: first.example.com',
+            '      secret_key: a',
+            '    - host: second.example.com',
+            '      secret_key: b',
+            'mail:',
+            '    autoresponder:',
+            '        - address: user@example.com',
+            '          message_file: /tmp/general.txt',
+            '          end_date: 2099-01-05T18:00:00+02:00',
+            'second.example.com:',
+            '    mail:',
+            '        autoresponder:',
+            '            - address: user@example.com',
+            '              message_file: /tmp/server.txt',
+            '              end_date: 2099-02-05T18:00:00+02:00',
+            '            - address: other@example.com',
+            '              message_file: /tmp/other.txt',
+            '              end_date: 2099-03-05T18:00:00+02:00',
+        ]));
+
+        $first = $this->loader->load(null, 'first.example.com')['mail']['autoresponder'];
+        self::assertCount(1, $first);
+        self::assertSame('/tmp/general.txt', $first[0]['message_file']);
+
+        $second = $this->loader->load(null, 'second.example.com')['mail']['autoresponder'];
+        self::assertCount(2, $second);
+        $byAddress = array_column($second, 'message_file', 'address');
+        self::assertSame('/tmp/server.txt', $byAddress['user@example.com']);
+        self::assertSame('/tmp/other.txt', $byAddress['other@example.com']);
+    }
+
+    public function testAutoresponderEntryRequiresFullAddress(): void
+    {
+        file_put_contents($this->userDir.'/plead.yaml', implode("\n", [
+            'servers:',
+            '    - host: only.example.com',
+            '      secret_key: a',
+            'mail:',
+            '    autoresponder:',
+            '        - address: user',
+            '          message_file: /tmp/m.txt',
+            '          end_date: 2099-01-05T18:00:00+02:00',
+        ]));
+
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('full email address');
+
+        $this->loader->load();
+    }
+
+    public function testAutoresponderEntryRequiresEndDate(): void
+    {
+        file_put_contents($this->userDir.'/plead.yaml', implode("\n", [
+            'servers:',
+            '    - host: only.example.com',
+            '      secret_key: a',
+            'mail:',
+            '    autoresponder:',
+            '        - address: user@example.com',
+            '          message_file: /tmp/m.txt',
+        ]));
+
+        $this->expectException(InvalidConfigurationException::class);
+
+        $this->loader->load();
     }
 
     public function testPerServerSectionOverridesGeneralMail(): void

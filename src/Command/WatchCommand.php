@@ -16,7 +16,7 @@ final class WatchCommand extends AbstractPleadCommand
     protected function configure(): void
     {
         $this
-            ->addOption('interval', null, InputOption::VALUE_REQUIRED, 'Seconds between reconcile passes', '60')
+            ->addOption('interval', null, InputOption::VALUE_REQUIRED, 'Seconds between reconcile passes (default: watch.interval from the config)')
             ->addOption('full', null, InputOption::VALUE_NONE, 'Re-verify everything against the server to catch drift')
             ->addOption('detached', 'd', InputOption::VALUE_NONE, 'Run in the background; output goes to the log file')
         ;
@@ -28,7 +28,10 @@ final class WatchCommand extends AbstractPleadCommand
             return $this->detach($input, $output);
         }
 
-        $interval = max(1, (int) $input->getOption('interval'));
+        $intervalOption = $input->getOption('interval');
+        $interval = null !== $intervalOption
+            ? (int) $intervalOption
+            : (int) $this->context()->config()['watch']['interval'];
         $full = (bool) $input->getOption('full');
 
         return new WatchLoop($output)->run(
@@ -45,6 +48,13 @@ final class WatchCommand extends AbstractPleadCommand
     {
         $context = $this->context();
         $changed = 0;
+
+        // Config-defined auto-replies: re-record intents when the rendered
+        // message or dates diverged from the local state.
+        $autoresponders = $context->config()['mail']['autoresponder'] ?? [];
+        if ([] !== $autoresponders) {
+            $changed += $context->autoReplyRuleEngine()->applyAll($autoresponders);
+        }
 
         // Rule-driven groups: recompute the desired recipients from the live
         // address list (or the configured static list) and record new intents

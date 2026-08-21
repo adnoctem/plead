@@ -13,7 +13,7 @@ use Symfony\Component\Yaml\Yaml;
 final class ConfigLoader
 {
     /** Top-level keys that belong to the schema; anything else names a server section. */
-    private const SCHEMA_KEYS = ['servers', 'mail', 'template', 'log_level'];
+    private const SCHEMA_KEYS = ['servers', 'mail', 'template', 'log_level', 'default_server', 'watch'];
 
     public function __construct(private readonly PathProviderInterface $paths) {}
 
@@ -47,7 +47,7 @@ final class ConfigLoader
         $processed = new Processor()->processConfiguration(new PleadConfiguration(), $configs);
 
         $servers = $processed['servers'];
-        $selectedIndex = $this->resolveServerIndex($servers, $serverOption);
+        $selectedIndex = $this->resolveServerIndex($servers, $serverOption, $processed['default_server'] ?? null);
         $selected = $this->applyAuthOverrides($servers[$selectedIndex]);
 
         $sections = $this->collectServerSections($raw, $servers);
@@ -62,6 +62,8 @@ final class ConfigLoader
                 'password' => $selected['password'],
             ],
             'mail' => $this->mergeMail($processed['mail'] ?? [], $sections[$selected['host']] ?? []),
+            'watch' => $processed['watch'],
+            'default_server' => $processed['default_server'] ?? null,
             'template' => $processed['template'],
             'log_level' => $processed['log_level'],
         ];
@@ -82,6 +84,7 @@ final class ConfigLoader
         $layers = [];
         $servers = null;
         $groups = null;
+        $autoresponders = null;
         foreach ($rawFiles as $file) {
             $layer = $file;
             if (isset($layer['servers'])) {
@@ -91,9 +94,13 @@ final class ConfigLoader
             if (isset($layer['mail']['group'])) {
                 $groups ??= $layer['mail']['group'];
                 unset($layer['mail']['group']);
-                if ([] === $layer['mail']) {
-                    unset($layer['mail']);
-                }
+            }
+            if (isset($layer['mail']['autoresponder'])) {
+                $autoresponders ??= $layer['mail']['autoresponder'];
+                unset($layer['mail']['autoresponder']);
+            }
+            if (isset($layer['mail']) && [] === $layer['mail']) {
+                unset($layer['mail']);
             }
             $layers[] = $layer;
         }
@@ -104,6 +111,9 @@ final class ConfigLoader
         }
         if (null !== $groups) {
             $final['mail']['group'] = $groups;
+        }
+        if (null !== $autoresponders) {
+            $final['mail']['autoresponder'] = $autoresponders;
         }
         $layers[] = $final;
 
@@ -153,17 +163,22 @@ final class ConfigLoader
         return $sections;
     }
 
-    /** @param array<int, array<string, mixed>> $servers */
-    private function resolveServerIndex(array $servers, ?string $serverOption): int
+    /**
+     * @param array<int, array<string, mixed>> $servers
+     */
+    private function resolveServerIndex(array $servers, ?string $serverOption, ?string $configDefault = null): int
     {
         $selection = $serverOption;
         if (null === $selection || '' === $selection) {
             $env = getenv('PLEAD_SERVER');
             $selection = false === $env || '' === $env ? null : $env;
         }
+        if (null === $selection) {
+            $selection = $configDefault;
+        }
 
         $hosts = array_column($servers, 'host');
-        if (null === $selection) {
+        if (null === $selection || '' === $selection) {
             return 0;
         }
 
@@ -230,7 +245,7 @@ final class ConfigLoader
 
         $defaults = array_merge($generalMail['defaults'] ?? [], $serverMail['defaults'] ?? []);
         $defaults['quota'] ??= null;
-        $defaults['antivirus'] ??= 'off';
+        $defaults['antivirus'] ??= null;
 
         $groups = [];
         foreach ($generalMail['group'] ?? [] as $entry) {
@@ -240,9 +255,18 @@ final class ConfigLoader
             $groups[$this->groupKey($entry)] = $entry;
         }
 
+        $autoresponders = [];
+        foreach ($generalMail['autoresponder'] ?? [] as $entry) {
+            $autoresponders[strtolower((string) $entry['address'])] = $entry;
+        }
+        foreach ($serverMail['autoresponder'] ?? [] as $entry) {
+            $autoresponders[strtolower((string) $entry['address'])] = $entry;
+        }
+
         return [
             'defaults' => $defaults,
             'group' => array_values($groups),
+            'autoresponder' => array_values($autoresponders),
         ];
     }
 

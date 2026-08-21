@@ -301,6 +301,53 @@ class PleskMailGateway
     }
 
     /**
+     * Change the hosting type of a domain (site): virtual host, forwarding or
+     * frame-forwarding (with destination URL) or none. Mirrors the hosting
+     * block shape of addSite().
+     *
+     * @param array<string, string> $properties virtual-hosting properties (name => value)
+     */
+    public function setSiteType(string $domain, string $htype, ?string $destUrl, array $properties = []): void
+    {
+        if ($this->dryRun) {
+            $this->logger->info('DRY-RUN: would set hosting type {htype} of domain {domain}', [
+                'htype' => $htype,
+                'domain' => $domain,
+            ]);
+
+            return;
+        }
+
+        // Shape mirrored from addSite(); pending live validation on the
+        // site-set packet.
+        $packet = $this->client->getPacket();
+        $set = $packet->addChild('site')->addChild('set');
+        $set->addChild('filter')->addChild('name', $domain);
+
+        $values = $set->addChild('values');
+        $values->addChild('gen_setup')->addChild('htype', $htype);
+
+        $hosting = $values->addChild('hosting');
+        if ('none' === $htype) {
+            $hosting->addChild('none');
+        } elseif ('std_fwd' === $htype || 'frm_fwd' === $htype) {
+            $node = $hosting->addChild($htype);
+            $node->addChild('dest_url', (string) $destUrl);
+        } else {
+            $vrt = $hosting->addChild('vrt_hst');
+            foreach ($properties as $property => $value) {
+                $propertyNode = $vrt->addChild('property');
+                $propertyNode->addChild('name', $property);
+                $propertyNode->addChild('value', $value);
+            }
+        }
+
+        $this->client->request($packet);
+
+        $this->logger->info('Set hosting type {htype} of domain {domain}', ['htype' => $htype, 'domain' => $domain]);
+    }
+
+    /**
      * The Plesk API has no cross-domain mail listing, but it accepts many
      * operations in a single HTTP request. These bulk methods batch all
      * per-domain/per-address queries into ONE round trip and merge the

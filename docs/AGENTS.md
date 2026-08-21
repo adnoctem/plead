@@ -29,14 +29,17 @@ php bin/plead list               # see all commands
 - **One watcher for everything.** `watch` (`src/Command/WatchCommand.php` + `src/Util/WatchLoop.php`):
   dirty-only by default (`reconciled = 0` / `unreconciledLists()`), `--full` sweeps everything,
   `-d/--detached` re-execs itself with stdio on the log file (pcntl fork+exec; pid file
-  `plead-<host>.watch.pid`). Each pass: rule engine first (derives desired recipients of `mail.group`
-  entries from live addresses, writes intents), then autoresponder/group/alias reconcilers push.
-  `Spinner` (braille frames, CR+`ESC[2K`) animates the wait; only when stdout is a TTY.
+  `plead-<host>.watch.pid`), interval from `watch.interval` config. Each pass: auto-reply definitions
+  first (re-record diverging `mail.autoresponder` entries), then rule engine (derives desired recipients
+  of `mail.group` entries from live addresses, writes intents), then autoresponder/group/alias
+  reconcilers push. `Spinner` (braille frames, CR+`ESC[2K`) animates the wait; only when stdout is a TTY.
 - **Rule-driven groups.** `src/Rule/` — `GroupRule` (address/domain + `pattern` and/or `recipients`,
   `GroupPattern::compile()` adds `~…~` delimiters when missing), `GroupRuleSet` (config → rules),
   `GroupRuleEngine` (live `listAddresses()` → filtered set, manual recipients appended verbatim — foreign
   addresses allowed; no-op passes record nothing). The list's own address is never derived into the group;
-  rule-driven lists are authoritative (no adoption, non-matching recipients purged).
+  rule-driven lists are authoritative (no adoption, non-matching recipients purged). Auto-replies get the
+  same treatment via `AutoReplyDefinition` + `AutoReplyRuleEngine` (`mail.autoresponder` entries;
+  `DateNormalizer::coerce()` handles YAML-parsed date timestamps).
 - **Batching.** The Plesk API has no cross-domain mail listing, so live list commands batch N queries into one HTTP POST via `PleskMailGateway::*Bulk()` + `Client::multiRequest` → `mail:address:list` = 2 round trips, group/autoresponder/export = 3.
 
 ## Command structure
@@ -45,10 +48,9 @@ Uniform verbs per namespace: `list` (enumerate), `get <target>` (single resource
 
 - `src/Command/Mail/Group/` — `mail:group:list|get|set|add|remove` (forwarding recipients; `set` takes `--recipients` and/or `--rule`, else the configured `mail.group` entry; global `--write-config` persists the definition into the config file via `ConfigFile::upsertMailGroup()`)
 - `src/Command/Mail/Alias/` — `mail:alias:list|get|set|add|remove` (additional mailbox addresses; modeled on Group)
-- `src/Command/Mail/Address/` — `mail:address:list|get|set|remove|password|rename|export` (mailboxes)
-- `src/Command/Mail/Autoresponder/` — `mail:autoresponder:list|get|set` (auto-replies; `set --enabled=false` disables)
-- `src/Command/` — root `watch` (the one watcher: `--interval`, `--full`, `-d/--detached`; see `src/Rule/`, `src/Util/WatchLoop.php`)
-- `src/Command/Domain/` — `domain:list|get|set|add|remove|traffic:get|traffic:set|descriptor` (webspaces/sites; `--status=enabled|disabled` via gen_setup 0/16; `--type=virtual-host|forwarding|frame-forwarding|none` maps to htype vrt_hst/std_fwd/frm_fwd/none)
+- `src/Command/Mail/Address/` — `mail:address:list|get|set|remove|password|rename|export` (mailboxes; `set` falls back to `mail.defaults` quota/antivirus when the flags are missing)
+- `src/Command/Mail/Autoresponder/` — `mail:autoresponder:list|get|set` (auto-replies; `set --enabled=false` disables; no options falls back to the configured `mail.autoresponder` entry; `--write-config` persists/removes it)
+- `src/Command/Domain/` — `domain:list|get|set|add|remove|traffic:get|traffic:set|descriptor` (webspaces/sites; `set` gains `--status=enabled|disabled` via gen_setup 0/16 and `--type=virtual-host|forwarding|frame-forwarding|none` + `--dest-url=`/`--property=` via `PleskMailGateway::setSiteType()` — pending live validation; `add` maps `--type` to htype vrt_hst/std_fwd/frm_fwd/none)
 - `src/Command/Server/` — `server:info` (server/get gen_info+stat+updates); `server:session:list|get|terminate` (session operator; get = list filtered client-side); `server:admin` (server/get admin); `server:service:status|start|stop|restart` (services_state read + `srv_man`; special verbs are deliberate here — lifecycle ops do not map onto list/get/set); `server:ip:list|get|add|set|remove`
   (`<ip>` operator; get = list filtered client-side); `server:components:list|install` (server/get components read; install uses the docs-only `updater/install-component` shape — NOT in the 1.6.9.1 schema, validate before relying on it); `server:extension:list|get|install|uninstall|call` (`<extension>` operator; git ops documented: get/create/update/remove/deploy/fetch); `server:ref [id]` +
   `server:exec <id> <args...>` (REST CLI-gate via `PleskRestGateway` — X-API-Key auth, covers ApiCli-only extensions like sslit that the XML ApiRpc hook does not)
