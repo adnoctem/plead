@@ -79,6 +79,7 @@ plead mail:group:remove group@company.com leaver@company.com
 plead mail:group:set group@company.com --recipients=a@company.com,b@company.com
 plead mail:group:set all@company.com --rule='^(1und1|info|support|noreply|pbx)@'
 plead mail:group:set all@company.com --rule='^(info|noreply)@' --recipients=consultant@external.com
+plead mail:group:set all@company.com --rule='^(info|noreply)@' --write-config   # keep it maintained by the watcher
 plead mail:group:get group@company.com          # live state on the Plesk server
 plead mail:group:get group@company.com --local  # desired state + history
 

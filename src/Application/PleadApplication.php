@@ -183,6 +183,12 @@ final class PleadApplication extends Application
             'Plesk server to operate on (host or index from the servers list); defaults to the first configured server.',
         ));
         $definition->addOption(new InputOption(
+            'write-config',
+            null,
+            InputOption::VALUE_NONE,
+            'Persist the change to the config file (mail.group definitions on mail:group:set).',
+        ));
+        $definition->addOption(new InputOption(
             'log-level',
             null,
             InputOption::VALUE_REQUIRED,
@@ -204,6 +210,7 @@ final class PleadApplication extends Application
                 $input->getOption('log-level') ?: null,
                 $output->getVerbosity(),
                 $input->getOption('server') ?: null,
+                (bool) $input->getOption('write-config'),
             );
         }
 

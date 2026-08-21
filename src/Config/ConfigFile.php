@@ -48,4 +48,50 @@ final class ConfigFile
             file_put_contents($target, Yaml::dump($data, 8, 4));
         }
     }
+
+    /**
+     * Add or replace a mail.group entry in the general mail section of the
+     * config file. Entries are matched by their composed address, so an
+     * existing domain-less entry ("address: all" + "domain: x") is replaced
+     * by the full-address form as well.
+     *
+     * @param array<string, mixed> $entry validated entry: address + pattern/recipients
+     */
+    public static function upsertMailGroup(string $target, string $email, array $entry): void
+    {
+        $email = strtolower($email);
+        $data = self::read($target);
+        $groups = $data['mail']['group'] ?? [];
+        if (!is_array($groups)) {
+            $groups = [];
+        }
+
+        $replaced = false;
+        foreach ($groups as $index => $existing) {
+            if (!is_array($existing) || self::composedAddress($existing) !== $email) {
+                continue;
+            }
+            $groups[$index] = $entry;
+            $replaced = true;
+
+            break;
+        }
+        if (!$replaced) {
+            $groups[] = $entry;
+        }
+
+        $data['mail']['group'] = $groups;
+        self::write($target, $data);
+    }
+
+    /** @param array<string, mixed> $entry */
+    private static function composedAddress(array $entry): string
+    {
+        $address = strtolower((string) ($entry['address'] ?? ''));
+        if (str_contains($address, '@')) {
+            return $address;
+        }
+
+        return $address.'@'.strtolower((string) ($entry['domain'] ?? ''));
+    }
 }

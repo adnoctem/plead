@@ -43,6 +43,7 @@ php bin/plead list               # see all commands
 
 Uniform verbs per namespace: `list` (enumerate), `get <target>` (single resource), `set` (mutate). No mixed verbs, no `show`/`enable`/`update` — those were deliberately unified away.
 
+- `src/Command/Mail/Group/` — `mail:group:list|get|set|add|remove` (forwarding recipients; `set` takes `--recipients` and/or `--rule`, else the configured `mail.group` entry; global `--write-config` persists the definition into the config file via `ConfigFile::upsertMailGroup()`)
 - `src/Command/Mail/Alias/` — `mail:alias:list|get|set|add|remove` (additional mailbox addresses; modeled on Group)
 - `src/Command/Mail/Address/` — `mail:address:list|get|set|remove|password|rename|export` (mailboxes)
 - `src/Command/Mail/Autoresponder/` — `mail:autoresponder:list|get|set` (auto-replies; `set --enabled=false` disables)

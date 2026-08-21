@@ -55,6 +55,7 @@ final class RuntimeContext
         private readonly ?string $logLevelOption,
         private readonly int $verbosity,
         private readonly ?string $serverOption = null,
+        private readonly bool $writeConfig = false,
         ?PleskMailGateway $gateway = null,
         ?PleskRestGateway $restGateway = null,
         ?AutoReplyRepository $autoReplyRepository = null,
@@ -207,6 +208,12 @@ final class RuntimeContext
     public function dryRun(): bool
     {
         return $this->dryRun;
+    }
+
+    /** Whether --write-config asked to persist changes to the config file. */
+    public function writeConfig(): bool
+    {
+        return $this->writeConfig;
     }
 
     public function logLevel(): Level
