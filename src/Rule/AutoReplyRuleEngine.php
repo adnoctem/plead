@@ -39,21 +39,20 @@ final class AutoReplyRuleEngine
         $definition = AutoReplyDefinition::fromConfigEntry($entry);
         $email = $definition->email();
 
-        $messageFile = $definition->messageFile();
-        if (!is_file($messageFile) || !is_readable($messageFile)) {
-            throw new \RuntimeException(sprintf('Cannot read autoresponder message file: %s', $messageFile));
-        }
-        $message = $this->renderer->render([
-            'message' => (string) file_get_contents($messageFile),
-            'date' => new \DateTimeImmutable(),
-        ]);
-
         $existing = $this->repository->find($email);
 
         // Without an explicit start date the reply should run as soon as
         // possible: keep the recorded start instead of re-stamping "now" on
         // every pass (which would re-flag the row dirty indefinitely).
         $startDate = $definition->startDate() ?? ($existing['start_date'] ?? DateNormalizer::now());
+
+        $message = $this->renderer->renderMessage(
+            $definition->messageFile(),
+            $definition->dataFile(),
+            $startDate,
+            $definition->endDate(),
+            $definition->inclusive(),
+        );
 
         if (null !== $existing
             && $existing['message'] === $message

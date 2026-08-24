@@ -8,16 +8,18 @@ use App\Util\DateNormalizer;
 
 /**
  * Desired auto-reply of one address, from a mail.autoresponder config entry:
- * message file (rendered as a Twig template), optional start date and a
- * required end date.
+ * message file (rendered as a Twig template), optional JSON/YAML data file
+ * for template variables, optional start date and a required end date.
  */
 final class AutoReplyDefinition
 {
     private function __construct(
         private readonly string $email,
         private readonly string $messageFile,
+        private readonly ?string $dataFile,
         private readonly ?string $startDate,
         private readonly string $endDate,
+        private readonly ?bool $inclusive,
     ) {}
 
     /**
@@ -38,6 +40,16 @@ final class AutoReplyDefinition
             throw new \InvalidArgumentException(sprintf('Autoresponder for "%s" needs a message_file.', $email));
         }
 
+        $dataFile = trim((string) ($entry['data_file'] ?? ''));
+        if ('' !== $dataFile && (!is_file($dataFile) || !is_readable($dataFile))) {
+            throw new \InvalidArgumentException(sprintf(
+                'Autoresponder data_file "%s" for "%s" is not a readable file.',
+                $dataFile,
+                $email,
+            ));
+        }
+        $dataFile = '' === $dataFile ? null : $dataFile;
+
         $startDate = null !== ($entry['start_date'] ?? null)
             ? DateNormalizer::coerce($entry['start_date'])
             : null;
@@ -49,7 +61,14 @@ final class AutoReplyDefinition
             ));
         }
 
-        return new self($email, $messageFile, $startDate, $endDate);
+        return new self(
+            $email,
+            $messageFile,
+            $dataFile,
+            $startDate,
+            $endDate,
+            isset($entry['inclusive']) ? (bool) $entry['inclusive'] : null,
+        );
     }
 
     public function email(): string
@@ -62,6 +81,12 @@ final class AutoReplyDefinition
         return $this->messageFile;
     }
 
+    /** @return null|string JSON/YAML file with template data, null = none */
+    public function dataFile(): ?string
+    {
+        return $this->dataFile;
+    }
+
     /** @return null|string normalized ISO 8601 start date, null = as soon as possible */
     public function startDate(): ?string
     {
@@ -71,5 +96,11 @@ final class AutoReplyDefinition
     public function endDate(): string
     {
         return $this->endDate;
+    }
+
+    /** @return null|bool whether the end date counts as vacation, null = data file decides */
+    public function inclusive(): ?bool
+    {
+        return $this->inclusive;
     }
 }

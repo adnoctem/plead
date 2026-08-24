@@ -207,7 +207,11 @@ final class RuntimeContext
 
     public function renderer(): AutoReplyRenderer
     {
-        return $this->renderer ??= new AutoReplyRenderer($this->templatePath());
+        return $this->renderer ??= new AutoReplyRenderer(
+            $this->templatePath(),
+            $this->translationsPath(),
+            $this->config()['template']['logo_url'] ?? null,
+        );
     }
 
     public function logger(): LoggerInterface
@@ -296,5 +300,22 @@ final class RuntimeContext
         $absolute = dirname(__DIR__, 2).'/'.$configured;
 
         return is_file($absolute) ? $absolute : $configured;
+    }
+
+    /**
+     * The translation catalog directory (autoresponder.{locale}.yaml), or
+     * null when nothing is resolvable - the template defaults then carry the
+     * text.
+     */
+    private function translationsPath(): ?string
+    {
+        $configured = $this->config()['template']['translations_path'];
+        if (is_dir($configured)) {
+            return $configured;
+        }
+
+        $absolute = dirname(__DIR__, 2).'/'.$configured;
+
+        return is_dir($absolute) ? $absolute : null;
     }
 }

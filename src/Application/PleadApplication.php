@@ -161,6 +161,11 @@ final class PleadApplication extends Application
         return $this->context;
     }
 
+    public function getLongVersion(): string
+    {
+        return sprintf('%s <info>%s</info>', $this->getName(), Version::current());
+    }
+
     protected function getDefaultInputDefinition(): InputDefinition
     {
         $definition = parent::getDefaultInputDefinition();

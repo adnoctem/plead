@@ -15,9 +15,16 @@ vendor/bin/phpunit --filter SomeTestName   # single test class/method
 php -l src/.../File.php          # syntax check (no dedicated PHP linter)
 pre-commit run --all-files       # yaml/markdown/actionlint checks before committing
 php bin/plead list               # see all commands
+composer build:phar              # build dist/plead.phar (needs Box on PATH, see below)
 ```
 
 `failOnWarning`/`failOnRisky` are enabled in phpunit.xml.dist — deprecation warnings fail the suite (e.g. `fputcsv()` needs explicit `escape: ''` on PHP 8.5).
+
+**Phar builds (`composer build:phar` → `box compile`, config `box.json`).** Box is NOT a composer dependency:
+it cannot coexist with our symfony/console 8.1 pin (its `fidry/console` caps at symfony ^7). Install it globally
+(`composer global require humbug/box`) or fetch the official `box.phar` in CI; the release workflow must do the
+same before building. `git-version` injects the git tag/commit into `src/Application/Version.php`
+(`@git-version@`), and the phar re-execs itself on `watch -d` via `Phar::running()`.
 
 ## Architecture in one screen
 
@@ -28,7 +35,8 @@ php bin/plead list               # see all commands
 - **Reads default to LIVE Plesk; `--local` reads SQLite.** `AbstractMailCommand::addLocalOption()`/`isLocal()`.
 - **One watcher for everything.** `watch` (`src/Command/WatchCommand.php` + `src/Util/WatchLoop.php`):
   dirty-only by default (`reconciled = 0` / `unreconciledLists()`), `--full` sweeps everything,
-  `-d/--detached` re-execs itself with stdio on the log file (pcntl fork+exec; pid file
+  `-d/--detached` spawns itself via `proc_open` with stdio on the log file (explicit argv, no shell;
+  the old `fclose(STDOUT)`/`fopen` fd-reuse trick no longer frees the stdio fds on PHP 8.5; pid file
   `plead-<host>.watch.pid`), interval from `watch.interval` config. Each pass: auto-reply definitions
   first (re-record diverging `mail.autoresponder` entries), then rule engine (derives desired recipients
   of `mail.group` entries from live addresses, writes intents), then autoresponder/group/alias
@@ -39,7 +47,14 @@ php bin/plead list               # see all commands
   addresses allowed; no-op passes record nothing). The list's own address is never derived into the group;
   rule-driven lists are authoritative (no adoption, non-matching recipients purged). Auto-replies get the
   same treatment via `AutoReplyDefinition` + `AutoReplyRuleEngine` (`mail.autoresponder` entries;
-  `DateNormalizer::coerce()` handles YAML-parsed date timestamps).
+  `DateNormalizer::coerce()` handles YAML-parsed date timestamps). Template data comes from JSON/YAML
+  `data_file` entries (`--data-file` on the CLI) via `AutoReplyRenderer::renderMessage()`, which renders
+  the message file as an inline Twig template and injects `startDate`/`endDate` from the real schedule).
+  Multi-language text is catalog-driven: `translations/autoresponder.{locale}.yaml` holds all sentences
+  (`template.translations_path`; 'de' is the fallback locale - missing entries degrade to German, never a
+  raw key, so renders cannot fail), templates loop over the discovered `languages` and resolve per-language
+  data values as `key[lang] ?? key.de ?? key`. `template.logo_url` feeds the HTML templates; a data-file `logo_url`
+  overrides it per campaign.
 - **Batching.** The Plesk API has no cross-domain mail listing, so live list commands batch N queries into one HTTP POST via `PleskMailGateway::*Bulk()` + `Client::multiRequest` → `mail:address:list` = 2 round trips, group/autoresponder/export = 3.
 
 ## Command structure
@@ -89,7 +104,7 @@ Full detail: `docs/plesk-xml-api-notes.md`. The short version an agent must not 
 - **Spawn mechanics:** `InteractiveProcessLauncher` (used by `config:edit`, `db:query`) must use fork + `pcntl_exec` (no `/bin/sh`): the `sh -c` wrapper breaks TUIs on WSL2/Windows Terminal (ConPTY). Falls back to `passthru` without pcntl. Terminal-mode reset sequences (mouse/focus reporting) around the spawn.
 - **Terminal control sequences** (spinner, reset, cursor) must be gated on `stream_isatty(STDOUT)` + non-Windows — they corrupt piped output otherwise.
 - On WSL/ConPTY, remember `reset` (or a fresh tab) after a hard-killed TUI.
-- Pre-production: `config/schema.sql` is the single source of truth and `Connection::migrate()` only runs it — databases from older layouts are discarded, not migrated. `watch -d` re-execs via fork+`pcntl_exec` (same rule as the TUI launcher: no `/bin/sh`).
+- Pre-production: `config/schema.sql` is the single source of truth and `Connection::migrate()` only runs it — databases from older layouts are discarded, not migrated. `watch -d` spawns itself via `proc_open` with file-redirected stdio (no `/bin/sh`; same argv rule as the TUI launcher).
 
 ## Docs map
 

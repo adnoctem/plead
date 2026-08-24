@@ -158,10 +158,14 @@ final class WatchCommandTest extends TestCase
     {
         $messageFile = $this->base.'/reply.txt';
         file_put_contents($messageFile, 'Bin im Urlaub');
+        $templateFile = $this->base.'/template.txt.twig';
+        file_put_contents($templateFile, '{{ message }}');
         file_put_contents($this->base.'/config/plead.yaml', implode("\n", [
             'servers:',
             '    - host: fake.local',
             '      secret_key: test-key',
+            'template:',
+            '    auto_reply_path: '.$templateFile,
             'mail:',
             '    autoresponder:',
             '        - address: user@company.com',

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Command;
 
 use App\Util\WatchLoop;
+use Phar;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -75,8 +76,8 @@ final class WatchCommand extends AbstractPleadCommand
 
     private function detach(InputInterface $input, OutputInterface $output): int
     {
-        if (!function_exists('pcntl_fork') || !function_exists('pcntl_exec')) {
-            $output->writeln('<error>--detached requires the pcntl extension (the container image ships it).</error>');
+        if (!function_exists('proc_open')) {
+            $output->writeln('<error>--detached requires the proc_open function.</error>');
 
             return self::FAILURE;
         }
@@ -84,35 +85,44 @@ final class WatchCommand extends AbstractPleadCommand
         $context = $this->context();
         $logFile = $context->paths->logFile();
 
-        $pid = pcntl_fork();
-        if (-1 === $pid) {
-            $output->writeln('<error>Unable to fork the detached watcher.</error>');
+        if (!is_dir(dirname($logFile)) && !mkdir(dirname($logFile), 0o775, true) && !is_dir(dirname($logFile))) {
+            $output->writeln(sprintf('<error>Unable to create data directory: %s</error>', dirname($logFile)));
 
             return self::FAILURE;
         }
 
-        if (0 === $pid) {
-            // Child: run the watcher with stdio pointed at the log file. The
-            // two fopen calls pick up the freed fds 1 and 2 (STDOUT/STDERR).
-            if (!is_dir(dirname($logFile)) && !mkdir(dirname($logFile), 0o775, true) && !is_dir(dirname($logFile))) {
-                exit(1);
-            }
-            if (defined('STDOUT')) {
-                fclose(STDOUT);
-            }
-            if (defined('STDERR')) {
-                fclose(STDERR);
-            }
-            if (false === fopen($logFile, 'a') || false === fopen($logFile, 'a')) {
-                exit(1);
-            }
+        // Spawn the watcher with its stdio pointed at the log file. A plain
+        // proc_open with file redirection performs the fd remapping reliably
+        // on every PHP version - the old fclose(STDOUT)/fopen() reuse trick
+        // no longer frees the stdio fds on PHP 8.5. No shell is involved, so
+        // the argv stays explicit (same rule as the TUI launcher).
+        $env = getenv();
+        $env['PLEAD_DETACHED'] = '1';
+        $null = 'Windows' === PHP_OS_FAMILY ? 'NUL' : '/dev/null';
 
-            putenv('PLEAD_DETACHED=1');
-            $argv = $this->childArgv($input);
-            @pcntl_exec(PHP_BINARY, $argv);
+        $proc = @proc_open(
+            [PHP_BINARY, ...$this->childArgv($input)],
+            [
+                0 => ['file', $null, 'r'],
+                1 => ['file', $logFile, 'a'],
+                2 => ['file', $logFile, 'a'],
+            ],
+            $pipes,
+            null,
+            $env,
+        );
 
-            exit(127);
+        if (false === $proc) {
+            $output->writeln('<error>Unable to start the detached watcher.</error>');
+
+            return self::FAILURE;
         }
+
+        $status = proc_get_status($proc);
+        $pid = (int) $status['pid'];
+
+        // Deliberately no proc_close(): it would wait for the watcher to
+        // exit. The watcher keeps running and is reparented on our exit.
 
         $pidFile = $context->paths->dataDir().'/plead-'.$context->serverHost().'.watch.pid';
         if (!is_dir(dirname($pidFile)) && !mkdir(dirname($pidFile), 0o775, true) && !is_dir(dirname($pidFile))) {
@@ -132,7 +142,9 @@ final class WatchCommand extends AbstractPleadCommand
     /** @return list<string> argv for the re-executed watcher child */
     private function childArgv(InputInterface $input): array
     {
-        $script = dirname(__DIR__, 2).'/bin/plead';
+        // Inside the compiled phar the re-exec target is the phar itself
+        // (Phar::running()); the source tree re-executes bin/plead.
+        $script = \Phar::running(false) ?: dirname(__DIR__, 2).'/bin/plead';
 
         $argv = [$script, 'watch'];
         foreach (['interval', 'full', 'server', 'config', 'log-level', 'dry-run'] as $option) {

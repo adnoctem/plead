@@ -30,3 +30,7 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   VALIDATE_PHP: true
                   FIX_PHP: false
+                # obsolete tools
+                  VALIDATE_JSCPD: false
+                  VALIDATE_BIOME_FORMAT: false
+                  VALIDATE_BIOME_LINT: false

@@ -32,7 +32,15 @@
         ],
         [
             "@semantic-release/github",
-            {}
+            {
+                "path": "dist/*.zip"
+            },
+            {
+                "path": "dist/*.tar.gz"
+            },
+            {
+                "path": "dist/CHECKSUMS_SHA256.txt"
+            }
         ],
         [
             "@semantic-release/changelog",

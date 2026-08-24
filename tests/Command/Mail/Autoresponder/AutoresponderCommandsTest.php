@@ -278,6 +278,318 @@ final class AutoresponderCommandsTest extends TestCase
         self::assertSame('2099-01-01T08:00:00+02:00', $row['start_date']);
     }
 
+    public function testDataFileInjectsJsonValuesIntoMessage(): void
+    {
+        $dataFile = $this->base.'/data.json';
+        file_put_contents($dataFile, json_encode([
+            'firstname' => 'Max',
+            'surname' => 'Mustermann',
+            'phonenumber' => '+49 30 123456',
+            'department' => 'Vertrieb',
+            'email' => 'vertrieb@example.com',
+            'inclusive' => true,
+        ], JSON_THROW_ON_ERROR));
+
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--message-file' => $this->messageFile,
+            '--data-file' => $dataFile,
+            '--start-date' => '2099-01-01T08:00:00+02:00',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        $row = $this->context->autoReplyRepository()->find('user@company.com');
+        self::assertStringContainsString('Max Mustermann', $row['message']);
+        self::assertStringContainsString('Vertrieb', $row['message']);
+        self::assertStringContainsString('vertrieb@example.com', $row['message']);
+        self::assertStringContainsString('vom 01.01.2099 bis einschließlich 05.01.2099', $row['message']);
+    }
+
+    public function testDataFileInjectsYamlValuesIntoMessage(): void
+    {
+        $dataFile = $this->base.'/data.yaml';
+        file_put_contents($dataFile, implode("\n", [
+            'firstname: Max',
+            'surname: Mustermann',
+            'phonenumber: "+49 30 123456"',
+            'department: Vertrieb',
+            'email: vertrieb@example.com',
+            'inclusive: true',
+        ]));
+
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--message-file' => $this->messageFile,
+            '--data-file' => $dataFile,
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        $row = $this->context->autoReplyRepository()->find('user@company.com');
+        self::assertStringContainsString('Max Mustermann', $row['message']);
+        self::assertStringContainsString('Vertrieb', $row['message']);
+    }
+
+    public function testDataFileScheduleDatesWinOverDataFileValues(): void
+    {
+        $dataFile = $this->base.'/data.json';
+        file_put_contents($dataFile, json_encode(['startDate' => '2099-09-09', 'endDate' => '2099-09-19'], JSON_THROW_ON_ERROR));
+
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--message-file' => $this->messageFile,
+            '--data-file' => $dataFile,
+            '--start-date' => '2099-01-01T08:00:00+02:00',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        $row = $this->context->autoReplyRepository()->find('user@company.com');
+        self::assertStringContainsString('vom 01.01.2099 bis', $row['message']);
+        self::assertStringContainsString('05.01.2099 in Urlaub', $row['message']);
+        self::assertStringNotContainsString('2099-09-09', $row['message']);
+        self::assertStringNotContainsString('2099-09-19', $row['message']);
+    }
+
+    public function testMissingDataFileFails(): void
+    {
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--message-file' => $this->messageFile,
+            '--data-file' => $this->base.'/does-not-exist.json',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+        ]);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('Cannot read data file', $tester->getDisplay());
+    }
+
+    public function testPreviewPrintsRenderedMessageWithoutSideEffects(): void
+    {
+        $dataFile = $this->base.'/data.json';
+        file_put_contents($dataFile, json_encode([
+            'firstname' => 'Max',
+            'surname' => 'Mustermann',
+            'phonenumber' => '+49 30 123456',
+            'department' => 'Vertrieb',
+            'email' => 'vertrieb@example.com',
+            'inclusive' => true,
+        ], JSON_THROW_ON_ERROR));
+
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--message-file' => $this->messageFile,
+            '--data-file' => $dataFile,
+            '--start-date' => '2099-01-01T08:00:00+02:00',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+            '--preview' => true,
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('Max Mustermann', $tester->getDisplay());
+        self::assertStringContainsString('Vertrieb', $tester->getDisplay());
+        self::assertStringContainsString('vom 01.01.2099 bis einschließlich 05.01.2099', $tester->getDisplay());
+        self::assertNull($this->context->autoReplyRepository()->find('user@company.com'));
+        self::assertCount(0, $this->context->syncLogRepository()->all('auto_reply'));
+        self::assertFalse($this->gateway->wasCalledWith('user@company.com'));
+    }
+
+    public function testPreviewFallsBackToConfigEntry(): void
+    {
+        $dataFile = $this->base.'/data.yaml';
+        file_put_contents($dataFile, implode("\n", ['firstname: Max', 'surname: Mustermann']));
+        $this->configWithAutoresponder($this->messageFile, $dataFile);
+
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute(['email' => 'user@company.com', '--preview' => true]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('Max Mustermann', $tester->getDisplay());
+        self::assertNull($this->context->autoReplyRepository()->find('user@company.com'));
+    }
+
+    public function testPreviewWithoutAnythingFails(): void
+    {
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute(['email' => 'user@company.com', '--preview' => true]);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('configure a mail.autoresponder entry', $tester->getDisplay());
+    }
+
+    public function testPreviewRejectsEndBeforeStart(): void
+    {
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--message-file' => $this->messageFile,
+            '--start-date' => '2099-01-10T08:00:00+02:00',
+            '--end-date' => '2099-01-01T08:00:00+02:00',
+            '--preview' => true,
+        ]);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('end-date must be after start-date', $tester->getDisplay());
+    }
+
+    public function testInclusiveFlagRendersInclusiveVariant(): void
+    {
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--message-file' => $this->messageFile,
+            '--start-date' => '2099-01-01T08:00:00+02:00',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+            '--inclusive' => true,
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        $row = $this->context->autoReplyRepository()->find('user@company.com');
+        self::assertStringContainsString('bis einschließlich 05.01.2099', $row['message']);
+        self::assertStringContainsString('through', $row['message']);
+        self::assertStringNotContainsString('until ', $row['message']);
+    }
+
+    public function testNoInclusiveOverridesDataFile(): void
+    {
+        $dataFile = $this->base.'/data.yaml';
+        file_put_contents($dataFile, implode("\n", ['firstname: Max', 'inclusive: true']));
+
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--message-file' => $this->messageFile,
+            '--data-file' => $dataFile,
+            '--start-date' => '2099-01-01T08:00:00+02:00',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+            '--no-inclusive' => true,
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        $row = $this->context->autoReplyRepository()->find('user@company.com');
+        self::assertStringContainsString('bis 05.01.2099', $row['message']);
+        self::assertStringContainsString('until', $row['message']);
+        self::assertStringNotContainsString('einschließlich', $row['message']);
+    }
+
+    public function testConfigEntryInclusiveAppliesOnFallback(): void
+    {
+        $this->configWithAutoresponder($this->messageFile, null, true);
+
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute(['email' => 'user@company.com']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        $row = $this->context->autoReplyRepository()->find('user@company.com');
+        self::assertStringContainsString('bis einschließlich 05.01.2099', $row['message']);
+    }
+
+    public function testDataFileNestedDepartmentTranslatesPerLanguage(): void
+    {
+        $dataFile = $this->base.'/data.yaml';
+        file_put_contents($dataFile, implode("\n", [
+            'firstname: Max',
+            'surname: Mustermann',
+            'department:',
+            '    de: Buchhaltung',
+            '    en: accounting',
+        ]));
+
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--message-file' => $this->messageFile,
+            '--data-file' => $dataFile,
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        $row = $this->context->autoReplyRepository()->find('user@company.com');
+        self::assertStringContainsString('unsere Buchhaltung', $row['message']);
+        self::assertStringContainsString('our accounting department', $row['message']);
+    }
+
+    public function testSetWithWriteConfigPersistsInclusive(): void
+    {
+        $context = new RuntimeContext($this->paths, null, false, null, 0, writeConfig: true, gateway: $this->gateway);
+
+        $tester = $this->tester(new AutoresponderSetCommand(), $context);
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--message-file' => $this->messageFile,
+            '--start-date' => '2099-01-01T08:00:00+02:00',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+            '--inclusive' => true,
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('written to', $tester->getDisplay());
+
+        $raw = ConfigFile::read($this->base.'/config/plead.yaml');
+        self::assertSame([
+            [
+                'address' => 'user@company.com',
+                'end_date' => '2099-01-05T08:00:00+02:00',
+                'inclusive' => true,
+                'message_file' => $this->messageFile,
+                'start_date' => '2099-01-01T08:00:00+02:00',
+            ],
+        ], $raw['mail']['autoresponder']);
+        $this->context->configLoader()->load($this->base.'/config/plead.yaml');
+    }
+
+    public function testInvalidJsonDataFileFails(): void
+    {
+        $dataFile = $this->base.'/broken.json';
+        file_put_contents($dataFile, '{not json');
+
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--message-file' => $this->messageFile,
+            '--data-file' => $dataFile,
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+        ]);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('Unable to render the auto-reply message', $tester->getDisplay());
+    }
+
+    public function testSetFallsBackToConfigEntryWithDataFile(): void
+    {
+        $dataFile = $this->base.'/data.yaml';
+        file_put_contents($dataFile, implode("\n", ['firstname: Max', 'surname: Mustermann']));
+        $this->configWithAutoresponder($this->messageFile, $dataFile);
+
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute(['email' => 'user@company.com']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        $row = $this->context->autoReplyRepository()->find('user@company.com');
+        self::assertStringContainsString('Max Mustermann', $row['message']);
+    }
+
+    public function testPartialCliRunBorrowsMessageFileFromConfigEntry(): void
+    {
+        $dataFile = $this->base.'/data.yaml';
+        file_put_contents($dataFile, implode("\n", ['firstname: Max', 'surname: Mustermann']));
+        $this->configWithAutoresponder($this->messageFile, $dataFile);
+
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute(['email' => 'user@company.com', '--end-date' => '2099-01-07T08:00:00+02:00']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        $row = $this->context->autoReplyRepository()->find('user@company.com');
+        self::assertStringContainsString('Max Mustermann', $row['message']);
+        self::assertSame('2099-01-07T08:00:00+02:00', $row['end_date']);
+    }
+
     public function testSetWithoutOptionsAndConfigFails(): void
     {
         $tester = $this->tester(new AutoresponderSetCommand());
@@ -306,9 +618,40 @@ final class AutoresponderCommandsTest extends TestCase
         self::assertSame([
             [
                 'address' => 'user@company.com',
+                'end_date' => '2099-01-05T08:00:00+02:00',
                 'message_file' => $this->messageFile,
                 'start_date' => '2099-01-01T08:00:00+02:00',
+            ],
+        ], $raw['mail']['autoresponder']);
+        $this->context->configLoader()->load($this->base.'/config/plead.yaml');
+    }
+
+    public function testSetWithWriteConfigPersistsDataFile(): void
+    {
+        $dataFile = $this->base.'/data.json';
+        file_put_contents($dataFile, '{"firstname": "Max"}');
+        $context = new RuntimeContext($this->paths, null, false, null, 0, writeConfig: true, gateway: $this->gateway);
+
+        $tester = $this->tester(new AutoresponderSetCommand(), $context);
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--message-file' => $this->messageFile,
+            '--data-file' => $dataFile,
+            '--start-date' => '2099-01-01T08:00:00+02:00',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('written to', $tester->getDisplay());
+
+        $raw = ConfigFile::read($this->base.'/config/plead.yaml');
+        self::assertSame([
+            [
+                'address' => 'user@company.com',
+                'data_file' => $dataFile,
                 'end_date' => '2099-01-05T08:00:00+02:00',
+                'message_file' => $this->messageFile,
+                'start_date' => '2099-01-01T08:00:00+02:00',
             ],
         ], $raw['mail']['autoresponder']);
         $this->context->configLoader()->load($this->base.'/config/plead.yaml');
@@ -337,9 +680,9 @@ final class AutoresponderCommandsTest extends TestCase
         return $tester;
     }
 
-    private function configWithAutoresponder(string $messageFile): void
+    private function configWithAutoresponder(string $messageFile, ?string $dataFile = null, ?bool $inclusive = null): void
     {
-        file_put_contents($this->base.'/config/plead.yaml', implode("\n", [
+        $lines = [
             'servers:',
             '    - host: fake.local',
             '      secret_key: test-key',
@@ -347,8 +690,16 @@ final class AutoresponderCommandsTest extends TestCase
             '    autoresponder:',
             '        - address: user@company.com',
             '          message_file: '.$messageFile,
-            '          start_date: "2099-01-01T08:00:00+02:00"',
-            '          end_date: "2099-01-05T18:00:00+02:00"',
-        ]));
+        ];
+        if (null !== $dataFile) {
+            $lines[] = '          data_file: '.$dataFile;
+        }
+        if (null !== $inclusive) {
+            $lines[] = '          inclusive: '.($inclusive ? 'true' : 'false');
+        }
+        $lines[] = '          start_date: "2099-01-01T08:00:00+02:00"';
+        $lines[] = '          end_date: "2099-01-05T18:00:00+02:00"';
+
+        file_put_contents($this->base.'/config/plead.yaml', implode("\n", $lines));
     }
 }

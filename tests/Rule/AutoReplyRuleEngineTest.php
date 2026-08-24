@@ -122,6 +122,118 @@ final class AutoReplyRuleEngineTest extends TestCase
         self::assertNotNull($this->repository->find('user@company.com'));
     }
 
+    public function testDataFileInjectsValuesIntoRenderedMessage(): void
+    {
+        file_put_contents($this->messageFile, 'Gruß {{ firstname }} {{ surname }}');
+        $dataFile = sys_get_temp_dir().'/plead-reply-'.bin2hex(random_bytes(4)).'.json';
+        file_put_contents($dataFile, json_encode(['firstname' => 'Max', 'surname' => 'Mustermann'], JSON_THROW_ON_ERROR));
+
+        try {
+            $entry = $this->entry();
+            $entry['data_file'] = $dataFile;
+
+            self::assertTrue($this->engine->apply($entry));
+            self::assertStringContainsString('Gruß Max Mustermann', $this->repository->find('user@company.com')['message']);
+        } finally {
+            @unlink($dataFile);
+        }
+    }
+
+    public function testDataFileYamlIsSupported(): void
+    {
+        file_put_contents($this->messageFile, 'Gruß {{ firstname }}');
+        $dataFile = sys_get_temp_dir().'/plead-reply-'.bin2hex(random_bytes(4)).'.yaml';
+        file_put_contents($dataFile, "firstname: Max\n");
+
+        try {
+            $entry = $this->entry();
+            $entry['data_file'] = $dataFile;
+
+            self::assertTrue($this->engine->apply($entry));
+            self::assertStringContainsString('Gruß Max', $this->repository->find('user@company.com')['message']);
+        } finally {
+            @unlink($dataFile);
+        }
+    }
+
+    public function testScheduleDatesWinOverDataFileValues(): void
+    {
+        file_put_contents($this->messageFile, '{{ startDate }} {{ endDate }}');
+        $dataFile = sys_get_temp_dir().'/plead-reply-'.bin2hex(random_bytes(4)).'.json';
+        file_put_contents($dataFile, json_encode(['startDate' => '2099-09-09', 'endDate' => '2099-09-19'], JSON_THROW_ON_ERROR));
+
+        try {
+            $entry = $this->entry();
+            $entry['data_file'] = $dataFile;
+
+            self::assertTrue($this->engine->apply($entry));
+            self::assertStringContainsString(
+                '2099-01-01T08:00:00+02:00 2099-01-05T18:00:00+02:00',
+                $this->repository->find('user@company.com')['message'],
+            );
+        } finally {
+            @unlink($dataFile);
+        }
+    }
+
+    public function testNoopWhenDataFileDidNotChangeMessage(): void
+    {
+        file_put_contents($this->messageFile, 'Gruß {{ firstname }}');
+        $dataFile = sys_get_temp_dir().'/plead-reply-'.bin2hex(random_bytes(4)).'.json';
+        file_put_contents($dataFile, json_encode(['firstname' => 'Max'], JSON_THROW_ON_ERROR));
+
+        try {
+            $entry = $this->entry();
+            $entry['data_file'] = $dataFile;
+
+            self::assertTrue($this->engine->apply($entry));
+
+            // A second pass with the same data file must not re-record.
+            self::assertFalse($this->engine->apply($entry));
+            self::assertCount(1, $this->syncLog->all('auto_reply'));
+        } finally {
+            @unlink($dataFile);
+        }
+    }
+
+    public function testApplyAllSkipsEntryWithBrokenDataFile(): void
+    {
+        $entries = [
+            $this->entry(),
+            [
+                'address' => 'broken@company.com',
+                'message_file' => $this->messageFile,
+                'data_file' => '/nonexistent/data.json',
+                'end_date' => '2099-01-05T18:00:00+02:00',
+            ],
+        ];
+
+        self::assertSame(1, $this->engine->applyAll($entries));
+        self::assertNotNull($this->repository->find('user@company.com'));
+        self::assertNull($this->repository->find('broken@company.com'));
+    }
+
+    public function testEntryInclusiveAppliesToRenderedMessage(): void
+    {
+        $engine = new AutoReplyRuleEngine(
+            $this->repository,
+            $this->syncLog,
+            new AutoReplyRenderer(__DIR__.'/../../templates/autoresponder.txt.twig', __DIR__.'/../../translations'),
+            new Logger('test'),
+            false,
+        );
+        file_put_contents($this->messageFile, 'Bin im Urlaub');
+        $entry = $this->entry();
+        $entry['inclusive'] = true;
+
+        self::assertTrue($engine->apply($entry));
+        self::assertStringContainsString('einschließlich', $this->repository->find('user@company.com')['message']);
+
+        $entry['inclusive'] = false;
+        self::assertTrue($engine->apply($entry));
+        self::assertStringNotContainsString('einschließlich', $this->repository->find('user@company.com')['message']);
+    }
+
     /** @return array<string, mixed> */
     private function entry(?string $start = '2099-01-01T08:00:00+02:00'): array
     {

@@ -22,8 +22,11 @@ final class AutoresponderSetCommand extends AbstractMailCommand
             ->addArgument('email', InputArgument::REQUIRED, 'Email address, e.g. user@company.com')
             ->addOption('enabled', null, InputOption::VALUE_REQUIRED, 'Whether the auto-reply should be enabled: true|false|yes|no|1|0 (default: true)')
             ->addOption('message-file', null, InputOption::VALUE_REQUIRED, 'File containing the auto-reply message (rendered as a Twig template)')
+            ->addOption('data-file', null, InputOption::VALUE_REQUIRED, 'JSON or YAML file with template data (e.g. firstname, phoneNumber); the schedule dates are injected automatically')
             ->addOption('start-date', null, InputOption::VALUE_REQUIRED, 'When the auto-reply becomes active (default: now). Any date string is accepted and normalized to ISO 8601 with offset.')
             ->addOption('end-date', null, InputOption::VALUE_REQUIRED, 'When the auto-reply stops. Plesk handles the turn-off natively.')
+            ->addOption('inclusive', null, InputOption::VALUE_NEGATABLE, 'Whether the end date counts as vacation: --inclusive/--no-inclusive (default: false). Authoritative - overrides the data file.')
+            ->addOption('preview', null, InputOption::VALUE_NONE, 'Render and print the message with the configured template, data file and dates; records nothing and touches neither the database nor Plesk')
         ;
     }
 
@@ -31,6 +34,14 @@ final class AutoresponderSetCommand extends AbstractMailCommand
     {
         $email = (string) $input->getArgument('email');
         $context = $this->context();
+
+        if ($input->getOption('preview')) {
+            if (!$this->mergeConfigEntry($input, $output, $email)) {
+                return self::FAILURE;
+            }
+
+            return $this->preview($input, $output, $email);
+        }
 
         $enabled = true;
         if (null !== $input->getOption('enabled')) {
@@ -43,25 +54,10 @@ final class AutoresponderSetCommand extends AbstractMailCommand
 
                 return self::FAILURE;
             }
-        } elseif (null === $input->getOption('message-file')
-            && null === $input->getOption('start-date')
-            && null === $input->getOption('end-date')) {
-            // No options at all: fall back to the configured mail.autoresponder
-            // entry for this address.
-            $entry = $this->configAutoresponderEntry($email);
-            if (null === $entry) {
-                $output->writeln(sprintf(
-                    '<error>Provide --message-file (and dates), or configure a mail.autoresponder entry for %s in the config.</error>',
-                    $email,
-                ));
-
+        } else {
+            if (!$this->mergeConfigEntry($input, $output, $email)) {
                 return self::FAILURE;
             }
-            $input->setOption('message-file', $entry['message_file']);
-            if (null !== ($entry['start_date'] ?? null)) {
-                $input->setOption('start-date', DateNormalizer::coerce($entry['start_date']));
-            }
-            $input->setOption('end-date', DateNormalizer::coerce($entry['end_date']));
         }
 
         $result = $enabled ? $this->enable($input, $output, $email) : $this->disable($output, $email);
@@ -92,6 +88,51 @@ final class AutoresponderSetCommand extends AbstractMailCommand
         return null;
     }
 
+    /**
+     * Fill CLI options from the configured mail.autoresponder entry: with no
+     * options at all the entry defines everything; with a partial CLI run the
+     * entry fills the missing pieces (message/data file and dates). Returns
+     * false when nothing at all could be resolved for the address.
+     */
+    private function mergeConfigEntry(InputInterface $input, OutputInterface $output, string $email): bool
+    {
+        $entry = $this->configAutoresponderEntry($email);
+        if (null === $entry) {
+            $hasOptions = null !== $input->getOption('message-file')
+                || null !== $input->getOption('data-file')
+                || null !== $input->getOption('start-date')
+                || null !== $input->getOption('end-date');
+            if ($hasOptions) {
+                return true;
+            }
+
+            $output->writeln(sprintf(
+                '<error>Provide --message-file (and dates), or configure a mail.autoresponder entry for %s in the config.</error>',
+                $email,
+            ));
+
+            return false;
+        }
+
+        if (null === $input->getOption('message-file')) {
+            $input->setOption('message-file', $entry['message_file']);
+        }
+        if (null === $input->getOption('data-file') && null !== ($entry['data_file'] ?? null)) {
+            $input->setOption('data-file', $entry['data_file']);
+        }
+        if (null === $input->getOption('start-date') && null !== ($entry['start_date'] ?? null)) {
+            $input->setOption('start-date', DateNormalizer::coerce($entry['start_date']));
+        }
+        if (null === $input->getOption('end-date')) {
+            $input->setOption('end-date', DateNormalizer::coerce($entry['end_date']));
+        }
+        if (null === $input->getOption('inclusive') && null !== ($entry['inclusive'] ?? null)) {
+            $input->setOption('inclusive', (bool) $entry['inclusive']);
+        }
+
+        return true;
+    }
+
     private function persistDefinition(InputInterface $input, string $email, OutputInterface $output): int
     {
         $entry = [
@@ -100,6 +141,13 @@ final class AutoresponderSetCommand extends AbstractMailCommand
             'start_date' => DateNormalizer::normalize((string) ($input->getOption('start-date') ?: DateNormalizer::now())),
             'end_date' => (string) $input->getOption('end-date'),
         ];
+        if (null !== $input->getOption('data-file')) {
+            $entry['data_file'] = (string) $input->getOption('data-file');
+        }
+        if (null !== $input->getOption('inclusive')) {
+            $entry['inclusive'] = (bool) $input->getOption('inclusive');
+        }
+        ksort($entry);
 
         $target = ConfigFile::targetFile($this->context()->paths->configPaths());
 
@@ -133,6 +181,73 @@ final class AutoresponderSetCommand extends AbstractMailCommand
         return self::SUCCESS;
     }
 
+    /**
+     * Render and print the auto-reply exactly as it would be stored and
+     * pushed (same template, data file and schedule), without recording an
+     * intent or touching the server - a pure dry check.
+     */
+    private function preview(InputInterface $input, OutputInterface $output, string $email): int
+    {
+        $context = $this->context();
+
+        $messageFile = (string) $input->getOption('message-file');
+        if ('' === $messageFile || !is_file($messageFile) || !is_readable($messageFile)) {
+            $output->writeln(sprintf('<error>Cannot read message file: %s</error>', $messageFile));
+
+            return self::FAILURE;
+        }
+
+        $dataFile = $input->getOption('data-file');
+        if (null !== $dataFile && (!is_file($dataFile) || !is_readable($dataFile))) {
+            $output->writeln(sprintf('<error>Cannot read data file: %s</error>', $dataFile));
+
+            return self::FAILURE;
+        }
+
+        try {
+            [$startDate, $endDate] = $this->resolveDates($input);
+        } catch (\InvalidArgumentException $e) {
+            $output->writeln(sprintf('<error>%s</error>', $e->getMessage()));
+
+            return self::FAILURE;
+        }
+
+        try {
+            $message = $context->renderer()->renderMessage(
+                $messageFile,
+                $dataFile,
+                $startDate,
+                $endDate,
+                $input->getOption('inclusive'),
+            );
+        } catch (\Throwable $e) {
+            $output->writeln(sprintf('<error>Unable to render the auto-reply message: %s</error>', $e->getMessage()));
+
+            return self::FAILURE;
+        }
+
+        $output->writeln($message);
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Normalize the CLI dates and enforce the ordering; throws on empty or
+     * invalid values.
+     *
+     * @return array{0: string, 1: string} normalized start date, end date
+     */
+    private function resolveDates(InputInterface $input): array
+    {
+        $startDate = DateNormalizer::normalize((string) ($input->getOption('start-date') ?: DateNormalizer::now()));
+        $endDate = DateNormalizer::normalize((string) $input->getOption('end-date'));
+        if (new \DateTimeImmutable($endDate) <= new \DateTimeImmutable($startDate)) {
+            throw new \InvalidArgumentException('end-date must be after start-date.');
+        }
+
+        return [$startDate, $endDate];
+    }
+
     private function enable(InputInterface $input, OutputInterface $output, string $email): int
     {
         $context = $this->context();
@@ -140,6 +255,13 @@ final class AutoresponderSetCommand extends AbstractMailCommand
         $messageFile = (string) $input->getOption('message-file');
         if ('' === $messageFile || !is_file($messageFile) || !is_readable($messageFile)) {
             $output->writeln(sprintf('<error>Cannot read message file: %s</error>', $messageFile));
+
+            return self::FAILURE;
+        }
+
+        $dataFile = $input->getOption('data-file');
+        if (null !== $dataFile && (!is_file($dataFile) || !is_readable($dataFile))) {
+            $output->writeln(sprintf('<error>Cannot read data file: %s</error>', $dataFile));
 
             return self::FAILURE;
         }
@@ -152,10 +274,19 @@ final class AutoresponderSetCommand extends AbstractMailCommand
             return self::FAILURE;
         }
 
-        $message = $context->renderer()->render([
-            'message' => (string) file_get_contents($messageFile),
-            'date' => new \DateTimeImmutable(),
-        ]);
+        try {
+            $message = $context->renderer()->renderMessage(
+                $messageFile,
+                $dataFile,
+                $startDate,
+                $endDate,
+                $input->getOption('inclusive'),
+            );
+        } catch (\Throwable $e) {
+            $output->writeln(sprintf('<error>Unable to render the auto-reply message: %s</error>', $e->getMessage()));
+
+            return self::FAILURE;
+        }
 
         // Audit first: the upsert below is the intent; the reconciler decides
         // whether it is applied now or picked up by the watcher.

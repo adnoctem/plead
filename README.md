@@ -44,6 +44,15 @@ The local SQLite database is the **desired state**; the Plesk server holds the *
 
 Rows are never deleted: auto-replies carry a `status` (`scheduled`/`disabled`) and recipients are soft-deleted, so the database doubles as a full audit trail of every intent, even months later. Read commands show the **live server state by default**; pass `--local` to inspect the desired state instead.
 
+## 📦 Installation
+
+Three ways to run `plead`, all behaving identically:
+
+- **Standalone phar (any platform, no install)** — download `plead.phar` from the [latest release][github_releases], `chmod +x` it and run `./plead.phar list` (Windows: `php plead.phar`). The phar is self-contained: config, SQLite state and logs live in the usual XDG locations, never inside the archive. It needs PHP 8.4+ with `ext-ctype`, `ext-curl`, `ext-dom`, `ext-iconv`, `ext-pdo_sqlite`, `ext-phar`,
+  `ext-simplexml`, `ext-xml` and `ext-zlib` (the embedded requirement checker enforces these); `ext-pcntl` is additionally required for `watch -d`. `plead.phar --version` reports the git tag (or commit hash) it was built from.
+- **Docker** — `docker pull ghcr.io/adnoctem/plead` (image tags cover the PHP 8.4/8.5 variants); `PLEAD_DATA_DIR=/data` is the persistent volume.
+- **From source** — `composer install` in a checkout; `bin/plead` runs directly on PHP 8.4+.
+
 ## ✨ TL;DR
 
 ```bash
@@ -56,9 +65,11 @@ plead config:edit          # open the config file in $EDITOR instead
 plead config:view
 plead config:path
 
-# schedule an auto-reply (message file is rendered as a Twig template)
-plead mail:autoresponder:set user@company.com \|
+# schedule an auto-reply (message file is rendered as a Twig template;
+# --data-file sources template variables from a JSON or YAML file)
+plead mail:autoresponder:set user@company.com \
     --message-file=~/vacation.txt \
+    --data-file=~/vacation-data.yaml \
     --start-date="2026-08-20 08:00" \
     --end-date="2026-08-30 18:00"
 
@@ -135,7 +146,7 @@ Read commands query the **live Plesk server** by default; add `--local` to read 
 | `mail:alias:remove <email> <alias>`     | Remove one alias address (soft-delete, keeps history)                                                                                                               |
 | `mail:autoresponder:list`               | All addresses with an enabled auto-reply (`--local`: scheduled)                                                                                                     |
 | `mail:autoresponder:get <email>`        | Auto-reply of an address (`--local`: desired state)                                                                                                                 |
-| `mail:autoresponder:set <email>`        | Enable/schedule (`--message-file`, `--start-date`, `--end-date`) or disable (`--enabled=false`); no options falls back to the configured `mail.autoresponder` entry |
+| `mail:autoresponder:set <email>`        | Enable/schedule (`--message-file`, `--data-file`, `--start-date`, `--end-date`, `--inclusive`), disable, or preview (`--preview`)                                   |
 | `watch`                                 | Continuously converge everything (auto-replies, groups, aliases, rule-driven lists; `--interval`, `--full`, `-d/--detached`)                                        |
 | `domain:list`                           | List all domains on the server                                                                                                                                      |
 | `domain:get <domain>`                   | Everything plead can read about a domain (hosting, limits, mail count)                                                                                              |
@@ -215,6 +226,12 @@ default_server: prod.example.com   # used when neither --server nor PLEAD_SERVER
 watch:
   interval: 60          # default interval of `plead watch` (--interval overrides)
 
+# optional: template + translation catalog locations (defaults shown)
+template:
+  auto_reply_path: templates/autoresponder.txt.twig
+  translations_path: translations
+  logo_url: "https://example.com/logo.png"   # optional: logo for HTML templates
+
 # general config applying to every server
 mail:
   defaults:
@@ -230,8 +247,10 @@ mail:
   autoresponder:
     - address: user@delta4x4.net
       message_file: /etc/plead/replies/vacation.txt
+      data_file: /etc/plead/replies/vacation-data.yaml   # optional: JSON/YAML template variables
       start_date: "2026-08-20T08:00:00+02:00"   # optional; quote to keep the offset
       end_date: "2026-08-30T18:00:00+02:00"
+      inclusive: false                          # optional: whether the end date is vacation
 
 # per-server overrides: this section only applies to dellius.delta4x4.net
 dellius.delta4x4.net:
@@ -256,9 +275,39 @@ Group entries define the **desired recipients** of a mail group:
 Add `--write-config` and the applied definition is written into the config file's `mail.group` (replacing an existing entry for the address), so the watcher keeps maintaining the list without a manual edit.
 
 Auto-replies can be configured the same way via `mail.autoresponder` entries (`address`, `message_file`, optional
-`start_date`, required `end_date`; quote the dates so the timezone offset survives the YAML round-trip).
-`mail:autoresponder:set <email>` without options falls back to the configured entry, `--write-config` persists the
-applied schedule (and `--enabled=false --write-config` removes it), and `watch` re-records diverging definitions every pass.
+`data_file`, `start_date` and `inclusive`, required `end_date`; quote the dates so the timezone offset survives the YAML round-trip).
+`mail:autoresponder:set <email>` without options falls back to the configured entry (a partial CLI run borrows the
+missing pieces from it), `--write-config` persists the applied schedule (and `--enabled=false --write-config` removes
+it), and `watch` re-records diverging definitions every pass.
+
+`--data-file` (or `data_file`) sources template variables from a JSON or YAML file — e.g. `firstname`, `surname`,
+`phonenumber`, `department`, `email`. The file is a flat map of Twig variables merged into the render context;
+the message file is rendered as an inline Twig template with the same context. The scheduling window is injected
+automatically as `startDate`/`endDate` (ISO 8601) and always wins over data-file values, so the rendered text can
+never drift from the actual activation window; `--inclusive`/`--no-inclusive` (or an `inclusive` config entry) is
+authoritative the same way. Any value that differs per language is a locale map, resolved as `key[lang] ?? key.de ?? key`
+inside the language loop: `email: {de: buchhaltung@delta4x4.com, en: invoices@delta4x4.com}` renders the German
+address in the German section and the English one in the English section (a plain string applies to every
+language, and a locale missing from the map falls back to the German value). The same works for `department`,
+`phonenumber` and any future field. `logo_url` optionally overrides
+`template.logo_url` for this autoresponder (e.g. a seasonal logo). With `--write-config` the data file path is
+persisted alongside the message file, so `watch` renders the identical message.
+
+Pass `--preview` to print the rendered message without recording an intent, touching the database or calling Plesk —
+a pure dry check before anything goes live. It honors the same config fallback as a regular run, so
+`mail:autoresponder:set <email> --preview` shows exactly what `watch` would push for a configured entry.
+
+**Translations.** All sentences live in catalog files under `template.translations_path` (default `translations`,
+may point outside the phar): `translations/autoresponder.de.yaml`, `autoresponder.en.yaml`, and so on — one file
+per language. The templates are pure structure: they loop over the languages found in the catalog directory, so
+**adding a language is a single new file** — no template or config edits. German (`de`) is the fallback locale: a
+missing entry in any catalog degrades to the German text, so raw keys are never shown and rendering never fails —
+a stale catalog cannot break the watcher. Each catalog also carries a `date_format` entry (e.g. `d.m.Y` vs
+`F j, Y`) so dates render locale-appropriately. The `translations/` folder ships the German and English catalogs;
+the MJML template (`templates/autoresponder.mjml.twig`) shares the same sentences and adds `phone_button` /
+`email_button` labels (it renders MJML markup — convert it with `spatie/mjml` before handing it to Plesk).
+Template authors should note that Twig consumes one newline after every `{% %}` tag — keep two blank source lines
+where the message should show a blank line (the shipped template documents this in its header comment).
 
 Environment variables override everything:
 

@@ -99,4 +99,65 @@ final class AutoReplyDefinitionTest extends TestCase
             'end_date' => '2026-08-20 08:00',
         ]);
     }
+
+    public function testDataFileExposedWhenSet(): void
+    {
+        $dataFile = tempnam(sys_get_temp_dir(), 'plead-data-');
+        self::assertNotFalse($dataFile);
+
+        try {
+            $definition = AutoReplyDefinition::fromConfigEntry([
+                'address' => 'user@company.com',
+                'message_file' => '/tmp/message.txt',
+                'data_file' => $dataFile,
+                'end_date' => '2026-08-30 18:00',
+            ]);
+
+            self::assertSame($dataFile, $definition->dataFile());
+        } finally {
+            @unlink($dataFile);
+        }
+    }
+
+    public function testUnreadableDataFileRejected(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('data_file');
+
+        AutoReplyDefinition::fromConfigEntry([
+            'address' => 'user@company.com',
+            'message_file' => '/tmp/message.txt',
+            'data_file' => '/nonexistent/data.json',
+            'end_date' => '2026-08-30 18:00',
+        ]);
+    }
+
+    public function testInclusiveExposedWhenSet(): void
+    {
+        $definition = AutoReplyDefinition::fromConfigEntry([
+            'address' => 'user@company.com',
+            'message_file' => '/tmp/message.txt',
+            'end_date' => '2026-08-30 18:00',
+            'inclusive' => true,
+        ]);
+        self::assertTrue($definition->inclusive());
+
+        $definition = AutoReplyDefinition::fromConfigEntry([
+            'address' => 'user@company.com',
+            'message_file' => '/tmp/message.txt',
+            'end_date' => '2026-08-30 18:00',
+            'inclusive' => false,
+        ]);
+        self::assertFalse($definition->inclusive());
+    }
+
+    public function testInclusiveNullWithoutEntry(): void
+    {
+        $definition = AutoReplyDefinition::fromConfigEntry([
+            'address' => 'user@company.com',
+            'message_file' => '/tmp/message.txt',
+            'end_date' => '2026-08-30 18:00',
+        ]);
+        self::assertNull($definition->inclusive());
+    }
 }
