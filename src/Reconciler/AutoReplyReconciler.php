@@ -64,7 +64,13 @@ final class AutoReplyReconciler
             if ('disabled' === $row['status']) {
                 $this->gateway->disableAutoresponder($email);
             } else {
-                $this->gateway->setAutoresponder($email, (string) $row['message'], (string) $row['end_date']);
+                $this->gateway->setAutoresponder(
+                    $email,
+                    (string) $row['message'],
+                    (string) $row['end_date'],
+                    '' === (string) $row['subject'] ? null : (string) $row['subject'],
+                    $this->contentType((string) $row['format']),
+                );
             }
 
             if ($this->dryRun) {
@@ -96,5 +102,15 @@ final class AutoReplyReconciler
 
             return false;
         }
+    }
+
+    /** Map the stored format ('plain'|'html') to the Plesk content type; '' = server default. */
+    private function contentType(string $format): ?string
+    {
+        return match ($format) {
+            'plain' => 'text/plain',
+            'html' => 'text/html',
+            default => null,
+        };
     }
 }

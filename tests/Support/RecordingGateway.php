@@ -120,7 +120,7 @@ final class RecordingGateway extends PleskMailGateway
         parent::__construct(new Client('fake.local', 8443, 'https'), $this->dryRunMode, new Logger('test'));
     }
 
-    public function setAutoresponder(string $email, string $message, string $endDate): void
+    public function setAutoresponder(string $email, string $message, string $endDate, ?string $subject = null, ?string $contentType = null): void
     {
         $this->calls[] = $email;
         if (in_array($email, $this->failFor, true)) {

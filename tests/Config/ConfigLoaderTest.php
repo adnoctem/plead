@@ -92,8 +92,8 @@ final class ConfigLoaderTest extends TestCase
         $config = $this->loader->load();
 
         self::assertSame('info', $config['log_level']);
-        self::assertSame('templates/autoresponder.txt.twig', $config['template']['auto_reply_path']);
-        self::assertSame('translations', $config['template']['translations_path']);
+        self::assertSame('resources/templates/autoresponder.txt.twig', $config['template']['auto_reply_path']);
+        self::assertSame('resources/translations', $config['template']['translations_path']);
         self::assertNull($config['mail']['defaults']['antivirus']);
         self::assertNull($config['mail']['defaults']['quota']);
         self::assertSame(60, $config['watch']['interval']);
@@ -252,28 +252,28 @@ final class ConfigLoaderTest extends TestCase
             'mail:',
             '    autoresponder:',
             '        - address: user@example.com',
-            '          message_file: /tmp/general.txt',
+            '          data_file: /tmp/general.yaml',
             '          end_date: 2099-01-05T18:00:00+02:00',
             'second.example.com:',
             '    mail:',
             '        autoresponder:',
             '            - address: user@example.com',
-            '              message_file: /tmp/server.txt',
+            '              data_file: /tmp/server.yaml',
             '              end_date: 2099-02-05T18:00:00+02:00',
             '            - address: other@example.com',
-            '              message_file: /tmp/other.txt',
+            '              data_file: /tmp/other.yaml',
             '              end_date: 2099-03-05T18:00:00+02:00',
         ]));
 
         $first = $this->loader->load(null, 'first.example.com')['mail']['autoresponder'];
         self::assertCount(1, $first);
-        self::assertSame('/tmp/general.txt', $first[0]['message_file']);
+        self::assertSame('/tmp/general.yaml', $first[0]['data_file']);
 
         $second = $this->loader->load(null, 'second.example.com')['mail']['autoresponder'];
         self::assertCount(2, $second);
-        $byAddress = array_column($second, 'message_file', 'address');
-        self::assertSame('/tmp/server.txt', $byAddress['user@example.com']);
-        self::assertSame('/tmp/other.txt', $byAddress['other@example.com']);
+        $byAddress = array_column($second, 'data_file', 'address');
+        self::assertSame('/tmp/server.yaml', $byAddress['user@example.com']);
+        self::assertSame('/tmp/other.yaml', $byAddress['other@example.com']);
     }
 
     public function testAutoresponderEntryRequiresFullAddress(): void
@@ -285,7 +285,7 @@ final class ConfigLoaderTest extends TestCase
             'mail:',
             '    autoresponder:',
             '        - address: user',
-            '          message_file: /tmp/m.txt',
+            '          data_file: /tmp/m.yaml',
             '          end_date: 2099-01-05T18:00:00+02:00',
         ]));
 
@@ -293,6 +293,46 @@ final class ConfigLoaderTest extends TestCase
         $this->expectExceptionMessage('full email address');
 
         $this->loader->load();
+    }
+
+    public function testAutoresponderEntryRejectsInvalidFormat(): void
+    {
+        file_put_contents($this->userDir.'/plead.yaml', implode("\n", [
+            'servers:',
+            '    - host: only.example.com',
+            '      secret_key: a',
+            'mail:',
+            '    autoresponder:',
+            '        - address: user@example.com',
+            '          format: markdown',
+            '          end_date: 2099-01-05T18:00:00+02:00',
+        ]));
+
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('"plain" or "html"');
+
+        $this->loader->load();
+    }
+
+    public function testAutoresponderEntryAcceptsSubjectAndFormat(): void
+    {
+        file_put_contents($this->userDir.'/plead.yaml', implode("\n", [
+            'servers:',
+            '    - host: only.example.com',
+            '      secret_key: a',
+            'mail:',
+            '    autoresponder:',
+            '        - address: user@example.com',
+            '          subject: "Automatische Antwort"',
+            '          format: html',
+            '          language: en',
+            '          end_date: 2099-01-05T18:00:00+02:00',
+        ]));
+
+        $entry = $this->loader->load()['mail']['autoresponder'][0];
+        self::assertSame('Automatische Antwort', $entry['subject']);
+        self::assertSame('html', $entry['format']);
+        self::assertSame('en', $entry['language']);
     }
 
     public function testAutoresponderEntryRequiresEndDate(): void
@@ -304,7 +344,7 @@ final class ConfigLoaderTest extends TestCase
             'mail:',
             '    autoresponder:',
             '        - address: user@example.com',
-            '          message_file: /tmp/m.txt',
+            '          data_file: /tmp/m.yaml',
         ]));
 
         $this->expectException(InvalidConfigurationException::class);

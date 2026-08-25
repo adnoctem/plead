@@ -38,7 +38,7 @@ One installation can manage several Plesk servers; a global `--server` flag pick
 
 The local SQLite database is the **desired state**; the Plesk server holds the **live state**. Every mutation follows the same three steps:
 
-1. **Record the intent locally first** — the change lands in SQLite (and the `sync_log` table gains a `pending` entry) *before* anything touches the network.
+1. **Record the intent locally first** — the change lands in SQLite (and the `sync_log` table gains a `pending` entry) _before_ anything touches the network.
 2. **Apply to Plesk** (or `--dry-run`).
 3. **Finalize** — on success the entry is marked `reconciled` and the log entry resolves to `ok`; on failure the entry stays `pending` (the watcher retries) and the log entry carries `error:<message>`.
 
@@ -65,16 +65,16 @@ plead config:edit          # open the config file in $EDITOR instead
 plead config:view
 plead config:path
 
-# schedule an auto-reply (message file is rendered as a Twig template;
+# schedule an auto-reply (the configured template renders the message;
 # --data-file sources template variables from a JSON or YAML file)
 plead mail:autoresponder:set user@company.com \
-    --message-file=~/vacation.txt \
     --data-file=~/vacation-data.yaml \
     --start-date="2026-08-20 08:00" \
-    --end-date="2026-08-30 18:00"
+    --end-date="2026-08-30 18:00" \
+    --subject="Automatische Antwort" --format=html
 
 # dry-run first — no network calls are made at all
-plead mail:autoresponder:set user@company.com --message-file=~/vacation.txt \
+plead mail:autoresponder:set user@company.com --data-file=~/vacation-data.yaml \
     --start-date="2026-08-20 08:00" --end-date="2026-08-30 18:00" --dry-run
 
 # what is configured live on the server vs. what plead intends to converge toward
@@ -125,81 +125,81 @@ plead domain:set delta4x4.net --description="Main company domain"
 
 Read commands query the **live Plesk server** by default; add `--local` to read the SQLite desired state instead.
 
-| Command                                 | Purpose                                                                                                                                                             |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------                               |
-| `mail:group:list`                       | List mail groups (live: mailnames with forwarding; `--local`: managed)                                                                                              |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------                               |
-| `mail:group:set <group>`                | Replace the full recipient list (`--recipients=a@b,c@d` and/or `--rule=<pcre>`; falls back to the configured `mail.group` entry)                                    |
-| `mail:group:add <group> <recipient>`    | Add one recipient                                                                                                                                                   |
-| `mail:group:remove <group> <recipient>` | Remove one recipient (soft-delete, keeps history)                                                                                                                   |
-| `mail:address:list`                     | List all mail addresses (`--domain=`, `--local`)                                                                                                                    |
-| `mail:address:get <email>`              | Mailbox, forwarding and auto-reply state of an address                                                                                                              |
-| `mail:address:set <email>`              | Set properties: `--description=`, `--outgoing-limit=`, `--quota=` (MiB), `--antivir=`; missing quota/antivir fall back to `mail.defaults`                           |
-| `mail:address:remove <email>`           | Remove the mail address                                                                                                                                             |
-| `mail:address:password <email>`         | Set (`--password=`) or rotate (`--generate`) the mailbox password                                                                                                   |
-| `mail:address:rename <email> <name>`    | Rename a mail account (local part only; mailbox settings are kept)                                                                                                  |
-| `mail:address:export`                   | Export all addresses (`--format=csv\                                                                                                                                |
-| `mail:alias:list`                       | Mailboxes with aliases (live: on the server; `--local`: managed)                                                                                                    |
-| `mail:alias:get <email>`                | Aliases of a mailbox (`--local` adds desired state + removal history)                                                                                               |
-| `mail:alias:set <email>`                | Replace the full alias list (`--aliases=a@b,c@d`)                                                                                                                   |
-| `mail:alias:add <email> <alias>`        | Add one alias address                                                                                                                                               |
-| `mail:alias:remove <email> <alias>`     | Remove one alias address (soft-delete, keeps history)                                                                                                               |
-| `mail:autoresponder:list`               | All addresses with an enabled auto-reply (`--local`: scheduled)                                                                                                     |
-| `mail:autoresponder:get <email>`        | Auto-reply of an address (`--local`: desired state)                                                                                                                 |
-| `mail:autoresponder:set <email>`        | Enable/schedule (`--message-file`, `--data-file`, `--start-date`, `--end-date`, `--inclusive`), disable, or preview (`--preview`)                                   |
-| `watch`                                 | Continuously converge everything (auto-replies, groups, aliases, rule-driven lists; `--interval`, `--full`, `-d/--detached`)                                        |
-| `domain:list`                           | List all domains on the server                                                                                                                                      |
-| `domain:get <domain>`                   | Everything plead can read about a domain (hosting, limits, mail count)                                                                                              |
-| `domain:set <domain>`                   | Set properties (`--description=`, `--status=enabled or disabled`, `--type=virtual-host                                                                              |
-| `domain:add <name>`                     | Create a domain (`--type=virtual-host or forwarding or frame-forwarding or none`, `--parent=`, `--dest-url=`, `--property=key:value`)                               |
-| `domain:remove <domain>`                | Remove a domain from the server                                                                                                                                     |
-| `domain:traffic:get <domain>`           | Traffic usage in a window (`--from=`, `--to=`, YYYY-MM-DD)                                                                                                          |
-| `domain:traffic:set <domain>`           | Record traffic counters manually (`--date=`, `--smtp-in=`, ...)                                                                                                     |
-| `domain:descriptor <domain>`            | Hosting settings descriptor (property names, types, defaults)                                                                                                       |
-| `config:get <dotted.key>`               | Show the resolved value of one configuration key                                                                                                                    |
-| `config:set <dotted.key> <value>`       | Write a configuration key to the user config file                                                                                                                   |
-| `config:list`                           | Show the resolved configuration with secrets masked                                                                                                                 |
-| `config:view`                           | Show the full resolved configuration (post-merge, including secrets)                                                                                                |
-| `config:edit`                           | Open the user config file in `$EDITOR` and validate it afterwards                                                                                                   |
-| `config:path`                           | Show where plead stores configuration, data, and logs                                                                                                               |
-| `db:path`                               | Show the location of the SQLite database                                                                                                                            |
-| `db:query`                              | Open an interactive `sqlite3` shell on the database                                                                                                                 |
-| `server:info`                           | Server identity, versions, object counts, resources and update status                                                                                               |
-| `server:session:list`                   | Currently opened control-panel sessions                                                                                                                             |
-| `server:session:get <session-id>`       | One session (the API has no single-session read; the list is filtered)                                                                                              |
-| `server:session:terminate <session-id>` | Close a control-panel session                                                                                                                                       |
-| `server:admin`                          | Plesk Administrator personal information                                                                                                                            |
-| `server:service:status [service]`       | Service states (all, or one id like web, smtp, dns)                                                                                                                 |
-| `server:service:start <service>`        | Start a server service                                                                                                                                              |
-| `server:service:stop <service>`         | Stop a server service                                                                                                                                               |
-| `server:service:restart <service>`      | Restart a server service                                                                                                                                            |
-| `server:ip:list`                        | All IP addresses on the server                                                                                                                                      |
-| `server:ip:get <ip>`                    | One IP address (list filtered client-side)                                                                                                                          |
-| `server:ip:add <ip>`                    | Add an IP (`--netmask=`, `--type=shared\                                                                                                                            |
-| `server:ip:set <ip>`                    | Set IP properties (`--type=`, `--public-ip=`)                                                                                                                       |
-| `server:ip:remove <ip>`                 | Remove an IP address from the server                                                                                                                                |
-| `server:components:list`                | Installed Plesk components                                                                                                                                          |
-| `server:components:install <id>`        | Install a component (`--update-id=`; docs shape, live validation pending)                                                                                           |
-| `server:extension:list`                 | Installed extensions                                                                                                                                                |
-| `server:extension:get <id>`             | One extension by id                                                                                                                                                 |
-| `server:extension:install <id>`         | Install an extension by id or `--url=`                                                                                                                              |
-| `server:extension:uninstall <id>`       | Uninstall an extension                                                                                                                                              |
-| `server:extension:call <id> <op>`       | Call an XML API operation of an ApiRpc extension (`--param=name:value`; e.g. git: get/create/update/remove/deploy/fetch)                                            |
-| `server:ref [id]`                       | REST CLI-gate: available CLI ids (no arg) or the reference of one id                                                                                                |
-| `server:exec <id> <args...>`            | Execute a Plesk CLI command via the REST CLI-gate (args after `--`, e.g. `extension -- --call sslit --help`; `--no-fail-on-error`)                                  |
-| `audit:trail`                           | Browse the audit trail (interactive TUI on a TTY, plain table otherwise; `--resource=`, `--result=`, `--limit=`)                                                    |
-| `audit:export`                          | Dump the entire audit trail (incl. change details) to a file (`--format=json or yaml`, `-o/--output`)                                                               |
+| Command                                 | Purpose                                                                                                                                                |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `mail:group:list`                       | List mail groups (live: mailnames with forwarding; `--local`: managed)                                                                                 |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------                  |
+| `mail:group:set <group>`                | Replace the full recipient list (`--recipients=a@b,c@d` and/or `--rule=<pcre>`; falls back to the configured `mail.group` entry)                       |
+| `mail:group:add <group> <recipient>`    | Add one recipient                                                                                                                                      |
+| `mail:group:remove <group> <recipient>` | Remove one recipient (soft-delete, keeps history)                                                                                                      |
+| `mail:address:list`                     | List all mail addresses (`--domain=`, `--local`)                                                                                                       |
+| `mail:address:get <email>`              | Mailbox, forwarding and auto-reply state of an address                                                                                                 |
+| `mail:address:set <email>`              | Set properties: `--description=`, `--outgoing-limit=`, `--quota=` (MiB), `--antivir=`; missing quota/antivir fall back to `mail.defaults`              |
+| `mail:address:remove <email>`           | Remove the mail address                                                                                                                                |
+| `mail:address:password <email>`         | Set (`--password=`) or rotate (`--generate`) the mailbox password                                                                                      |
+| `mail:address:rename <email> <name>`    | Rename a mail account (local part only; mailbox settings are kept)                                                                                     |
+| `mail:address:export`                   | Export all addresses (`--format=csv\                                                                                                                   |
+| `mail:alias:list`                       | Mailboxes with aliases (live: on the server; `--local`: managed)                                                                                       |
+| `mail:alias:get <email>`                | Aliases of a mailbox (`--local` adds desired state + removal history)                                                                                  |
+| `mail:alias:set <email>`                | Replace the full alias list (`--aliases=a@b,c@d`)                                                                                                      |
+| `mail:alias:add <email> <alias>`        | Add one alias address                                                                                                                                  |
+| `mail:alias:remove <email> <alias>`     | Remove one alias address (soft-delete, keeps history)                                                                                                  |
+| `mail:autoresponder:list`               | All addresses with an enabled auto-reply (`--local`: scheduled)                                                                                        |
+| `mail:autoresponder:get <email>`        | Auto-reply of an address (`--local`: desired state)                                                                                                    |
+| `mail:autoresponder:set <email>`        | Enable/schedule (`--template`, `--data-file`, `--start-date`, `--end-date`, `--inclusive`, `--subject`, `--format`), disable, or preview (`--preview`) |
+| `watch`                                 | Continuously converge everything (auto-replies, groups, aliases, rule-driven lists; `--interval`, `--full`, `-d/--detached`)                           |
+| `domain:list`                           | List all domains on the server                                                                                                                         |
+| `domain:get <domain>`                   | Everything plead can read about a domain (hosting, limits, mail count)                                                                                 |
+| `domain:set <domain>`                   | Set properties (`--description=`, `--status=enabled or disabled`, `--type=virtual-host                                                                 |
+| `domain:add <name>`                     | Create a domain (`--type=virtual-host or forwarding or frame-forwarding or none`, `--parent=`, `--dest-url=`, `--property=key:value`)                  |
+| `domain:remove <domain>`                | Remove a domain from the server                                                                                                                        |
+| `domain:traffic:get <domain>`           | Traffic usage in a window (`--from=`, `--to=`, YYYY-MM-DD)                                                                                             |
+| `domain:traffic:set <domain>`           | Record traffic counters manually (`--date=`, `--smtp-in=`, ...)                                                                                        |
+| `domain:descriptor <domain>`            | Hosting settings descriptor (property names, types, defaults)                                                                                          |
+| `config:get <dotted.key>`               | Show the resolved value of one configuration key                                                                                                       |
+| `config:set <dotted.key> <value>`       | Write a configuration key to the user config file                                                                                                      |
+| `config:list`                           | Show the resolved configuration with secrets masked                                                                                                    |
+| `config:view`                           | Show the full resolved configuration (post-merge, including secrets)                                                                                   |
+| `config:edit`                           | Open the user config file in `$EDITOR` and validate it afterwards                                                                                      |
+| `config:path`                           | Show where plead stores configuration, data, and logs                                                                                                  |
+| `db:path`                               | Show the location of the SQLite database                                                                                                               |
+| `db:query`                              | Open an interactive `sqlite3` shell on the database                                                                                                    |
+| `server:info`                           | Server identity, versions, object counts, resources and update status                                                                                  |
+| `server:session:list`                   | Currently opened control-panel sessions                                                                                                                |
+| `server:session:get <session-id>`       | One session (the API has no single-session read; the list is filtered)                                                                                 |
+| `server:session:terminate <session-id>` | Close a control-panel session                                                                                                                          |
+| `server:admin`                          | Plesk Administrator personal information                                                                                                               |
+| `server:service:status [service]`       | Service states (all, or one id like web, smtp, dns)                                                                                                    |
+| `server:service:start <service>`        | Start a server service                                                                                                                                 |
+| `server:service:stop <service>`         | Stop a server service                                                                                                                                  |
+| `server:service:restart <service>`      | Restart a server service                                                                                                                               |
+| `server:ip:list`                        | All IP addresses on the server                                                                                                                         |
+| `server:ip:get <ip>`                    | One IP address (list filtered client-side)                                                                                                             |
+| `server:ip:add <ip>`                    | Add an IP (`--netmask=`, `--type=shared\                                                                                                               |
+| `server:ip:set <ip>`                    | Set IP properties (`--type=`, `--public-ip=`)                                                                                                          |
+| `server:ip:remove <ip>`                 | Remove an IP address from the server                                                                                                                   |
+| `server:components:list`                | Installed Plesk components                                                                                                                             |
+| `server:components:install <id>`        | Install a component (`--update-id=`; docs shape, live validation pending)                                                                              |
+| `server:extension:list`                 | Installed extensions                                                                                                                                   |
+| `server:extension:get <id>`             | One extension by id                                                                                                                                    |
+| `server:extension:install <id>`         | Install an extension by id or `--url=`                                                                                                                 |
+| `server:extension:uninstall <id>`       | Uninstall an extension                                                                                                                                 |
+| `server:extension:call <id> <op>`       | Call an XML API operation of an ApiRpc extension (`--param=name:value`; e.g. git: get/create/update/remove/deploy/fetch)                               |
+| `server:ref [id]`                       | REST CLI-gate: available CLI ids (no arg) or the reference of one id                                                                                   |
+| `server:exec <id> <args...>`            | Execute a Plesk CLI command via the REST CLI-gate (args after `--`, e.g. `extension -- --call sslit --help`; `--no-fail-on-error`)                     |
+| `audit:trail`                           | Browse the audit trail (interactive TUI on a TTY, plain table otherwise; `--resource=`, `--result=`, `--limit=`)                                       |
+| `audit:export`                          | Dump the entire audit trail (incl. change details) to a file (`--format=json or yaml`, `-o/--output`)                                                  |
 
 Global options (available on every command):
 
-| Flag            | Behavior                                                                   ||
+| Flag | Behavior ||
 | --------------- | -------------------------------------------------------------------------- ||
-| `-c, --config`  | Load only this config file; skip discovery and merging                     ||
-| `--server`      | Operate on this server (host or index; default: the first)                 ||
-| `--write-config`| Persist the change to the config file (mail.group definitions)             ||
-| `--dry-run`     | Log mutations without performing them - no network calls at all            ||
-| `--log-level`   | Baseline file log level (default `info`); `-v/-vv/-vvv` also raise it      ||
-| `-v/-vv/-vvv`   | Console verbosity (drives both console output and file log level)          ||
+| `-c, --config` | Load only this config file; skip discovery and merging ||
+| `--server` | Operate on this server (host or index; default: the first) ||
+| `--write-config`| Persist the change to the config file (mail.group definitions) ||
+| `--dry-run` | Log mutations without performing them - no network calls at all ||
+| `--log-level` | Baseline file log level (default `info`); `-v/-vv/-vvv` also raise it ||
+| `-v/-vv/-vvv` | Console verbosity (drives both console output and file log level) ||
 
 ## ⚙️ Configuration
 
@@ -218,46 +218,48 @@ servers:
   - host: dellius.delta4x4.net
     secret_key: <key>
   - host: prod.example.com
-    login: admin        # or credentials instead of a secret key
+    login: admin # or credentials instead of a secret key
     password: <password>
 
-default_server: prod.example.com   # used when neither --server nor PLEAD_SERVER is given
+default_server: prod.example.com # used when neither --server nor PLEAD_SERVER is given
 
 watch:
-  interval: 60          # default interval of `plead watch` (--interval overrides)
+  interval: 60 # default interval of `plead watch` (--interval overrides)
 
 # optional: template + translation catalog locations (defaults shown)
 template:
-  auto_reply_path: templates/autoresponder.txt.twig
-  translations_path: translations
-  logo_url: "https://example.com/logo.png"   # optional: logo for HTML templates
+  auto_reply_path: resources/templates/autoresponder.txt.twig
+  translations_path: resources/translations
+  logo_url: "https://example.com/logo.png" # optional: logo for HTML templates
+  language: de # optional: render language for single-language templates
 
 # general config applying to every server
 mail:
   defaults:
-    quota: 512MB        # parsed to bytes; also accepts 1GB, 2 GB, 1048576
-    antivirus: off      # off|in|out|inout; default quota/antivirus for mail:address:set
+    quota: 512MB # parsed to bytes; also accepts 1GB, 2 GB, 1048576
+    antivirus: off # off|in|out|inout; default quota/antivirus for mail:address:set
   group:
     - address: all@delta4x4.net
-      pattern: '^(1und1|payments|info|support|shop|noreply|marketing|bestellungen)@'
+      pattern: "^(1und1|payments|info|support|shop|noreply|marketing|bestellungen)@"
     - address: group2@delta4x4.net
       recipients:
         - user1@example.com
         - user2@example.com
   autoresponder:
     - address: user@delta4x4.net
-      message_file: /etc/plead/replies/vacation.txt
-      data_file: /etc/plead/replies/vacation-data.yaml   # optional: JSON/YAML template variables
-      start_date: "2026-08-20T08:00:00+02:00"   # optional; quote to keep the offset
+      data_file: /etc/plead/replies/vacation-data.yaml # optional: JSON/YAML template variables
+      start_date: "2026-08-20T08:00:00+02:00" # optional; quote to keep the offset
       end_date: "2026-08-30T18:00:00+02:00"
-      inclusive: false                          # optional: whether the end date is vacation
+      inclusive: false # optional: whether the end date is vacation
+      subject: "Automatische Antwort" # optional: reply subject (default: Re: <request_subject>)
+      format: html # optional: plain|html (default: server default)
 
 # per-server overrides: this section only applies to dellius.delta4x4.net
 dellius.delta4x4.net:
   mail:
     group:
       - address: group@delta4x4.net
-        pattern: '^(info|support)@'
+        pattern: "^(info|support)@"
 ```
 
 Group entries define the **desired recipients** of a mail group:
@@ -274,15 +276,24 @@ Group entries define the **desired recipients** of a mail group:
 
 Add `--write-config` and the applied definition is written into the config file's `mail.group` (replacing an existing entry for the address), so the watcher keeps maintaining the list without a manual edit.
 
-Auto-replies can be configured the same way via `mail.autoresponder` entries (`address`, `message_file`, optional
-`data_file`, `start_date` and `inclusive`, required `end_date`; quote the dates so the timezone offset survives the YAML round-trip).
+Auto-replies can be configured the same way via `mail.autoresponder` entries (`address`, optional `data_file`,
+`start_date`, `inclusive`, `subject` and `format`, required `end_date`; quote the dates so the timezone offset
+survives the YAML round-trip).
 `mail:autoresponder:set <email>` without options falls back to the configured entry (a partial CLI run borrows the
 missing pieces from it), `--write-config` persists the applied schedule (and `--enabled=false --write-config` removes
 it), and `watch` re-records diverging definitions every pass.
 
+`--subject` sets the reply subject (default: Plesk's `Re: <request_subject>`); `--format plain|html` selects the
+autoresponder content type (Plesk stores `text/plain`/`text/html`; the element order in the XML packet matters,
+see `docs/plesk-xml-api-notes.md`). A rendered message that is HTML (e.g. the MJML template) is rejected unless
+the format is `html` — pass `--force` to store it with a non-html format anyway. `--language de|en` selects the render language (default: `template.language` or the first catalog language) —
+both the txt and the HTML templates render exactly one language per invocation.
+`--template` renders a specific template for this invocation instead of
+`template.auto_reply_path` — handy to preview the MJML variant before switching it in the config.
+
 `--data-file` (or `data_file`) sources template variables from a JSON or YAML file — e.g. `firstname`, `surname`,
-`phonenumber`, `department`, `email`. The file is a flat map of Twig variables merged into the render context;
-the message file is rendered as an inline Twig template with the same context. The scheduling window is injected
+`phonenumber`, `department`, `email`. The file is a flat map of Twig variables merged into the render context.
+The scheduling window is injected
 automatically as `startDate`/`endDate` (ISO 8601) and always wins over data-file values, so the rendered text can
 never drift from the actual activation window; `--inclusive`/`--no-inclusive` (or an `inclusive` config entry) is
 authoritative the same way. Any value that differs per language is a locale map, resolved as `key[lang] ?? key.de ?? key`
@@ -298,14 +309,22 @@ a pure dry check before anything goes live. It honors the same config fallback a
 `mail:autoresponder:set <email> --preview` shows exactly what `watch` would push for a configured entry.
 
 **Translations.** All sentences live in catalog files under `template.translations_path` (default `translations`,
-may point outside the phar): `translations/autoresponder.de.yaml`, `autoresponder.en.yaml`, and so on — one file
+may point outside the phar): `resources/translations/autoresponder.de.yaml`, `autoresponder.en.yaml`, and so on — one file
 per language. The templates are pure structure: they loop over the languages found in the catalog directory, so
 **adding a language is a single new file** — no template or config edits. German (`de`) is the fallback locale: a
 missing entry in any catalog degrades to the German text, so raw keys are never shown and rendering never fails —
 a stale catalog cannot break the watcher. Each catalog also carries a `date_format` entry (e.g. `d.m.Y` vs
-`F j, Y`) so dates render locale-appropriately. The `translations/` folder ships the German and English catalogs;
-the MJML template (`templates/autoresponder.mjml.twig`) shares the same sentences and adds `phone_button` /
-`email_button` labels (it renders MJML markup — convert it with `spatie/mjml` before handing it to Plesk).
+`F j, Y`) so dates render locale-appropriately. The `resources/translations/` folder ships the German and English catalogs;
+the MJML template (`resources/templates/autoresponder.mjml.twig`) shares the same sentences and adds `phone_button` /
+`email_button` labels. Templates that render MJML markup are **converted to final HTML automatically** by the
+rendering pipeline (via the `mjml` CLI binary — install it with `npm install -g mjml` or set `MJML_BINARY_PATH`;
+the container image ships it), so the message stored on Plesk is ready to send. Both templates render
+**one language per invocation** (the `language` context variable — `--language`, `template.language` or a
+per-entry `language`; default: the first catalog language). In the HTML template the phone number and email
+inside the text are clickable `tel:`/`mailto:` links and the action buttons sit side by side below the card.
+The email is fully responsive: below 650px viewport width MJML stacks the columns, the 196px page gaps shrink
+to 56px and the card tightens its padding. Note that the mjml.io try-it-live pane is desktop-width only — to
+preview the mobile layout, shrink your browser window below 650px.
 Template authors should note that Twig consumes one newline after every `{% %}` tag — keep two blank source lines
 where the message should show a blank line (the shipped template documents this in its header comment).
 
@@ -339,7 +358,7 @@ contact details to reach out directly.
 
 ## ©️Copyright
 
-*Licensed under the [MIT][license] license.*
+_Licensed under the [MIT][license] license._
 
 <!-- File references -->
 

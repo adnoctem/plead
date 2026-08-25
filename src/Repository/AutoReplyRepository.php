@@ -14,18 +14,20 @@ final class AutoReplyRepository
         private readonly string $server,
     ) {}
 
-    public function upsert(string $email, string $message, string $startDate, string $endDate): void
+    public function upsert(string $email, string $message, string $startDate, string $endDate, string $subject = '', string $format = ''): void
     {
         // (Re)scheduling records a fresh intent: the previous reconcile state
         // no longer matches, so the row is flagged dirty for the watcher.
         $statement = $this->connection->pdo()->prepare(
             <<<'SQL'
-                INSERT INTO auto_replies (server, email, message, start_date, end_date, status, reconciled, reconciled_at, updated_at)
-                VALUES (:server, :email, :message, :start_date, :end_date, 'scheduled', 0, NULL, :updated_at)
+                INSERT INTO auto_replies (server, email, message, start_date, end_date, subject, format, status, reconciled, reconciled_at, updated_at)
+                VALUES (:server, :email, :message, :start_date, :end_date, :subject, :format, 'scheduled', 0, NULL, :updated_at)
                 ON CONFLICT(server, email) DO UPDATE SET
                     message = :message,
                     start_date = :start_date,
                     end_date = :end_date,
+                    subject = :subject,
+                    format = :format,
                     status = 'scheduled',
                     reconciled = 0,
                     reconciled_at = NULL,
@@ -38,6 +40,8 @@ final class AutoReplyRepository
             'message' => $message,
             'start_date' => $startDate,
             'end_date' => $endDate,
+            'subject' => $subject,
+            'format' => $format,
             'updated_at' => DateNormalizer::now(),
         ]);
     }
@@ -70,7 +74,7 @@ final class AutoReplyRepository
     public function find(string $email): ?array
     {
         $statement = $this->connection->pdo()->prepare(
-            'SELECT email, message, start_date, end_date, status, reconciled, reconciled_at, updated_at
+            'SELECT email, message, start_date, end_date, subject, format, status, reconciled, reconciled_at, updated_at
              FROM auto_replies WHERE server = :server AND email = :email',
         );
         $statement->execute(['server' => $this->server, 'email' => $email]);
@@ -88,7 +92,7 @@ final class AutoReplyRepository
     public function pending(\DateTimeImmutable $now): array
     {
         $statement = $this->connection->pdo()->prepare(
-            'SELECT email, message, start_date, end_date, status, reconciled, reconciled_at, updated_at
+            'SELECT email, message, start_date, end_date, subject, format, status, reconciled, reconciled_at, updated_at
              FROM auto_replies WHERE server = :server AND reconciled = 0 ORDER BY email',
         );
         $statement->execute(['server' => $this->server]);
@@ -105,7 +109,7 @@ final class AutoReplyRepository
     public function dueAll(\DateTimeImmutable $now): array
     {
         $statement = $this->connection->pdo()->prepare(
-            'SELECT email, message, start_date, end_date, status, reconciled, reconciled_at, updated_at
+            'SELECT email, message, start_date, end_date, subject, format, status, reconciled, reconciled_at, updated_at
              FROM auto_replies WHERE server = :server ORDER BY email',
         );
         $statement->execute(['server' => $this->server]);
@@ -126,7 +130,7 @@ final class AutoReplyRepository
     public function allEntries(): array
     {
         $statement = $this->connection->pdo()->prepare(
-            'SELECT email, message, start_date, end_date, status, reconciled, reconciled_at, updated_at
+            'SELECT email, message, start_date, end_date, subject, format, status, reconciled, reconciled_at, updated_at
              FROM auto_replies WHERE server = :server ORDER BY email',
         );
         $statement->execute(['server' => $this->server]);

@@ -51,13 +51,20 @@ Empirically-verified facts about the Plesk XML API (tested against **Plesk Obsid
 ## Misc
 
 - `curl_close()` is deprecated on PHP 8.5 (vendor lib noise) — `bin/plead` suppresses deprecations.
-- The official docs for `mail-update` (modifying-mail-account-settings) describe the `set` sub-operation semantics correctly: it *replaces* all settings mentioned, keeps others untouched — and samples match the validated shapes.
+- The official docs for `mail-update` (modifying-mail-account-settings) describe the `set` sub-operation semantics correctly: it _replaces_ all settings mentioned, keeps others untouched — and samples match the validated shapes.
 
 ## More empirically-validated shapes (2026-08-20)
 
 - **`antivir` values are an enum**: `off | in | out | inout` (NOT `on`/`off` — `on` is rejected with errcode 1014). Flat element in `update/set`; the response reports it as `<antivir>off</antivir>`.
-- **`autoresponder` in `update/set` accepts**: `enabled, subject, text, charset, end_date, attachment, forward` — **`start_date` is REJECTED** (1014: "Expected is one of ( attachment, forward, end_date )") and **`content_type` is also rejected** (server fills it itself; errtext "Expected is one of ( attachment, forward, end_date )"). Window-start scheduling must be computed client-side (as plead
+- **`autoresponder` in `update/set` accepts**: `enabled, subject, text, charset, end_date, attachment, forward` — **`start_date` is REJECTED** (1014: "Expected is one of ( attachment, forward, end_date )"). Window-start scheduling must be computed client-side (as plead
   does).
+  - **`content_type` IS settable** (validated live 2026-08-25 on testing@delta4x4.net) — but **element order matters
+    (XSD sequence)**: `enabled, subject, content_type, charset, text, ...` — `content_type` placed _after_ `text` is
+    rejected with "Element 'content_type': This element is not expected. Expected is one of ( attachment, forward,
+    end_date )" (this is why the 2026-08-20 probe reported it as unsupported). Allowed values round-trip:
+    `text/plain`, `text/html`.
+  - `subject` round-trips; omitting it leaves Plesk's default `Re: <request_subject>`.
+  - `end_date` is `Y-m-d`; an empty value is rejected — clear a set end date by sending `1970-01-01` (the server normalizes past dates to no end date).
 - **`forwarding.enabled` IS settable** in `update/set` (`<forwarding><enabled>false</enabled>` → ok). Whether `set` wipes the address list alongside is untested — assume yes (set = replace-all-mentioned), test on a forwarding-free mailbox.
 - **Webspace `status` IS settable** via `<webspace><set><values><gen_setup><status>0|16</status>` (0 = enabled, 16 = disabled) — validated live on 4wd.de.
 - **`server/get` data tags** (all optional, combinable): `key, gen_info, components, stat, admin, interfaces, services_state, prefs, shells, session_setup, site-isolation-config, updates, admin-domain-list, certificates`.

@@ -51,12 +51,18 @@ class PleskMailGateway
         return [] === $autoresponders ? null : $this->autoresponderFromNode($autoresponders[0]);
     }
 
-    public function setAutoresponder(string $email, string $message, string $endDate): void
+    /**
+     * @param null|string $subject     reply subject; null = Plesk default (Re: <request_subject>)
+     * @param null|string $contentType text/plain or text/html; null = server default
+     */
+    public function setAutoresponder(string $email, string $message, string $endDate, ?string $subject = null, ?string $contentType = null): void
     {
         if ($this->dryRun) {
-            $this->logger->info('DRY-RUN: would call mail update set_autoresponder for {email} (end_date {end_date})', [
+            $this->logger->info('DRY-RUN: would call mail update set_autoresponder for {email} (end_date {end_date}, subject {subject}, content_type {content_type})', [
                 'email' => $email,
                 'end_date' => $this->toPleskDate($endDate),
+                'subject' => $subject ?? '(default)',
+                'content_type' => $contentType ?? '(default)',
             ]);
 
             return;
@@ -72,8 +78,16 @@ class PleskMailGateway
         $filter->addChild('site-id', (string) $siteId);
         $mailname = $filter->addChild('mailname');
         $mailname->addChild('name', $name);
+        // Element order matters (XSD sequence): enabled, subject, content_type,
+        // charset, text, ..., end_date - content_type AFTER text is rejected.
         $autoresponder = $mailname->addChild('autoresponder');
         $autoresponder->addChild('enabled', 'true');
+        if (null !== $subject) {
+            $autoresponder->addChild('subject', $subject);
+        }
+        if (null !== $contentType) {
+            $autoresponder->addChild('content_type', $contentType);
+        }
         $autoresponder->addChild('text', $message);
         $autoresponder->addChild('end_date', $pleskEndDate);
 

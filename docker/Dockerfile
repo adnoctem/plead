@@ -16,7 +16,10 @@ WORKDIR /app
 # hadolint ignore=DL3018
 RUN apk add --no-cache \
         git \
-    && rm -rf /var/cache/apk/*
+        nodejs \
+        npm \
+    && rm -rf /var/cache/apk/* \
+    && npm install --global --no-audit --no-fund mjml
 
 # install `install-php-extensions` to install extensions (and composer) with all dependencies included
 # ref: https://github.com/mlocati/docker-php-extension-installer
@@ -41,6 +44,10 @@ COPY --link --chown=${PUID}:${PGID} docker/conf/php/10-app.ini $PHP_INI_DIR/app.
 
 # plead keeps its SQLite database and log file under PLEAD_DATA_DIR
 VOLUME [ "/data" ]
+
+# A CLI container exposes no port to probe; the healthcheck verifies the PHP
+# runtime the image is built around stays functional.
+HEALTHCHECK --interval=60s --timeout=5s --start-period=10s --retries=3 CMD ["php", "-v"]
 
 # set default environment
 ENV APP_ENV=dev \

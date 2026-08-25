@@ -11,6 +11,7 @@ use App\Command\Mail\Autoresponder\AutoresponderListCommand;
 use App\Command\Mail\Autoresponder\AutoresponderSetCommand;
 use App\Config\ConfigFile;
 use App\Config\PathProvider\PathProviderInterface;
+use App\Template\MjmlConverter;
 use App\Tests\Support\RecordingGateway;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
@@ -23,10 +24,10 @@ use Symfony\Component\Console\Tester\CommandTester;
 final class AutoresponderCommandsTest extends TestCase
 {
     private string $base;
-    private string $messageFile;
     private RecordingGateway $gateway;
     private RuntimeContext $context;
     private PathProviderInterface $paths;
+    private string $fakeMjmlBinary;
 
     protected function setUp(): void
     {
@@ -37,9 +38,6 @@ final class AutoresponderCommandsTest extends TestCase
             $this->base.'/config/plead.yaml',
             "servers:\n    - host: fake.local\n      secret_key: test-key\n",
         );
-        $this->messageFile = $this->base.'/message.txt';
-        file_put_contents($this->messageFile, 'Bin im Urlaub & Grüße');
-
         $this->paths = new class($this->base) implements PathProviderInterface {
             public function __construct(private readonly string $base) {}
 
@@ -80,7 +78,21 @@ final class AutoresponderCommandsTest extends TestCase
         };
 
         $this->gateway = new RecordingGateway();
-        $this->context = new RuntimeContext($this->paths, null, false, null, 0, gateway: $this->gateway);
+        // A pass-through "mjml" binary: wraps the input in HTML so the
+        // conversion pipeline is exercised without requiring the real npm
+        // binary in CI.
+        $this->fakeMjmlBinary = $this->base.'/fake-mjml';
+        file_put_contents($this->fakeMjmlBinary, "#!/bin/sh\nprintf '<!doctype html><html><body>\\n'\ncat\nprintf '\\n</body></html>'\n");
+        chmod($this->fakeMjmlBinary, 0o755);
+        $this->context = new RuntimeContext(
+            $this->paths,
+            null,
+            false,
+            null,
+            0,
+            gateway: $this->gateway,
+            mjmlConverter: new MjmlConverter($this->fakeMjmlBinary),
+        );
     }
 
     public function testSchedulesFutureStartWithoutApplying(): void
@@ -88,7 +100,6 @@ final class AutoresponderCommandsTest extends TestCase
         $tester = $this->tester(new AutoresponderSetCommand());
         $tester->execute([
             'email' => 'user@company.com',
-            '--message-file' => $this->messageFile,
             '--start-date' => '2099-01-01T08:00:00+02:00',
             '--end-date' => '2099-01-05T08:00:00+02:00',
         ]);
@@ -104,7 +115,6 @@ final class AutoresponderCommandsTest extends TestCase
         $tester = $this->tester(new AutoresponderSetCommand());
         $tester->execute([
             'email' => 'user@company.com',
-            '--message-file' => $this->messageFile,
             '--end-date' => '2099-01-05T08:00:00+02:00',
         ]);
 
@@ -119,25 +129,12 @@ final class AutoresponderCommandsTest extends TestCase
         $tester = $this->tester(new AutoresponderSetCommand());
         $tester->execute([
             'email' => 'user@company.com',
-            '--message-file' => $this->messageFile,
             '--start-date' => '2099-01-10T08:00:00+02:00',
             '--end-date' => '2099-01-01T08:00:00+02:00',
         ]);
 
         self::assertNotSame(0, $tester->getStatusCode());
         self::assertStringContainsString('end-date must be after start-date', $tester->getDisplay());
-    }
-
-    public function testMissingMessageFileFails(): void
-    {
-        $tester = $this->tester(new AutoresponderSetCommand());
-        $tester->execute([
-            'email' => 'user@company.com',
-            '--message-file' => $this->base.'/does-not-exist.txt',
-            '--end-date' => '2099-01-05T08:00:00+02:00',
-        ]);
-
-        self::assertNotSame(0, $tester->getStatusCode());
     }
 
     public function testGatewayFailureStaysPendingForWatcher(): void
@@ -147,7 +144,6 @@ final class AutoresponderCommandsTest extends TestCase
         $tester = $this->tester(new AutoresponderSetCommand());
         $tester->execute([
             'email' => 'user@company.com',
-            '--message-file' => $this->messageFile,
             '--end-date' => '2099-01-05T08:00:00+02:00',
         ]);
 
@@ -160,7 +156,6 @@ final class AutoresponderCommandsTest extends TestCase
     {
         $this->tester(new AutoresponderSetCommand())->execute([
             'email' => 'user@company.com',
-            '--message-file' => $this->messageFile,
             '--end-date' => '2099-01-05T08:00:00+02:00',
         ]);
 
@@ -182,7 +177,6 @@ final class AutoresponderCommandsTest extends TestCase
     {
         $this->tester(new AutoresponderSetCommand())->execute([
             'email' => 'user@company.com',
-            '--message-file' => $this->messageFile,
             '--end-date' => '2099-01-05T08:00:00+02:00',
         ]);
         $this->gateway->failFor = ['user@company.com'];
@@ -201,7 +195,6 @@ final class AutoresponderCommandsTest extends TestCase
     {
         $this->tester(new AutoresponderSetCommand())->execute([
             'email' => 'user@company.com',
-            '--message-file' => $this->messageFile,
             '--end-date' => '2099-01-05T08:00:00+02:00',
         ]);
 
@@ -216,7 +209,6 @@ final class AutoresponderCommandsTest extends TestCase
     {
         $this->tester(new AutoresponderSetCommand())->execute([
             'email' => 'user@company.com',
-            '--message-file' => $this->messageFile,
             '--start-date' => '2099-01-01T08:00:00+02:00',
             '--end-date' => '2099-01-05T08:00:00+02:00',
         ]);
@@ -256,7 +248,6 @@ final class AutoresponderCommandsTest extends TestCase
         $tester = new CommandTester($command);
         $tester->execute([
             'email' => 'user@company.com',
-            '--message-file' => $this->messageFile,
             '--end-date' => '2099-01-05T08:00:00+02:00',
         ]);
 
@@ -266,7 +257,7 @@ final class AutoresponderCommandsTest extends TestCase
 
     public function testSetFallsBackToConfigEntry(): void
     {
-        $this->configWithAutoresponder($this->messageFile);
+        $this->configWithAutoresponder();
 
         $tester = $this->tester(new AutoresponderSetCommand());
         $tester->execute(['email' => 'user@company.com']);
@@ -293,7 +284,6 @@ final class AutoresponderCommandsTest extends TestCase
         $tester = $this->tester(new AutoresponderSetCommand());
         $tester->execute([
             'email' => 'user@company.com',
-            '--message-file' => $this->messageFile,
             '--data-file' => $dataFile,
             '--start-date' => '2099-01-01T08:00:00+02:00',
             '--end-date' => '2099-01-05T08:00:00+02:00',
@@ -322,7 +312,6 @@ final class AutoresponderCommandsTest extends TestCase
         $tester = $this->tester(new AutoresponderSetCommand());
         $tester->execute([
             'email' => 'user@company.com',
-            '--message-file' => $this->messageFile,
             '--data-file' => $dataFile,
             '--end-date' => '2099-01-05T08:00:00+02:00',
         ]);
@@ -341,7 +330,6 @@ final class AutoresponderCommandsTest extends TestCase
         $tester = $this->tester(new AutoresponderSetCommand());
         $tester->execute([
             'email' => 'user@company.com',
-            '--message-file' => $this->messageFile,
             '--data-file' => $dataFile,
             '--start-date' => '2099-01-01T08:00:00+02:00',
             '--end-date' => '2099-01-05T08:00:00+02:00',
@@ -360,7 +348,6 @@ final class AutoresponderCommandsTest extends TestCase
         $tester = $this->tester(new AutoresponderSetCommand());
         $tester->execute([
             'email' => 'user@company.com',
-            '--message-file' => $this->messageFile,
             '--data-file' => $this->base.'/does-not-exist.json',
             '--end-date' => '2099-01-05T08:00:00+02:00',
         ]);
@@ -384,7 +371,6 @@ final class AutoresponderCommandsTest extends TestCase
         $tester = $this->tester(new AutoresponderSetCommand());
         $tester->execute([
             'email' => 'user@company.com',
-            '--message-file' => $this->messageFile,
             '--data-file' => $dataFile,
             '--start-date' => '2099-01-01T08:00:00+02:00',
             '--end-date' => '2099-01-05T08:00:00+02:00',
@@ -404,7 +390,7 @@ final class AutoresponderCommandsTest extends TestCase
     {
         $dataFile = $this->base.'/data.yaml';
         file_put_contents($dataFile, implode("\n", ['firstname: Max', 'surname: Mustermann']));
-        $this->configWithAutoresponder($this->messageFile, $dataFile);
+        $this->configWithAutoresponder($dataFile);
 
         $tester = $this->tester(new AutoresponderSetCommand());
         $tester->execute(['email' => 'user@company.com', '--preview' => true]);
@@ -428,7 +414,6 @@ final class AutoresponderCommandsTest extends TestCase
         $tester = $this->tester(new AutoresponderSetCommand());
         $tester->execute([
             'email' => 'user@company.com',
-            '--message-file' => $this->messageFile,
             '--start-date' => '2099-01-10T08:00:00+02:00',
             '--end-date' => '2099-01-01T08:00:00+02:00',
             '--preview' => true,
@@ -443,7 +428,6 @@ final class AutoresponderCommandsTest extends TestCase
         $tester = $this->tester(new AutoresponderSetCommand());
         $tester->execute([
             'email' => 'user@company.com',
-            '--message-file' => $this->messageFile,
             '--start-date' => '2099-01-01T08:00:00+02:00',
             '--end-date' => '2099-01-05T08:00:00+02:00',
             '--inclusive' => true,
@@ -452,8 +436,8 @@ final class AutoresponderCommandsTest extends TestCase
         self::assertSame(0, $tester->getStatusCode());
         $row = $this->context->autoReplyRepository()->find('user@company.com');
         self::assertStringContainsString('bis einschließlich 05.01.2099', $row['message']);
-        self::assertStringContainsString('through', $row['message']);
-        self::assertStringNotContainsString('until ', $row['message']);
+        self::assertStringNotContainsString('through', $row['message']);
+        self::assertStringNotContainsString('until', $row['message']);
     }
 
     public function testNoInclusiveOverridesDataFile(): void
@@ -464,7 +448,6 @@ final class AutoresponderCommandsTest extends TestCase
         $tester = $this->tester(new AutoresponderSetCommand());
         $tester->execute([
             'email' => 'user@company.com',
-            '--message-file' => $this->messageFile,
             '--data-file' => $dataFile,
             '--start-date' => '2099-01-01T08:00:00+02:00',
             '--end-date' => '2099-01-05T08:00:00+02:00',
@@ -474,13 +457,14 @@ final class AutoresponderCommandsTest extends TestCase
         self::assertSame(0, $tester->getStatusCode());
         $row = $this->context->autoReplyRepository()->find('user@company.com');
         self::assertStringContainsString('bis 05.01.2099', $row['message']);
-        self::assertStringContainsString('until', $row['message']);
         self::assertStringNotContainsString('einschließlich', $row['message']);
+        self::assertStringNotContainsString('through', $row['message']);
+        self::assertStringNotContainsString('until', $row['message']);
     }
 
     public function testConfigEntryInclusiveAppliesOnFallback(): void
     {
-        $this->configWithAutoresponder($this->messageFile, null, true);
+        $this->configWithAutoresponder(null, true);
 
         $tester = $this->tester(new AutoresponderSetCommand());
         $tester->execute(['email' => 'user@company.com']);
@@ -504,7 +488,6 @@ final class AutoresponderCommandsTest extends TestCase
         $tester = $this->tester(new AutoresponderSetCommand());
         $tester->execute([
             'email' => 'user@company.com',
-            '--message-file' => $this->messageFile,
             '--data-file' => $dataFile,
             '--end-date' => '2099-01-05T08:00:00+02:00',
         ]);
@@ -512,6 +495,14 @@ final class AutoresponderCommandsTest extends TestCase
         self::assertSame(0, $tester->getStatusCode());
         $row = $this->context->autoReplyRepository()->find('user@company.com');
         self::assertStringContainsString('unsere Buchhaltung', $row['message']);
+
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--data-file' => $dataFile,
+            '--language' => 'en',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+        ]);
+        $row = $this->context->autoReplyRepository()->find('user@company.com');
         self::assertStringContainsString('our accounting department', $row['message']);
     }
 
@@ -522,7 +513,6 @@ final class AutoresponderCommandsTest extends TestCase
         $tester = $this->tester(new AutoresponderSetCommand(), $context);
         $tester->execute([
             'email' => 'user@company.com',
-            '--message-file' => $this->messageFile,
             '--start-date' => '2099-01-01T08:00:00+02:00',
             '--end-date' => '2099-01-05T08:00:00+02:00',
             '--inclusive' => true,
@@ -537,7 +527,6 @@ final class AutoresponderCommandsTest extends TestCase
                 'address' => 'user@company.com',
                 'end_date' => '2099-01-05T08:00:00+02:00',
                 'inclusive' => true,
-                'message_file' => $this->messageFile,
                 'start_date' => '2099-01-01T08:00:00+02:00',
             ],
         ], $raw['mail']['autoresponder']);
@@ -552,7 +541,6 @@ final class AutoresponderCommandsTest extends TestCase
         $tester = $this->tester(new AutoresponderSetCommand());
         $tester->execute([
             'email' => 'user@company.com',
-            '--message-file' => $this->messageFile,
             '--data-file' => $dataFile,
             '--end-date' => '2099-01-05T08:00:00+02:00',
         ]);
@@ -565,7 +553,7 @@ final class AutoresponderCommandsTest extends TestCase
     {
         $dataFile = $this->base.'/data.yaml';
         file_put_contents($dataFile, implode("\n", ['firstname: Max', 'surname: Mustermann']));
-        $this->configWithAutoresponder($this->messageFile, $dataFile);
+        $this->configWithAutoresponder($dataFile);
 
         $tester = $this->tester(new AutoresponderSetCommand());
         $tester->execute(['email' => 'user@company.com']);
@@ -579,7 +567,7 @@ final class AutoresponderCommandsTest extends TestCase
     {
         $dataFile = $this->base.'/data.yaml';
         file_put_contents($dataFile, implode("\n", ['firstname: Max', 'surname: Mustermann']));
-        $this->configWithAutoresponder($this->messageFile, $dataFile);
+        $this->configWithAutoresponder($dataFile);
 
         $tester = $this->tester(new AutoresponderSetCommand());
         $tester->execute(['email' => 'user@company.com', '--end-date' => '2099-01-07T08:00:00+02:00']);
@@ -606,7 +594,6 @@ final class AutoresponderCommandsTest extends TestCase
         $tester = $this->tester(new AutoresponderSetCommand(), $context);
         $tester->execute([
             'email' => 'user@company.com',
-            '--message-file' => $this->messageFile,
             '--start-date' => '2099-01-01T08:00:00+02:00',
             '--end-date' => '2099-01-05T08:00:00+02:00',
         ]);
@@ -619,7 +606,6 @@ final class AutoresponderCommandsTest extends TestCase
             [
                 'address' => 'user@company.com',
                 'end_date' => '2099-01-05T08:00:00+02:00',
-                'message_file' => $this->messageFile,
                 'start_date' => '2099-01-01T08:00:00+02:00',
             ],
         ], $raw['mail']['autoresponder']);
@@ -635,7 +621,6 @@ final class AutoresponderCommandsTest extends TestCase
         $tester = $this->tester(new AutoresponderSetCommand(), $context);
         $tester->execute([
             'email' => 'user@company.com',
-            '--message-file' => $this->messageFile,
             '--data-file' => $dataFile,
             '--start-date' => '2099-01-01T08:00:00+02:00',
             '--end-date' => '2099-01-05T08:00:00+02:00',
@@ -650,7 +635,6 @@ final class AutoresponderCommandsTest extends TestCase
                 'address' => 'user@company.com',
                 'data_file' => $dataFile,
                 'end_date' => '2099-01-05T08:00:00+02:00',
-                'message_file' => $this->messageFile,
                 'start_date' => '2099-01-01T08:00:00+02:00',
             ],
         ], $raw['mail']['autoresponder']);
@@ -659,7 +643,7 @@ final class AutoresponderCommandsTest extends TestCase
 
     public function testDisableWithWriteConfigRemovesEntry(): void
     {
-        $this->configWithAutoresponder($this->messageFile);
+        $this->configWithAutoresponder();
         $context = new RuntimeContext($this->paths, null, false, null, 0, writeConfig: true, gateway: $this->gateway);
 
         $tester = $this->tester(new AutoresponderSetCommand(), $context);
@@ -672,6 +656,310 @@ final class AutoresponderCommandsTest extends TestCase
         self::assertArrayNotHasKey('autoresponder', $raw['mail'] ?? []);
     }
 
+    public function testTemplateOverrideRendersMjml(): void
+    {
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--template' => 'resources/templates/autoresponder.mjml.twig',
+            '--start-date' => '2099-01-01T08:00:00+02:00',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+            '--preview' => true,
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        $display = $tester->getDisplay();
+        // The MJML pipeline converts the rendered markup to HTML.
+        self::assertStringContainsString('<!doctype html>', $display);
+        self::assertStringContainsString('<mjml background-color="#0B0B0F">', $display);
+        self::assertStringContainsString('mj-body background-color="#0B0B0F" width="650px"', $display);
+        self::assertStringContainsString('.aa-btn:hover a { background: #FFA31A !important; }', $display);
+        // Responsive: mobile media query shrinks gaps and tightens the card.
+        self::assertStringContainsString('@media only screen and (max-width:650px)', $display);
+        self::assertStringContainsString('.aa-gap td, .aa-gap div { height: 56px !important; line-height: 56px !important; }', $display);
+        self::assertStringContainsString('<mj-spacer css-class="aa-gap" height="196px"></mj-spacer>', $display);
+        // Single language per view (German default), buttons side by side.
+        self::assertStringContainsString('Sehr geehrter Kunde / Geschäftspartner,', $display);
+        self::assertStringNotContainsString('Dear Customer', $display);
+        self::assertSame(2, substr_count($display, '<mj-column width="42%"'));
+        // Values are clickable in the sentence and mirrored by the buttons.
+        self::assertSame(2, substr_count($display, 'href="tel:'));
+        self::assertSame(2, substr_count($display, 'href="mailto:'));
+        self::assertStringContainsString('Anrufen', $display);
+        self::assertStringContainsString('E-Mail schreiben', $display);
+        // Footer with social links and copyright.
+        self::assertStringContainsString('github.com/adnoctem', $display);
+        self::assertStringContainsString('adnoctem.co', $display);
+        self::assertStringContainsString('Ad Noctem Collective', $display);
+        // Bold dates inside the period sentence (spans, not nested mj-text).
+        self::assertStringContainsString('<span style="font-weight:600">01.01.2099</span>', $display);
+        self::assertStringNotContainsString('<mj-text style="font-weight:600">', $display);
+    }
+
+    public function testLanguageFlagRendersSingleLanguage(): void
+    {
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--template' => 'resources/templates/autoresponder.mjml.twig',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+            '--language' => 'en',
+            '--preview' => true,
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        $display = $tester->getDisplay();
+        self::assertStringContainsString('Dear Customer / Business Partner,', $display);
+        self::assertStringContainsString('Call us', $display);
+        self::assertStringNotContainsString('Sehr geehrter', $display);
+        self::assertStringNotContainsString('Anrufen', $display);
+    }
+
+    public function testUnknownLanguageFails(): void
+    {
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+            '--language' => 'fr',
+            '--preview' => true,
+        ]);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('Unknown language "fr"', $tester->getDisplay());
+        self::assertStringContainsString('de, en', $tester->getDisplay());
+    }
+
+    public function testConfigEntryLanguageAppliesOnFallback(): void
+    {
+        file_put_contents($this->base.'/config/plead.yaml', implode("\n", [
+            'servers:',
+            '    - host: fake.local',
+            '      secret_key: test-key',
+            'mail:',
+            '    autoresponder:',
+            '        - address: user@company.com',
+            '          language: en',
+            '          start_date: "2099-01-01T08:00:00+02:00"',
+            '          end_date: "2099-01-05T18:00:00+02:00"',
+        ]));
+
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--template' => 'resources/templates/autoresponder.mjml.twig',
+            '--format' => 'html',
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        $row = $this->context->autoReplyRepository()->find('user@company.com');
+        self::assertStringContainsString('Dear Customer', $row['message']);
+        self::assertStringNotContainsString('Sehr geehrter', $row['message']);
+    }
+
+    public function testSetWithWriteConfigPersistsLanguage(): void
+    {
+        $context = new RuntimeContext($this->paths, null, false, null, 0, writeConfig: true, gateway: $this->gateway);
+
+        $tester = $this->tester(new AutoresponderSetCommand(), $context);
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--language' => 'en',
+            '--start-date' => '2099-01-01T08:00:00+02:00',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('written to', $tester->getDisplay());
+
+        $raw = ConfigFile::read($this->base.'/config/plead.yaml');
+        self::assertSame([
+            [
+                'address' => 'user@company.com',
+                'end_date' => '2099-01-05T08:00:00+02:00',
+                'language' => 'en',
+                'start_date' => '2099-01-01T08:00:00+02:00',
+            ],
+        ], $raw['mail']['autoresponder']);
+        $this->context->configLoader()->load($this->base.'/config/plead.yaml');
+    }
+
+    public function testTemplateOverrideNotFoundFails(): void
+    {
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--template' => '/nonexistent/template.twig',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+            '--preview' => true,
+        ]);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('Cannot read template file', $tester->getDisplay());
+    }
+
+    public function testSubjectAndFormatStoredAndPushed(): void
+    {
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--subject' => 'Automatische Antwort',
+            '--format' => 'html',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        $row = $this->context->autoReplyRepository()->find('user@company.com');
+        self::assertSame('Automatische Antwort', $row['subject']);
+        self::assertSame('html', $row['format']);
+    }
+
+    public function testInvalidFormatFails(): void
+    {
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--format' => 'markdown',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+        ]);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('Invalid value for --format', $tester->getDisplay());
+    }
+
+    public function testConfigEntrySubjectAndFormatApplyOnFallback(): void
+    {
+        file_put_contents($this->base.'/config/plead.yaml', implode("\n", [
+            'servers:',
+            '    - host: fake.local',
+            '      secret_key: test-key',
+            'mail:',
+            '    autoresponder:',
+            '        - address: user@company.com',
+            '          subject: "Automatische Antwort"',
+            '          format: html',
+            '          start_date: "2099-01-01T08:00:00+02:00"',
+            '          end_date: "2099-01-05T18:00:00+02:00"',
+        ]));
+
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute(['email' => 'user@company.com']);
+
+        self::assertSame(0, $tester->getStatusCode());
+        $row = $this->context->autoReplyRepository()->find('user@company.com');
+        self::assertSame('Automatische Antwort', $row['subject']);
+        self::assertSame('html', $row['format']);
+    }
+
+    public function testHtmlMessageWithoutHtmlFormatFailsUnlessForced(): void
+    {
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--template' => 'resources/templates/autoresponder.mjml.twig',
+            '--format' => 'plain',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+        ]);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('message is HTML but the format is not "html"', $tester->getDisplay());
+        self::assertNull($this->context->autoReplyRepository()->find('user@company.com'));
+
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--template' => 'resources/templates/autoresponder.mjml.twig',
+            '--format' => 'plain',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+            '--force' => true,
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        $row = $this->context->autoReplyRepository()->find('user@company.com');
+        self::assertStringContainsString('<!doctype html>', $row['message']);
+        self::assertSame('plain', $row['format']);
+    }
+
+    public function testHtmlMessageWithoutExplicitFormatFailsUnlessForced(): void
+    {
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--template' => 'resources/templates/autoresponder.mjml.twig',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+        ]);
+
+        self::assertNotSame(0, $tester->getStatusCode());
+
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--template' => 'resources/templates/autoresponder.mjml.twig',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+            '--force' => true,
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        $row = $this->context->autoReplyRepository()->find('user@company.com');
+        self::assertSame('', $row['format']);
+    }
+
+    public function testHtmlMessageWithHtmlFormatSucceeds(): void
+    {
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--template' => 'resources/templates/autoresponder.mjml.twig',
+            '--format' => 'html',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        $row = $this->context->autoReplyRepository()->find('user@company.com');
+        self::assertSame('html', $row['format']);
+    }
+
+    public function testPreviewWarnsOnHtmlWithoutHtmlFormat(): void
+    {
+        $tester = $this->tester(new AutoresponderSetCommand());
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--template' => 'resources/templates/autoresponder.mjml.twig',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+            '--preview' => true,
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('message is HTML but the format is not "html"', $tester->getDisplay());
+    }
+
+    public function testSetWithWriteConfigPersistsSubjectAndFormat(): void
+    {
+        $context = new RuntimeContext($this->paths, null, false, null, 0, writeConfig: true, gateway: $this->gateway);
+
+        $tester = $this->tester(new AutoresponderSetCommand(), $context);
+        $tester->execute([
+            'email' => 'user@company.com',
+            '--subject' => 'Automatische Antwort',
+            '--format' => 'plain',
+            '--start-date' => '2099-01-01T08:00:00+02:00',
+            '--end-date' => '2099-01-05T08:00:00+02:00',
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertStringContainsString('written to', $tester->getDisplay());
+
+        $raw = ConfigFile::read($this->base.'/config/plead.yaml');
+        self::assertSame([
+            [
+                'address' => 'user@company.com',
+                'end_date' => '2099-01-05T08:00:00+02:00',
+                'format' => 'plain',
+                'start_date' => '2099-01-01T08:00:00+02:00',
+                'subject' => 'Automatische Antwort',
+            ],
+        ], $raw['mail']['autoresponder']);
+        $this->context->configLoader()->load($this->base.'/config/plead.yaml');
+    }
+
     private function tester(AbstractPleadCommand $command, ?RuntimeContext $context = null): CommandTester
     {
         $tester = new CommandTester($command);
@@ -680,7 +968,7 @@ final class AutoresponderCommandsTest extends TestCase
         return $tester;
     }
 
-    private function configWithAutoresponder(string $messageFile, ?string $dataFile = null, ?bool $inclusive = null): void
+    private function configWithAutoresponder(?string $dataFile = null, ?bool $inclusive = null): void
     {
         $lines = [
             'servers:',
@@ -689,7 +977,6 @@ final class AutoresponderCommandsTest extends TestCase
             'mail:',
             '    autoresponder:',
             '        - address: user@company.com',
-            '          message_file: '.$messageFile,
         ];
         if (null !== $dataFile) {
             $lines[] = '          data_file: '.$dataFile;

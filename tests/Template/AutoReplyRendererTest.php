@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Template;
 
 use App\Template\AutoReplyRenderer;
+use App\Template\MjmlConverter;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
@@ -71,13 +72,11 @@ final class AutoReplyRendererTest extends TestCase
     public function testRenderMessageWithoutCatalogsThrows(): void
     {
         $renderer = new AutoReplyRenderer($this->templateFile, null);
-        $messageFile = $this->base.'/body.txt';
-        file_put_contents($messageFile, 'x');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('translation catalogs');
 
-        $renderer->renderMessage($messageFile, null, null, null);
+        $renderer->renderMessage(null, null, null, null);
     }
 
     public function testKeyLangResolvesLocaleMaps(): void
@@ -90,8 +89,6 @@ final class AutoReplyRendererTest extends TestCase
             '{% for lang in languages %}{{ email[lang] ?? email }}|{{ phonenumber[lang] ?? phonenumber }};{% endfor %}',
         );
         $renderer = new AutoReplyRenderer($templateFile, $this->catalogs);
-        $messageFile = $this->base.'/body.txt';
-        file_put_contents($messageFile, 'x');
         $dataFile = $this->base.'/data.yaml';
         file_put_contents($dataFile, implode("\n", [
             'email:',
@@ -100,7 +97,7 @@ final class AutoReplyRendererTest extends TestCase
             'phonenumber: "+49 8134 930217"',
         ]));
 
-        $out = $renderer->renderMessage($messageFile, $dataFile, null, null);
+        $out = $renderer->renderMessage($dataFile, null, null);
 
         self::assertSame('buchhaltung@delta4x4.com|+49 8134 930217;invoices@delta4x4.com|+49 8134 930217;', $out);
     }
@@ -112,12 +109,10 @@ final class AutoReplyRendererTest extends TestCase
         $templateFile = $this->base.'/flat.txt.twig';
         file_put_contents($templateFile, '{% for lang in languages %}{{ email[lang] ?? email }};{% endfor %}');
         $renderer = new AutoReplyRenderer($templateFile, $this->catalogs);
-        $messageFile = $this->base.'/body.txt';
-        file_put_contents($messageFile, 'x');
         $dataFile = $this->base.'/data.yaml';
         file_put_contents($dataFile, 'email: "office@delta4x4.com"'."\n");
 
-        $out = $renderer->renderMessage($messageFile, $dataFile, null, null);
+        $out = $renderer->renderMessage($dataFile, null, null);
 
         self::assertSame('office@delta4x4.com;office@delta4x4.com;', $out);
     }
@@ -142,10 +137,8 @@ final class AutoReplyRendererTest extends TestCase
         $templateFile = $this->base.'/logo.txt.twig';
         file_put_contents($templateFile, "{{ logo_url ?? 'default.png' }}");
         $renderer = new AutoReplyRenderer($templateFile, $this->catalogs, 'https://cdn.example.com/logo.png');
-        $messageFile = $this->base.'/body.txt';
-        file_put_contents($messageFile, 'x');
 
-        self::assertSame('https://cdn.example.com/logo.png', $renderer->renderMessage($messageFile, null, null, null));
+        self::assertSame('https://cdn.example.com/logo.png', $renderer->renderMessage(null, null, null, null));
     }
 
     public function testDataFileLogoOverridesConstructor(): void
@@ -154,14 +147,12 @@ final class AutoReplyRendererTest extends TestCase
         $templateFile = $this->base.'/logo.txt.twig';
         file_put_contents($templateFile, "{{ logo_url ?? 'default.png' }}");
         $renderer = new AutoReplyRenderer($templateFile, $this->catalogs, 'https://cdn.example.com/logo.png');
-        $messageFile = $this->base.'/body.txt';
-        file_put_contents($messageFile, 'x');
         $dataFile = $this->base.'/data.yaml';
         file_put_contents($dataFile, 'logo_url: "https://cdn.example.com/christmas.png"'."\n");
 
         self::assertSame(
             'https://cdn.example.com/christmas.png',
-            $renderer->renderMessage($messageFile, $dataFile, null, null),
+            $renderer->renderMessage($dataFile, null, null),
         );
     }
 
@@ -171,26 +162,76 @@ final class AutoReplyRendererTest extends TestCase
         $templateFile = $this->base.'/logo.txt.twig';
         file_put_contents($templateFile, "{{ logo_url ?? 'default.png' }}");
         $renderer = new AutoReplyRenderer($templateFile, $this->catalogs, null);
-        $messageFile = $this->base.'/body.txt';
-        file_put_contents($messageFile, 'x');
 
-        self::assertSame('default.png', $renderer->renderMessage($messageFile, null, null, null));
+        self::assertSame('default.png', $renderer->renderMessage(null, null, null, null));
     }
 
-    public function testRenderMessageInjectsScheduleAndMessageFile(): void
+    public function testRenderMessageInjectsDatesAndInclusive(): void
     {
         $this->writeCatalog('de', ['greeting' => 'Hallo']);
-        $templateFile = $this->base.'/passthrough.txt.twig';
-        file_put_contents($templateFile, '{{ message }}');
+        $templateFile = $this->base.'/dates.txt.twig';
+        file_put_contents(
+            $templateFile,
+            '{{ startDate }}|{{ endDate }}|{% if inclusive %}yes{% else %}no{% endif %}',
+        );
         $renderer = new AutoReplyRenderer($templateFile, $this->catalogs);
-        $messageFile = $this->base.'/body.txt';
-        file_put_contents($messageFile, 'Gruß {{ firstname }}');
-        $dataFile = $this->base.'/data.yaml';
-        file_put_contents($dataFile, "firstname: Max\n");
 
-        $out = $renderer->renderMessage($messageFile, $dataFile, '2026-08-20T08:00:00+02:00', '2026-08-30T18:00:00+02:00');
+        $out = $renderer->renderMessage(null, '2026-08-20T08:00:00+02:00', '2026-08-30T18:00:00+02:00', true);
 
-        self::assertSame('Gruß Max', $out);
+        self::assertSame('2026-08-20T08:00:00+02:00|2026-08-30T18:00:00+02:00|yes', $out);
+    }
+
+    public function testLanguageInjectedIntoContext(): void
+    {
+        $this->writeCatalog('de', ['greeting' => 'Hallo']);
+        $this->writeCatalog('en', ['greeting' => 'Hello']);
+        $templateFile = $this->base.'/lang.txt.twig';
+        file_put_contents($templateFile, '{{ language }}');
+        $renderer = new AutoReplyRenderer($templateFile, $this->catalogs);
+
+        self::assertSame('de', $renderer->renderMessage(null, null, null, null));
+        self::assertSame('en', $renderer->renderMessage(null, null, null, null, 'en'));
+    }
+
+    public function testUnknownLanguageThrows(): void
+    {
+        $this->writeCatalog('de', ['greeting' => 'Hallo']);
+        $renderer = new AutoReplyRenderer($this->templateFile, $this->catalogs);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Unknown autoresponder language "fr"');
+
+        $renderer->renderMessage(null, null, null, null, 'fr');
+    }
+
+    public function testMjmlOutputIsConvertedToHtml(): void
+    {
+        $this->writeCatalog('de', ['greeting' => 'Hallo']);
+        $fakeBinary = $this->base.'/fake-mjml';
+        file_put_contents($fakeBinary, "#!/bin/sh\nprintf '<!doctype html><html><body>'\ncat\nprintf '</body></html>'\n");
+        chmod($fakeBinary, 0o755);
+        $templateFile = $this->base.'/mail.mjml.twig';
+        file_put_contents($templateFile, '<mjml><mj-body><mj-section><mj-column><mj-text>{{ "greeting"|trans({}, "autoresponder", language) }}</mj-text></mj-column></mj-section></mj-body></mjml>');
+        $renderer = new AutoReplyRenderer($templateFile, $this->catalogs, null, new MjmlConverter($fakeBinary));
+
+        $out = $renderer->renderMessage(null, null, null, null, 'de');
+
+        self::assertStringContainsString('<!doctype html>', $out);
+        self::assertStringContainsString('<mjml><mj-body>', $out);
+        self::assertStringContainsString('Hallo', $out);
+    }
+
+    public function testNonMjmlOutputIsLeftUntouched(): void
+    {
+        $this->writeCatalog('de', ['greeting' => 'Hallo']);
+        $fakeBinary = $this->base.'/fake-mjml';
+        file_put_contents($fakeBinary, "#!/bin/sh\nprintf 'CONVERTED'\n");
+        chmod($fakeBinary, 0o755);
+        $templateFile = $this->base.'/plain.txt.twig';
+        file_put_contents($templateFile, 'Nur Text');
+        $renderer = new AutoReplyRenderer($templateFile, $this->catalogs, null, new MjmlConverter($fakeBinary));
+
+        self::assertSame('Nur Text', $renderer->renderMessage(null, null, null, null));
     }
 
     private function removeDir(string $dir): void

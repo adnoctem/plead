@@ -47,23 +47,32 @@ final class AutoReplyRuleEngine
         $startDate = $definition->startDate() ?? ($existing['start_date'] ?? DateNormalizer::now());
 
         $message = $this->renderer->renderMessage(
-            $definition->messageFile(),
             $definition->dataFile(),
             $startDate,
             $definition->endDate(),
             $definition->inclusive(),
+            $definition->language(),
         );
 
         if (null !== $existing
             && $existing['message'] === $message
             && $existing['start_date'] === $startDate
-            && $existing['end_date'] === $definition->endDate()) {
+            && $existing['end_date'] === $definition->endDate()
+            && $existing['subject'] === ($definition->subject() ?? '')
+            && $existing['format'] === ($definition->format() ?? '')) {
             return false;
         }
 
         $logId = $this->syncLog->logPending('auto_reply', $email, 'set');
 
-        $this->repository->upsert($email, $message, $startDate, $definition->endDate());
+        $this->repository->upsert(
+            $email,
+            $message,
+            $startDate,
+            $definition->endDate(),
+            $definition->subject() ?? '',
+            $definition->format() ?? '',
+        );
         $this->syncLog->resolve($logId, $this->dryRun ? 'dry-run' : 'ok');
 
         $this->logger->info('Config-defined auto-reply {email} recorded', ['email' => $email]);

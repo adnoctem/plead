@@ -21,11 +21,15 @@ final class AutoresponderSetCommand extends AbstractMailCommand
         $this
             ->addArgument('email', InputArgument::REQUIRED, 'Email address, e.g. user@company.com')
             ->addOption('enabled', null, InputOption::VALUE_REQUIRED, 'Whether the auto-reply should be enabled: true|false|yes|no|1|0 (default: true)')
-            ->addOption('message-file', null, InputOption::VALUE_REQUIRED, 'File containing the auto-reply message (rendered as a Twig template)')
+            ->addOption('template', null, InputOption::VALUE_REQUIRED, 'Template to render for this invocation (default: template.auto_reply_path from the config)')
             ->addOption('data-file', null, InputOption::VALUE_REQUIRED, 'JSON or YAML file with template data (e.g. firstname, phoneNumber); the schedule dates are injected automatically')
             ->addOption('start-date', null, InputOption::VALUE_REQUIRED, 'When the auto-reply becomes active (default: now). Any date string is accepted and normalized to ISO 8601 with offset.')
             ->addOption('end-date', null, InputOption::VALUE_REQUIRED, 'When the auto-reply stops. Plesk handles the turn-off natively.')
             ->addOption('inclusive', null, InputOption::VALUE_NEGATABLE, 'Whether the end date counts as vacation: --inclusive/--no-inclusive (default: false). Authoritative - overrides the data file.')
+            ->addOption('subject', null, InputOption::VALUE_REQUIRED, 'Reply subject (default: Plesk\'s "Re: <request_subject>")')
+            ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Autoresponder format: plain|html (default: server default)')
+            ->addOption('language', null, InputOption::VALUE_REQUIRED, 'Render language (catalog locale, e.g. de or en; default: template.language or the first catalog language). The txt template renders every language regardless.')
+            ->addOption('force', null, InputOption::VALUE_NONE, 'Store the message even when the format does not match the rendered content (e.g. an HTML message with a non-html format)')
             ->addOption('preview', null, InputOption::VALUE_NONE, 'Render and print the message with the configured template, data file and dates; records nothing and touches neither the database nor Plesk')
         ;
     }
@@ -35,8 +39,17 @@ final class AutoresponderSetCommand extends AbstractMailCommand
         $email = (string) $input->getArgument('email');
         $context = $this->context();
 
+        if (null !== $input->getOption('format') && !in_array(strtolower((string) $input->getOption('format')), ['plain', 'html'], true)) {
+            $output->writeln(sprintf('<error>Invalid value for --format: "%s". Use plain or html.</error>', $input->getOption('format')));
+
+            return self::FAILURE;
+        }
+
         if ($input->getOption('preview')) {
             if (!$this->mergeConfigEntry($input, $output, $email)) {
+                return self::FAILURE;
+            }
+            if (!$this->validateLanguage($input, $output)) {
                 return self::FAILURE;
             }
 
@@ -58,6 +71,9 @@ final class AutoresponderSetCommand extends AbstractMailCommand
             if (!$this->mergeConfigEntry($input, $output, $email)) {
                 return self::FAILURE;
             }
+        }
+        if (!$this->validateLanguage($input, $output)) {
+            return self::FAILURE;
         }
 
         $result = $enabled ? $this->enable($input, $output, $email) : $this->disable($output, $email);
@@ -91,32 +107,30 @@ final class AutoresponderSetCommand extends AbstractMailCommand
     /**
      * Fill CLI options from the configured mail.autoresponder entry: with no
      * options at all the entry defines everything; with a partial CLI run the
-     * entry fills the missing pieces (message/data file and dates). Returns
-     * false when nothing at all could be resolved for the address.
+     * entry fills the missing pieces (data file, dates, subject, format).
+     * Returns false when nothing at all could be resolved for the address.
      */
     private function mergeConfigEntry(InputInterface $input, OutputInterface $output, string $email): bool
     {
         $entry = $this->configAutoresponderEntry($email);
         if (null === $entry) {
-            $hasOptions = null !== $input->getOption('message-file')
-                || null !== $input->getOption('data-file')
+            $hasOptions = null !== $input->getOption('data-file')
                 || null !== $input->getOption('start-date')
-                || null !== $input->getOption('end-date');
+                || null !== $input->getOption('end-date')
+                || null !== $input->getOption('subject')
+                || null !== $input->getOption('format');
             if ($hasOptions) {
                 return true;
             }
 
             $output->writeln(sprintf(
-                '<error>Provide --message-file (and dates), or configure a mail.autoresponder entry for %s in the config.</error>',
+                '<error>Provide --data-file (and dates), or configure a mail.autoresponder entry for %s in the config.</error>',
                 $email,
             ));
 
             return false;
         }
 
-        if (null === $input->getOption('message-file')) {
-            $input->setOption('message-file', $entry['message_file']);
-        }
         if (null === $input->getOption('data-file') && null !== ($entry['data_file'] ?? null)) {
             $input->setOption('data-file', $entry['data_file']);
         }
@@ -129,6 +143,15 @@ final class AutoresponderSetCommand extends AbstractMailCommand
         if (null === $input->getOption('inclusive') && null !== ($entry['inclusive'] ?? null)) {
             $input->setOption('inclusive', (bool) $entry['inclusive']);
         }
+        if (null === $input->getOption('subject') && null !== ($entry['subject'] ?? null)) {
+            $input->setOption('subject', $entry['subject']);
+        }
+        if (null === $input->getOption('format') && null !== ($entry['format'] ?? null)) {
+            $input->setOption('format', $entry['format']);
+        }
+        if (null === $input->getOption('language') && null !== ($entry['language'] ?? null)) {
+            $input->setOption('language', $entry['language']);
+        }
 
         return true;
     }
@@ -137,7 +160,6 @@ final class AutoresponderSetCommand extends AbstractMailCommand
     {
         $entry = [
             'address' => $email,
-            'message_file' => (string) $input->getOption('message-file'),
             'start_date' => DateNormalizer::normalize((string) ($input->getOption('start-date') ?: DateNormalizer::now())),
             'end_date' => (string) $input->getOption('end-date'),
         ];
@@ -146,6 +168,15 @@ final class AutoresponderSetCommand extends AbstractMailCommand
         }
         if (null !== $input->getOption('inclusive')) {
             $entry['inclusive'] = (bool) $input->getOption('inclusive');
+        }
+        if (null !== $input->getOption('subject')) {
+            $entry['subject'] = (string) $input->getOption('subject');
+        }
+        if (null !== $input->getOption('format')) {
+            $entry['format'] = (string) $input->getOption('format');
+        }
+        if (null !== $input->getOption('language')) {
+            $entry['language'] = (string) $input->getOption('language');
         }
         ksort($entry);
 
@@ -190,10 +221,7 @@ final class AutoresponderSetCommand extends AbstractMailCommand
     {
         $context = $this->context();
 
-        $messageFile = (string) $input->getOption('message-file');
-        if ('' === $messageFile || !is_file($messageFile) || !is_readable($messageFile)) {
-            $output->writeln(sprintf('<error>Cannot read message file: %s</error>', $messageFile));
-
+        if (null !== $input->getOption('template') && !$this->resolveTemplateOverride($input, $output)) {
             return self::FAILURE;
         }
 
@@ -213,17 +241,21 @@ final class AutoresponderSetCommand extends AbstractMailCommand
         }
 
         try {
-            $message = $context->renderer()->renderMessage(
-                $messageFile,
+            $message = $context->renderer($input->getOption('template'))->renderMessage(
                 $dataFile,
                 $startDate,
                 $endDate,
                 $input->getOption('inclusive'),
+                $input->getOption('language'),
             );
         } catch (\Throwable $e) {
             $output->writeln(sprintf('<error>Unable to render the auto-reply message: %s</error>', $e->getMessage()));
 
             return self::FAILURE;
+        }
+
+        if (self::renderedIsHtml($message) && 'html' !== strtolower((string) ($input->getOption('format') ?? ''))) {
+            $output->writeln('<comment>Note: the rendered message is HTML but the format is not "html" - use --format html when storing it (or --force to keep the current format).</comment>');
         }
 
         $output->writeln($message);
@@ -252,10 +284,7 @@ final class AutoresponderSetCommand extends AbstractMailCommand
     {
         $context = $this->context();
 
-        $messageFile = (string) $input->getOption('message-file');
-        if ('' === $messageFile || !is_file($messageFile) || !is_readable($messageFile)) {
-            $output->writeln(sprintf('<error>Cannot read message file: %s</error>', $messageFile));
-
+        if (null !== $input->getOption('template') && !$this->resolveTemplateOverride($input, $output)) {
             return self::FAILURE;
         }
 
@@ -275,15 +304,27 @@ final class AutoresponderSetCommand extends AbstractMailCommand
         }
 
         try {
-            $message = $context->renderer()->renderMessage(
-                $messageFile,
+            $message = $context->renderer($input->getOption('template'))->renderMessage(
                 $dataFile,
                 $startDate,
                 $endDate,
                 $input->getOption('inclusive'),
+                $input->getOption('language'),
             );
         } catch (\Throwable $e) {
             $output->writeln(sprintf('<error>Unable to render the auto-reply message: %s</error>', $e->getMessage()));
+
+            return self::FAILURE;
+        }
+
+        $subject = $input->getOption('subject');
+        $format = null !== $input->getOption('format') ? strtolower((string) $input->getOption('format')) : null;
+
+        // An HTML-rendered message (e.g. the MJML template) must not be
+        // stored with a plain/server-default content type: the reply would be
+        // delivered as text/plain despite the HTML body. --force overrides.
+        if (self::renderedIsHtml($message) && 'html' !== $format && !$input->getOption('force')) {
+            $output->writeln('<error>The rendered message is HTML but the format is not "html". Use --format html, or --force to store it with the current format.</error>');
 
             return self::FAILURE;
         }
@@ -292,7 +333,7 @@ final class AutoresponderSetCommand extends AbstractMailCommand
         // whether it is applied now or picked up by the watcher.
         $logId = $context->syncLogRepository()->logPending('auto_reply', $email, 'set');
 
-        $context->autoReplyRepository()->upsert($email, $message, $startDate, $endDate);
+        $context->autoReplyRepository()->upsert($email, $message, $startDate, $endDate, (string) ($subject ?? ''), (string) ($format ?? ''));
 
         if (new \DateTimeImmutable($startDate) <= new \DateTimeImmutable()) {
             $context->reconciler()->reconcile($email);
@@ -388,5 +429,67 @@ final class AutoresponderSetCommand extends AbstractMailCommand
             'false', 'no', '0', 'off' => false,
             default => null,
         };
+    }
+
+    /**
+     * The --language value (CLI or merged from the config entry) must be one
+     * of the catalog languages; the txt template ignores it and renders every
+     * language regardless.
+     */
+    private function validateLanguage(InputInterface $input, OutputInterface $output): bool
+    {
+        $language = $input->getOption('language');
+        if (null === $language) {
+            return true;
+        }
+
+        $available = $this->context()->renderer()->languages();
+        if (!in_array($language, $available, true)) {
+            $output->writeln(sprintf(
+                '<error>Unknown language "%s". Available: %s</error>',
+                $language,
+                implode(', ', $available),
+            ));
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /** Whether the rendered message is HTML (e.g. converted MJML output). */
+    private static function renderedIsHtml(string $message): bool
+    {
+        $message = ltrim($message);
+
+        return str_starts_with($message, '<!doctype html>') || str_starts_with($message, '<html');
+    }
+
+    /**
+     * Resolve the --template override the same way the config template is
+     * resolved (absolute/existing path, then repo-relative fallback) and
+     * store it back on the option. Prints an error and returns false when
+     * nothing resolvable was found.
+     */
+    private function resolveTemplateOverride(InputInterface $input, OutputInterface $output): bool
+    {
+        $configured = (string) $input->getOption('template');
+        $resolved = $configured;
+        if (!is_file($configured)) {
+            $absolute = dirname(__DIR__, 4).'/'.$configured;
+            if (is_file($absolute)) {
+                $resolved = $absolute;
+            }
+        }
+
+        if (!is_file($resolved)) {
+            $output->writeln(sprintf('<error>Cannot read template file: %s</error>', $configured));
+
+            return false;
+        }
+
+        $input->setOption('template', $resolved);
+
+        return true;
     }
 }

@@ -156,20 +156,16 @@ final class WatchCommandTest extends TestCase
 
     public function testWatchAppliesConfigDefinedAutoresponders(): void
     {
-        $messageFile = $this->base.'/reply.txt';
-        file_put_contents($messageFile, 'Bin im Urlaub');
-        $templateFile = $this->base.'/template.txt.twig';
-        file_put_contents($templateFile, '{{ message }}');
+        $dataFile = $this->base.'/reply-data.yaml';
+        file_put_contents($dataFile, implode("\n", ['firstname: Erika', 'surname: Mustermann']));
         file_put_contents($this->base.'/config/plead.yaml', implode("\n", [
             'servers:',
             '    - host: fake.local',
             '      secret_key: test-key',
-            'template:',
-            '    auto_reply_path: '.$templateFile,
             'mail:',
             '    autoresponder:',
             '        - address: user@company.com',
-            '          message_file: '.$messageFile,
+            '          data_file: '.$dataFile,
             '          start_date: "2099-01-01T08:00:00+02:00"',
             '          end_date: "2099-01-05T18:00:00+02:00"',
         ]));
@@ -185,7 +181,7 @@ final class WatchCommandTest extends TestCase
         self::assertSame(0, $tester->getStatusCode());
         $row = $this->context->autoReplyRepository()->find('user@company.com');
         self::assertNotNull($row);
-        self::assertStringContainsString('Bin im Urlaub', $row['message']);
+        self::assertStringContainsString('Erika Mustermann', $row['message']);
         self::assertSame('2099-01-01T08:00:00+02:00', $row['start_date']);
     }
 

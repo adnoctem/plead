@@ -22,6 +22,7 @@ use App\Repository\SyncLogRepository;
 use App\Rule\AutoReplyRuleEngine;
 use App\Rule\GroupRuleEngine;
 use App\Template\AutoReplyRenderer;
+use App\Template\MjmlConverter;
 use Monolog\Handler\StreamHandler;
 use Monolog\Level;
 use Monolog\Logger;
@@ -49,6 +50,7 @@ final class RuntimeContext
     private ?AutoReplyRuleEngine $autoReplyRuleEngine = null;
     private ?AutoReplyRenderer $renderer = null;
     private ?LoggerInterface $logger = null;
+    private ?MjmlConverter $mjmlConverter = null;
 
     public function __construct(
         public readonly PathProviderInterface $paths,
@@ -67,6 +69,7 @@ final class RuntimeContext
         ?SyncLogRepository $syncLogRepository = null,
         ?Connection $connection = null,
         ?LoggerInterface $logger = null,
+        ?MjmlConverter $mjmlConverter = null,
     ) {
         $this->gateway = $gateway;
         $this->restGateway = $restGateway;
@@ -77,6 +80,7 @@ final class RuntimeContext
         $this->syncLogRepository = $syncLogRepository;
         $this->connection = $connection;
         $this->logger = $logger;
+        $this->mjmlConverter = $mjmlConverter;
     }
 
     public function configLoader(): ConfigLoader
@@ -205,12 +209,25 @@ final class RuntimeContext
         );
     }
 
-    public function renderer(): AutoReplyRenderer
+    public function renderer(?string $templateOverride = null): AutoReplyRenderer
     {
-        return $this->renderer ??= new AutoReplyRenderer(
-            $this->templatePath(),
+        if (null === $templateOverride) {
+            return $this->renderer ??= new AutoReplyRenderer(
+                $this->templatePath(),
+                $this->translationsPath(),
+                $this->config()['template']['logo_url'] ?? null,
+                $this->mjmlConverter,
+            );
+        }
+
+        // Per-invocation template override (e.g. --template): resolve like the
+        // configured template and build a fresh renderer sharing the same
+        // translations, logo and MJML converter settings.
+        return new AutoReplyRenderer(
+            $this->resolveTemplatePath($templateOverride),
             $this->translationsPath(),
             $this->config()['template']['logo_url'] ?? null,
+            $this->mjmlConverter,
         );
     }
 
@@ -292,7 +309,11 @@ final class RuntimeContext
 
     private function templatePath(): string
     {
-        $configured = $this->config()['template']['auto_reply_path'];
+        return $this->resolveTemplatePath($this->config()['template']['auto_reply_path']);
+    }
+
+    private function resolveTemplatePath(string $configured): string
+    {
         if (is_file($configured)) {
             return $configured;
         }

@@ -1,0 +1,5 @@
+[codespell]
+skip = *.de.yaml
+# inout: Plesk antivirus enum value (off|in|out|inout), not a typo of "input".
+# sie/unter/oder: real German words in the German translation catalog.
+ignore-words-list = inout, sie, under, oder

@@ -45,6 +45,8 @@ final class AutoresponderGetCommand extends AbstractMailCommand
         $output->writeln(sprintf('State:     %s', '1' === (string) $row['reconciled'] ? 'reconciled' : 'pending'));
         $output->writeln(sprintf('Start:     %s', $row['start_date']));
         $output->writeln(sprintf('End:       %s', $row['end_date']));
+        $output->writeln(sprintf('Subject:   %s', '' !== (string) $row['subject'] ? $row['subject'] : '(Plesk default)'));
+        $output->writeln(sprintf('Format:    %s', '' !== (string) $row['format'] ? $row['format'] : '(server default)'));
         $output->writeln(sprintf('Reconciled:%s', null !== $row['reconciled_at'] ? ' '.$row['reconciled_at'] : ' (not yet)'));
         $output->writeln('Message:');
         $output->writeln($row['message']);

@@ -48,13 +48,18 @@ same before building. `git-version` injects the git tag/commit into `src/Applica
   rule-driven lists are authoritative (no adoption, non-matching recipients purged). Auto-replies get the
   same treatment via `AutoReplyDefinition` + `AutoReplyRuleEngine` (`mail.autoresponder` entries;
   `DateNormalizer::coerce()` handles YAML-parsed date timestamps). Template data comes from JSON/YAML
-  `data_file` entries (`--data-file` on the CLI) via `AutoReplyRenderer::renderMessage()`, which renders
-  the message file as an inline Twig template and injects `startDate`/`endDate` from the real schedule).
-  Multi-language text is catalog-driven: `translations/autoresponder.{locale}.yaml` holds all sentences
+  `data_file` entries (`--data-file` on the CLI) via `AutoReplyRenderer::renderMessage()`, which injects
+  `startDate`/`endDate` from the real schedule. The reply `subject` ('' = Plesk default `Re: <request_subject>`)
+  and `format` (`plain`/`html` → `text/plain`/`text/html`) ride along in the same rows; the gateway emits
+  `content_type` BEFORE `text` (XSD sequence — see `docs/plesk-xml-api-notes.md`).
+  Multi-language text is catalog-driven: `resources/translations/autoresponder.{locale}.yaml` holds all sentences
   (`template.translations_path`; 'de' is the fallback locale - missing entries degrade to German, never a
   raw key, so renders cannot fail), templates loop over the discovered `languages` and resolve per-language
-  data values as `key[lang] ?? key.de ?? key`. `template.logo_url` feeds the HTML templates; a data-file `logo_url`
-  overrides it per campaign.
+  data values as `key[lang] ?? key.de ?? key`. Both templates render ONE language per invocation via the
+  `language` context variable (`--language` / `template.language` / per-entry `language`). MJML output is
+  auto-converted to HTML by `MjmlConverter` (the `mjml` CLI binary via symfony/process; `MJML_BINARY_PATH`
+  overrides the PATH lookup - spatie's node-module import cannot work inside the phar). `template.logo_url`
+  feeds the HTML templates; a data-file `logo_url` overrides it per campaign.
 - **Batching.** The Plesk API has no cross-domain mail listing, so live list commands batch N queries into one HTTP POST via `PleskMailGateway::*Bulk()` + `Client::multiRequest` → `mail:address:list` = 2 round trips, group/autoresponder/export = 3.
 
 ## Command structure
@@ -64,7 +69,7 @@ Uniform verbs per namespace: `list` (enumerate), `get <target>` (single resource
 - `src/Command/Mail/Group/` — `mail:group:list|get|set|add|remove` (forwarding recipients; `set` takes `--recipients` and/or `--rule`, else the configured `mail.group` entry; global `--write-config` persists the definition into the config file via `ConfigFile::upsertMailGroup()`)
 - `src/Command/Mail/Alias/` — `mail:alias:list|get|set|add|remove` (additional mailbox addresses; modeled on Group)
 - `src/Command/Mail/Address/` — `mail:address:list|get|set|remove|password|rename|export` (mailboxes; `set` falls back to `mail.defaults` quota/antivirus when the flags are missing)
-- `src/Command/Mail/Autoresponder/` — `mail:autoresponder:list|get|set` (auto-replies; `set --enabled=false` disables; no options falls back to the configured `mail.autoresponder` entry; `--write-config` persists/removes it)
+- `src/Command/Mail/Autoresponder/` — `mail:autoresponder:list|get|set` (auto-replies; `set --enabled=false` disables; `--template` overrides the render template per invocation, `--subject`/`--format plain|html` set the reply subject and content type; no options falls back to the configured `mail.autoresponder` entry; `--write-config` persists/removes it)
 - `src/Command/Domain/` — `domain:list|get|set|add|remove|traffic:get|traffic:set|descriptor` (webspaces/sites; `set` gains `--status=enabled|disabled` via gen_setup 0/16 and `--type=virtual-host|forwarding|frame-forwarding|none` + `--dest-url=`/`--property=` via `PleskMailGateway::setSiteType()` — pending live validation; `add` maps `--type` to htype vrt_hst/std_fwd/frm_fwd/none)
 - `src/Command/Server/` — `server:info` (server/get gen_info+stat+updates); `server:session:list|get|terminate` (session operator; get = list filtered client-side); `server:admin` (server/get admin); `server:service:status|start|stop|restart` (services_state read + `srv_man`; special verbs are deliberate here — lifecycle ops do not map onto list/get/set); `server:ip:list|get|add|set|remove`
   (`<ip>` operator; get = list filtered client-side); `server:components:list|install` (server/get components read; install uses the docs-only `updater/install-component` shape — NOT in the 1.6.9.1 schema, validate before relying on it); `server:extension:list|get|install|uninstall|call` (`<extension>` operator; git ops documented: get/create/update/remove/deploy/fetch); `server:ref [id]` +

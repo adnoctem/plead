@@ -18,13 +18,11 @@ final class AutoReplyDefinitionTest extends TestCase
     {
         $definition = AutoReplyDefinition::fromConfigEntry([
             'address' => 'User@Company.com',
-            'message_file' => '/tmp/message.txt',
             'start_date' => '2026-08-20T08:00:00+02:00',
             'end_date' => '2026-08-30T18:00:00+02:00',
         ]);
 
         self::assertSame('user@company.com', $definition->email());
-        self::assertSame('/tmp/message.txt', $definition->messageFile());
         self::assertSame('2026-08-20T08:00:00+02:00', $definition->startDate());
         self::assertSame('2026-08-30T18:00:00+02:00', $definition->endDate());
     }
@@ -35,7 +33,6 @@ final class AutoReplyDefinitionTest extends TestCase
         // The instant is preserved; the offset normalizes to UTC.
         $definition = AutoReplyDefinition::fromConfigEntry([
             'address' => 'user@company.com',
-            'message_file' => '/tmp/message.txt',
             'start_date' => new \DateTimeImmutable('2099-01-01T08:00:00+02:00')->getTimestamp(),
             'end_date' => new \DateTimeImmutable('2099-01-05T18:00:00+02:00')->getTimestamp(),
         ]);
@@ -47,7 +44,6 @@ final class AutoReplyDefinitionTest extends TestCase
     {
         $definition = AutoReplyDefinition::fromConfigEntry([
             'address' => 'user@company.com',
-            'message_file' => '/tmp/message.txt',
             'end_date' => '2026-08-30 18:00',
         ]);
 
@@ -61,20 +57,62 @@ final class AutoReplyDefinitionTest extends TestCase
 
         AutoReplyDefinition::fromConfigEntry([
             'address' => 'user',
-            'message_file' => '/tmp/message.txt',
             'end_date' => '2026-08-30 18:00',
         ]);
     }
 
-    public function testMessageFileRequired(): void
+    public function testSubjectExposedWhenSet(): void
+    {
+        $definition = AutoReplyDefinition::fromConfigEntry([
+            'address' => 'user@company.com',
+            'end_date' => '2026-08-30 18:00',
+            'subject' => 'Automatische Antwort',
+        ]);
+        self::assertSame('Automatische Antwort', $definition->subject());
+
+        $definition = AutoReplyDefinition::fromConfigEntry([
+            'address' => 'user@company.com',
+            'end_date' => '2026-08-30 18:00',
+        ]);
+        self::assertNull($definition->subject());
+    }
+
+    public function testFormatExposedWhenSet(): void
+    {
+        $definition = AutoReplyDefinition::fromConfigEntry([
+            'address' => 'user@company.com',
+            'end_date' => '2026-08-30 18:00',
+            'format' => 'html',
+        ]);
+        self::assertSame('html', $definition->format());
+    }
+
+    public function testInvalidFormatRejected(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('message_file');
+        $this->expectExceptionMessage('format');
 
         AutoReplyDefinition::fromConfigEntry([
             'address' => 'user@company.com',
             'end_date' => '2026-08-30 18:00',
+            'format' => 'markdown',
         ]);
+    }
+
+    public function testLanguageExposedWhenSet(): void
+    {
+        $definition = AutoReplyDefinition::fromConfigEntry([
+            'address' => 'user@company.com',
+            'end_date' => '2026-08-30 18:00',
+            'language' => 'en',
+        ]);
+        self::assertSame('en', $definition->language());
+
+        $definition = AutoReplyDefinition::fromConfigEntry([
+            'address' => 'user@company.com',
+            'end_date' => '2026-08-30 18:00',
+        ]);
+        self::assertNull($definition->language());
     }
 
     public function testEndDateRequired(): void
@@ -83,7 +121,6 @@ final class AutoReplyDefinitionTest extends TestCase
 
         AutoReplyDefinition::fromConfigEntry([
             'address' => 'user@company.com',
-            'message_file' => '/tmp/message.txt',
         ]);
     }
 
@@ -94,7 +131,6 @@ final class AutoReplyDefinitionTest extends TestCase
 
         AutoReplyDefinition::fromConfigEntry([
             'address' => 'user@company.com',
-            'message_file' => '/tmp/message.txt',
             'start_date' => '2026-08-30 18:00',
             'end_date' => '2026-08-20 08:00',
         ]);
@@ -108,7 +144,6 @@ final class AutoReplyDefinitionTest extends TestCase
         try {
             $definition = AutoReplyDefinition::fromConfigEntry([
                 'address' => 'user@company.com',
-                'message_file' => '/tmp/message.txt',
                 'data_file' => $dataFile,
                 'end_date' => '2026-08-30 18:00',
             ]);
@@ -126,7 +161,6 @@ final class AutoReplyDefinitionTest extends TestCase
 
         AutoReplyDefinition::fromConfigEntry([
             'address' => 'user@company.com',
-            'message_file' => '/tmp/message.txt',
             'data_file' => '/nonexistent/data.json',
             'end_date' => '2026-08-30 18:00',
         ]);
@@ -136,7 +170,6 @@ final class AutoReplyDefinitionTest extends TestCase
     {
         $definition = AutoReplyDefinition::fromConfigEntry([
             'address' => 'user@company.com',
-            'message_file' => '/tmp/message.txt',
             'end_date' => '2026-08-30 18:00',
             'inclusive' => true,
         ]);
@@ -144,7 +177,6 @@ final class AutoReplyDefinitionTest extends TestCase
 
         $definition = AutoReplyDefinition::fromConfigEntry([
             'address' => 'user@company.com',
-            'message_file' => '/tmp/message.txt',
             'end_date' => '2026-08-30 18:00',
             'inclusive' => false,
         ]);
@@ -155,7 +187,6 @@ final class AutoReplyDefinitionTest extends TestCase
     {
         $definition = AutoReplyDefinition::fromConfigEntry([
             'address' => 'user@company.com',
-            'message_file' => '/tmp/message.txt',
             'end_date' => '2026-08-30 18:00',
         ]);
         self::assertNull($definition->inclusive());

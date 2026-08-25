@@ -61,23 +61,23 @@ pre-commit install
 
 ## 🗂️ Repository Layout
 
-| Path                  | Purpose                                                                                                                                 |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `bin/plead`           | CLI entrypoint                                                                                                                          |
-| `src/`                | Application code (PSR-4, `App\` namespace)                                                                                              |
-| `src/Command/`        | Symfony Console commands (`mail:group:*`, `mail:address:*`, `mail:autoresponder:*`, `domain:*`, `config:*`, `db:*`)                     |
-| `src/Command/Mail/`   | `AbstractMailCommand` (shared `--local` option), `AbstractWatchCommand` (spinner loop)                                                  |
-| `src/Reconciler/`     | Convergence logic shared by one-shot commands and watchers                                                                              |
-| `src/Gateway/`        | Thin wrapper over the Plesk XML-RPC client (the only code that talks to Plesk)                                                          |
-| `src/Repository/`     | SQLite repositories (desired state + audit trail)                                                                                       |
-| `src/Util/`           | `Spinner`, `InteractiveProcessLauncher`, `DateNormalizer`                                                                               |
-| `src/Logging/`        | Monolog formatter                                                                                                                       |
-| `src/Config/`         | Config discovery/merge (YAML/JSON), path providers per OS                                                                               |
-| `config/`             | SQLite schema                                                                                                                           |
-| `templates/`          | Twig templates (auto-reply message rendering, autoescape off)                                                                           |
-| `tests/`              | PHPUnit tests (mirrors `src/`)                                                                                                          |
-| `docs/`               | `AGENTS.md` (agent instructions, symlinked to repo root), `plesk-xml-api-notes.md`, `CONTRIBUTING.md`, `ACKNOWLEDGEMENTS.md`, `TODO.md` |
-| `secrets/`            | **Gitignored.** Project-internal planning documents. Never commit anything from this directory.                                         |
+| Path                | Purpose                                                                                                                                 |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `bin/plead`         | CLI entrypoint                                                                                                                          |
+| `src/`              | Application code (PSR-4, `App\` namespace)                                                                                              |
+| `src/Command/`      | Symfony Console commands (`mail:group:*`, `mail:address:*`, `mail:autoresponder:*`, `domain:*`, `config:*`, `db:*`)                     |
+| `src/Command/Mail/` | `AbstractMailCommand` (shared `--local` option), `AbstractWatchCommand` (spinner loop)                                                  |
+| `src/Reconciler/`   | Convergence logic shared by one-shot commands and watchers                                                                              |
+| `src/Gateway/`      | Thin wrapper over the Plesk XML-RPC client (the only code that talks to Plesk)                                                          |
+| `src/Repository/`   | SQLite repositories (desired state + audit trail)                                                                                       |
+| `src/Util/`         | `Spinner`, `InteractiveProcessLauncher`, `DateNormalizer`                                                                               |
+| `src/Logging/`      | Monolog formatter                                                                                                                       |
+| `src/Config/`       | Config discovery/merge (YAML/JSON), path providers per OS                                                                               |
+| `config/`           | SQLite schema                                                                                                                           |
+| `resources/`        | Twig templates (`templates/`) and translation catalogs (`translations/`)                                                                |
+| `tests/`            | PHPUnit tests (mirrors `src/`)                                                                                                          |
+| `docs/`             | `AGENTS.md` (agent instructions, symlinked to repo root), `plesk-xml-api-notes.md`, `CONTRIBUTING.md`, `ACKNOWLEDGEMENTS.md`, `TODO.md` |
+| `secrets/`          | **Gitignored.** Project-internal planning documents. Never commit anything from this directory.                                         |
 
 ## ℹ️ Commit Message Format
 
@@ -137,7 +137,7 @@ Must be one of the following:
 The following is the list of supported scopes:
 
 - `src` — Application code under `src/` and the `bin/plead` entrypoint
-- `templates` — Changes to Twig templates (`templates/`)
+- `templates` — Changes to Twig templates or translation catalogs (`resources/`)
 - `config` — Changes to configuration files (`.php-cs-fixer.dist.php`, `.pre-commit-config.yaml`, `.releaserc`, `config/`, etc.)
 - `docs` — Documentation changes (`README.md`, `docs/`)
 

@@ -1,12 +1,14 @@
-{# All sentences come from translations/autoresponder.{locale}.yaml; this
-   template only holds structure. It loops over the languages found in the
-   catalog directory; 'de' is the fallback locale for missing entries.
+{# All sentences come from resources/translations/autoresponder.{locale}.yaml; this
+   template only holds structure. Like the MJML template it renders ONE
+   language per invocation, chosen via the 'language' context variable
+   (--language / template.language / a per-entry language / the first
+   catalog language); 'de' is the fallback locale for missing entries.
    Data values that differ per language use locale maps resolved as
    key[lang] ?? key.de ?? key (e.g. email: {de: ..., en: ...}); a missing
    locale falls back to the German value, scalars to themselves.
    Note: Twig consumes one newline after every {% tag %} - keep two blank
    source lines where the message should show a blank line. #}
-{% for lang in languages %}
+{% set lang = language ?? languages|first %}
 {% set fmt = 'date_format'|trans({}, 'autoresponder', lang) %}
 {% set vars = {
     '%start%': startDate|date(fmt),
@@ -26,8 +28,3 @@
 {{ 'regards'|trans(vars, 'autoresponder', lang) }}
 
 {{ firstname }} {{ surname }}
-
-{% if not loop.last %}---{% endif %}
-
-
-{% endfor %}

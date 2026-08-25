@@ -1,28 +1,14 @@
 {
-    "main": "bin/plead",
-    "output": "dist/plead.phar",
-    "directories": [
-        "src",
-        "config",
-        "templates",
-        "translations"
-    ],
-    "files": [
-        "LICENSE"
-    ],
-    "blacklist": [
-        ".git",
-        ".github",
-        "docs",
-        "tests",
-        "secrets",
-        "docker"
-    ],
-    "compression": "GZ",
-    "force-autodiscovery": true,
-    "git-version": "git-version",
-    "banner": [
-        "plead - a CLI for managing Plesk mail resources",
-        "https://github.com/adnoctem/plead (MIT)"
-    ]
+  "main": "bin/plead",
+  "output": "dist/plead.phar",
+  "directories": ["src", "config", "resources/templates", "resources/translations"],
+  "files": ["LICENSE"],
+  "blacklist": [".git", ".github", "docs", "tests", "secrets", "docker"],
+  "compression": "GZ",
+  "force-autodiscovery": true,
+  "git-version": "git-version",
+  "banner": [
+    "plead - a CLI for managing Plesk mail resources",
+    "https://github.com/adnoctem/plead (MIT)"
+  ]
 }

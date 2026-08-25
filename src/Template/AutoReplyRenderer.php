@@ -14,7 +14,7 @@ use Twig\Loader\FilesystemLoader;
 
 /**
  * Renders autoresponder templates. The sentences live in
- * translations/autoresponder.{locale}.yaml catalogs (the template is pure
+ * resources/translations/autoresponder.{locale}.yaml catalogs (the template is pure
  * structure and iterates the available languages); 'de' is the fallback
  * locale, so a missing entry never leaks a raw key and never fails a render.
  */
@@ -25,16 +25,21 @@ final class AutoReplyRenderer
     /** @var list<string> locales with a catalog, in glob (alphabetical) order */
     private readonly array $languages;
 
+    private readonly MjmlConverter $mjmlConverter;
+
     /**
-     * @param null|string $translationsPath directory with autoresponder.{locale}.yaml
-     *                                      catalogs; null or missing = no languages
-     * @param null|string $logoUrl          per-install logo (template.logo_url); a
-     *                                      data-file logo_url may override it
+     * @param null|string        $translationsPath directory with autoresponder.{locale}.yaml
+     *                                             catalogs; null or missing = no languages
+     * @param null|string        $logoUrl          per-install logo (template.logo_url); a
+     *                                             data-file logo_url may override it
+     * @param null|MjmlConverter $mjmlConverter    converter for templates that render MJML
+     *                                             markup (detected by the <mjml> output prefix)
      */
     public function __construct(
         private readonly string $templatePath,
         ?string $translationsPath = null,
         private readonly ?string $logoUrl = null,
+        ?MjmlConverter $mjmlConverter = null,
     ) {
         $this->twig = new Environment(
             new FilesystemLoader(dirname($templatePath)),
@@ -46,6 +51,7 @@ final class AutoReplyRenderer
         $this->twig->addExtension(new TranslationExtension($this->buildTranslator($translationsPath)));
 
         $this->languages = $this->discoverLanguages($translationsPath);
+        $this->mjmlConverter = $mjmlConverter ?? new MjmlConverter();
     }
 
     /** @return list<string> the locales with a translation catalog */
@@ -61,30 +67,36 @@ final class AutoReplyRenderer
     }
 
     /**
-     * Render an auto-reply message from its message file, optionally enriched
-     * with template data from a JSON/YAML data file. The message file is
-     * rendered as an inline Twig template with the same context (so its
-     * {{ firstname }}-style placeholders resolve too), then handed to the
-     * configured template as the 'message' variable. The scheduling dates,
-     * the inclusive flag and the language list are injected automatically
-     * (CLI/configuration is authoritative over the data file); per-language
-     * data values use locale maps resolved as key[lang] ?? key. The logo URL
-     * is config-backed but a data-file value may override it.
+     * Render an auto-reply message, enriched with template data from a
+     * JSON/YAML data file. The scheduling dates, the inclusive flag and the
+     * language list are injected automatically (CLI/configuration is
+     * authoritative over the data file); per-language data values use locale
+     * maps resolved as key[lang] ?? key. The logo URL is config-backed but a
+     * data-file value may override it.
+     *
+     * @param null|string $language the render language (e.g. 'de'); null =
+     *                              first catalog language. The txt template
+     *                              ignores it and renders every language.
      */
     public function renderMessage(
-        string $messageFile,
         ?string $dataFile,
         ?string $startDate,
         ?string $endDate,
         ?bool $inclusive = null,
+        ?string $language = null,
     ): string {
-        if (!is_file($messageFile) || !is_readable($messageFile)) {
-            throw new \RuntimeException(sprintf('Cannot read autoresponder message file: %s', $messageFile));
+        if (null !== $language && !in_array($language, $this->languages, true)) {
+            throw new \RuntimeException(sprintf(
+                'Unknown autoresponder language "%s". Available: %s',
+                $language,
+                implode(', ', $this->languages),
+            ));
         }
 
         $context = [
             'date' => new \DateTimeImmutable(),
             'languages' => $this->languages,
+            'language' => $language ?? ($this->languages[0] ?? null),
         ];
         if (null !== $startDate) {
             $context['startDate'] = $startDate;
@@ -106,19 +118,27 @@ final class AutoReplyRenderer
             $context['logo_url'] = $this->logoUrl;
         }
 
-        $context['message'] = $this->twig->createTemplate((string) file_get_contents($messageFile))->render($context);
-
         $message = $this->render($context);
 
         // The shipped templates render their sections from the catalogs; an
         // empty render without any catalog would silently store an empty
-        // auto-reply, so surface it loudly instead. Custom templates that
-        // render content on their own (e.g. {{ message }}) are unaffected.
+        // auto-reply, so surface it loudly instead.
         if ('' === $message && [] === $this->languages) {
             throw new \RuntimeException(
                 'No autoresponder translation catalogs found - the template sentences come from '
-                .'translations/autoresponder.{locale}.yaml (see template.translations_path).',
+                .'resources/translations/autoresponder.{locale}.yaml (see template.translations_path).',
             );
+        }
+
+        // Templates that render MJML markup (e.g. the MJML autoresponder) are
+        // converted to the final HTML here, so the stored message is ready
+        // for Plesk; a missing mjml binary surfaces as a clear error.
+        if (str_starts_with(ltrim($message), '<mjml')) {
+            try {
+                $message = $this->mjmlConverter->convert($message);
+            } catch (\Throwable $e) {
+                throw new \RuntimeException(sprintf('Unable to convert the MJML template to HTML: %s', $e->getMessage()), 0, $e);
+            }
         }
 
         return $message;

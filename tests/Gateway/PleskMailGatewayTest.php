@@ -125,6 +125,31 @@ final class PleskMailGatewayTest extends TestCase
         self::assertStringNotContainsString('charset', $packet);
     }
 
+    public function testSetAutoresponderBuildsPacketWithSubjectAndContentTypeInDocsOrder(): void
+    {
+        $this->gateway->setAutoresponder(
+            'user@company.com',
+            'Probe message',
+            '2026-08-20T09:00:00+02:00',
+            'Automatische Antwort',
+            'text/html',
+        );
+
+        $packet = $this->client->requests[1];
+        self::assertStringContainsString('<autoresponder><enabled>true</enabled><subject>Automatische Antwort</subject>', $packet);
+        // Element order matters (XSD sequence): content_type must precede text.
+        self::assertStringContainsString('<content_type>text/html</content_type><text>Probe message</text>', $packet);
+        self::assertStringContainsString('<end_date>2026-08-20</end_date>', $packet);
+    }
+
+    public function testSetAutoresponderDryRunLogsSubjectAndContentType(): void
+    {
+        $gateway = new PleskMailGateway($this->client, true, new Logger('test'));
+        $gateway->setAutoresponder('user@company.com', 'msg', '2026-08-20T09:00:00+02:00', 'Subject', 'text/plain');
+
+        self::assertCount(0, $this->client->requests);
+    }
+
     public function testDisableAutoresponderBuildsPacket(): void
     {
         $this->gateway->disableAutoresponder('user@company.com');

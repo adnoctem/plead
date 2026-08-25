@@ -8,18 +8,20 @@ use App\Util\DateNormalizer;
 
 /**
  * Desired auto-reply of one address, from a mail.autoresponder config entry:
- * message file (rendered as a Twig template), optional JSON/YAML data file
- * for template variables, optional start date and a required end date.
+ * optional JSON/YAML data file for template variables, optional start date,
+ * subject and format, and a required end date.
  */
 final class AutoReplyDefinition
 {
     private function __construct(
         private readonly string $email,
-        private readonly string $messageFile,
         private readonly ?string $dataFile,
         private readonly ?string $startDate,
         private readonly string $endDate,
         private readonly ?bool $inclusive,
+        private readonly ?string $subject,
+        private readonly ?string $format,
+        private readonly ?string $language,
     ) {}
 
     /**
@@ -33,11 +35,6 @@ final class AutoReplyDefinition
                 'Autoresponder address "%s" must be a full email address.',
                 (string) ($entry['address'] ?? ''),
             ));
-        }
-
-        $messageFile = trim((string) ($entry['message_file'] ?? ''));
-        if ('' === $messageFile) {
-            throw new \InvalidArgumentException(sprintf('Autoresponder for "%s" needs a message_file.', $email));
         }
 
         $dataFile = trim((string) ($entry['data_file'] ?? ''));
@@ -61,24 +58,33 @@ final class AutoReplyDefinition
             ));
         }
 
+        $subject = trim((string) ($entry['subject'] ?? ''));
+        $format = trim((string) ($entry['format'] ?? ''));
+        if ('' !== $format && !in_array($format, ['plain', 'html'], true)) {
+            throw new \InvalidArgumentException(sprintf(
+                'Autoresponder format for "%s" must be "plain" or "html", got "%s".',
+                $email,
+                $format,
+            ));
+        }
+
+        $language = trim((string) ($entry['language'] ?? ''));
+
         return new self(
             $email,
-            $messageFile,
             $dataFile,
             $startDate,
             $endDate,
             isset($entry['inclusive']) ? (bool) $entry['inclusive'] : null,
+            '' === $subject ? null : $subject,
+            '' === $format ? null : $format,
+            '' === $language ? null : $language,
         );
     }
 
     public function email(): string
     {
         return $this->email;
-    }
-
-    public function messageFile(): string
-    {
-        return $this->messageFile;
     }
 
     /** @return null|string JSON/YAML file with template data, null = none */
@@ -102,5 +108,23 @@ final class AutoReplyDefinition
     public function inclusive(): ?bool
     {
         return $this->inclusive;
+    }
+
+    /** @return null|string reply subject, null = Plesk default (Re: <request_subject>) */
+    public function subject(): ?string
+    {
+        return $this->subject;
+    }
+
+    /** @return null|string 'plain'|'html', null = server default */
+    public function format(): ?string
+    {
+        return $this->format;
+    }
+
+    /** @return null|string render language (catalog locale), null = first catalog language */
+    public function language(): ?string
+    {
+        return $this->language;
     }
 }

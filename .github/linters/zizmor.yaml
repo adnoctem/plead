@@ -1,5 +1,5 @@
 rules:
-    template-injection:
-        ignore:
-            - superlint.yaml
-            - stale.yaml
+  template-injection:
+    ignore:
+      - superlint.yaml
+      - stale.yaml

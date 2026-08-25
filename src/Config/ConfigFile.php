@@ -88,7 +88,7 @@ final class ConfigFile
      * Add or replace a mail.autoresponder entry in the general mail section of
      * the config file, matched by address.
      *
-     * @param array<string, mixed> $entry validated entry: address + message_file + dates
+     * @param array<string, mixed> $entry validated mail.autoresponder entry
      */
     public static function upsertMailAutoresponder(string $target, string $email, array $entry): void
     {

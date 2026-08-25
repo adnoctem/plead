@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS auto_replies (
   message TEXT NOT NULL,          -- rendered template output, stored verbatim — not a file path
   start_date TEXT NOT NULL,       -- ISO 8601 with UTC offset, e.g. 2026-08-19T08:00:00+02:00
   end_date TEXT NOT NULL,
+  subject TEXT NOT NULL DEFAULT '',   -- reply subject; '' = Plesk default (Re: <request_subject>)
+  format TEXT NOT NULL DEFAULT '',    -- '' | 'plain' | 'html' (autoresponder content type)
   status TEXT NOT NULL DEFAULT 'scheduled',  -- 'scheduled' | 'disabled'; rows are never deleted (audit trail)
   reconciled INTEGER NOT NULL DEFAULT 0,     -- 0 = intent recorded but not yet confirmed on Plesk
   reconciled_at TEXT,             -- when the desired state was last confirmed on Plesk
