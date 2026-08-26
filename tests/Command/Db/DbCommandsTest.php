@@ -43,7 +43,6 @@ final class DbCommandsTest extends TestCase
     {
         TestEnv::reset();
         putenv('PATH='.$this->originalPath);
-        putenv('PLEAD_SQLITE3_MARKER');
     }
 
     public function testPathShowsDatabaseLocation(): void
@@ -69,8 +68,6 @@ final class DbCommandsTest extends TestCase
 
     public function testQueryOpensSqliteShell(): void
     {
-        $marker = dirname($this->fakeBin).'/called.txt';
-        putenv('PLEAD_SQLITE3_MARKER='.$marker);
         $this->installFakeSqlite3();
         $this->prependFakeBinToPath();
 
@@ -78,7 +75,9 @@ final class DbCommandsTest extends TestCase
 
         self::assertSame(0, $this->tester->getStatusCode(), $this->tester->getDisplay());
         self::assertStringContainsString('Opening '.$this->databasePath().' with sqlite3', $this->tester->getDisplay());
-        self::assertSame($this->databasePath(), trim((string) file_get_contents($marker)));
+        // The fake stamps the database file with the path it was given, so
+        // the file content proves the shell opened exactly this database.
+        self::assertStringContainsString($this->databasePath(), (string) file_get_contents($this->databasePath()));
     }
 
     public function testQueryFailsWithoutSqlite3(): void

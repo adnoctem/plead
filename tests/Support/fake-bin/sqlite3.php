@@ -4,16 +4,15 @@
 declare(strict_types=1);
 
 // Test double for the sqlite3 CLI: opening a database file creates it (like
-// the real shell does). The path passed as $argv[1] can additionally be
-// recorded for assertions via the PLEAD_SQLITE3_MARKER environment variable.
+// the real shell does) and stamps the path it received into the file, so
+// tests can verify that the right database path reached the binary.
 
 $database = (string) ($argv[1] ?? '');
 
-if ('' !== $database) {
-    file_put_contents($database, '');
+if ('' === $database) {
+    fwrite(STDERR, "sqlite3: no database file given\n");
+
+    exit(2);
 }
 
-$marker = getenv('PLEAD_SQLITE3_MARKER');
-if (false !== $marker && '' !== $marker) {
-    file_put_contents($marker, $database);
-}
+file_put_contents($database, sprintf("sqlite3 fake: opened %s\n", $database), FILE_APPEND);

@@ -19,7 +19,7 @@ final class InteractiveProcessLauncher
         // path first.
         if (str_contains($program, '/') || str_contains($program, '\\')) {
             foreach ($this->executableCandidates($program) as $candidate) {
-                if (is_executable($candidate)) {
+                if ($this->isRunnable($candidate)) {
                     return $candidate;
                 }
             }
@@ -30,7 +30,7 @@ final class InteractiveProcessLauncher
         foreach (explode(PATH_SEPARATOR, (string) getenv('PATH')) as $dir) {
             foreach ($this->executableCandidates($program) as $name) {
                 $candidate = rtrim($dir, '/\\').DIRECTORY_SEPARATOR.$name;
-                if (is_file($candidate) && is_executable($candidate)) {
+                if ($this->isRunnable($candidate)) {
                     return $candidate;
                 }
             }
@@ -89,6 +89,20 @@ final class InteractiveProcessLauncher
         }
 
         return [$program, $program.'.exe', $program.'.com', $program.'.bat', $program.'.cmd'];
+    }
+
+    /**
+     * Windows' is_executable() resolves via GetBinaryType(), which only
+     * accepts real PE binaries - .cmd/.bat files (the executable-script
+     * equivalent) fail even though cmd.exe can run them. Accept the
+     * executable-script extensions explicitly so editors and CLIs with a
+     * batch shim resolve on Windows.
+     */
+    private function isRunnable(string $path): bool
+    {
+        return is_executable($path)
+            || ('Windows' === PHP_OS_FAMILY && is_file($path)
+                && preg_match('/\.(exe|com|bat|cmd)$/i', $path));
     }
 
     /** @param list<string> $argv */
