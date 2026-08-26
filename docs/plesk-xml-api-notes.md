@@ -39,7 +39,7 @@ Empirically-verified facts about the Plesk XML API (tested against **Plesk Obsid
 ## webspace operator
 
 - Enumeration and reads as above; `domain:get` requests `gen_info + hosting + limits + prefs` datasets.
-- Update shape (from the plesk library's `Webspace::setProperties`, validated live): `<webspace><set><filter><name>…</name></filter><values><gen_setup><description>…</description></gen_setup></values></set></webspace>`.
+- Update shape (from the Plesk library's `Webspace::setProperties`, validated live): `<webspace><set><filter><name>…</name></filter><values><gen_setup><description>…</description></gen_setup></values></set></webspace>`.
 - Status convention: `0` = enabled, `16` = disabled (via `gen_setup`).
 
 ## Batching (`Client::multiRequest`)
