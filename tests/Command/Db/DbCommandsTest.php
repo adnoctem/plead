@@ -76,7 +76,7 @@ final class DbCommandsTest extends TestCase
 
         $this->tester->run(['command' => 'db:query']);
 
-        self::assertSame(0, $this->tester->getStatusCode());
+        self::assertSame(0, $this->tester->getStatusCode(), $this->tester->getDisplay());
         self::assertStringContainsString('Opening '.$this->databasePath().' with sqlite3', $this->tester->getDisplay());
         self::assertSame($this->databasePath(), trim((string) file_get_contents($marker)));
     }

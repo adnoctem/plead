@@ -11,6 +11,7 @@
     "ext-iconv": "*",
     "ext-pdo_sqlite": "*",
     "ext-simplexml": "*",
+    "ext-pcntl": "*",
     "monolog/monolog": "^3.10",
     "phpseclib/phpseclib": "^3.0",
     "plesk/api-php-lib": "^2.2",

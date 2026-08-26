@@ -137,16 +137,22 @@ final class InteractiveProcessLauncher
     }
 
     /**
-     * Shell-mediated spawn without pcntl. On Windows, .cmd/.bat files (the
-     * executable-script equivalent) can only be launched through cmd.exe -
-     * CreateProcess alone resolves bare names to .exe files only. The extra
-     * quote pair around the whole command line keeps cmd /c from stripping
-     * the argument quotes (see `cmd /?` quote rules).
+     * Shell-mediated spawn without pcntl. The program is resolved to its
+     * absolute path first so the shell cannot fail a PATH lookup, and on
+     * Windows the whole command runs through cmd.exe: .cmd/.bat files (the
+     * executable-script equivalent) can only be launched that way. The extra
+     * quote pair around the command line keeps cmd /c from stripping the
+     * argument quotes (see `cmd /?` quote rules).
      *
      * @param list<string> $argv
      */
     private function passthruSpawn(array $argv): int
     {
+        $binary = $this->resolve($argv[0]);
+        if (null !== $binary) {
+            $argv[0] = $binary;
+        }
+
         $command = implode(' ', array_map('escapeshellarg', $argv));
         if ('Windows' === PHP_OS_FAMILY) {
             $command = 'cmd /c "'.$command.'"';

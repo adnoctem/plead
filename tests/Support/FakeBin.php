@@ -26,7 +26,9 @@ final class FakeBin
         $wrapper = $target.'.cmd';
         file_put_contents(
             $wrapper,
-            '@"'.PHP_BINARY.'" "'.str_replace('\\', '/', $fixture).'" %*',
+            "@echo off\r\n"
+            .'"'.PHP_BINARY.'" "'.str_replace('\\', '/', $fixture).'" %*'."\r\n"
+            .'exit /b %errorlevel%'."\r\n",
         );
 
         return $wrapper;
