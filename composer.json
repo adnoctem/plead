@@ -37,15 +37,19 @@
       "@lint:phpstan",
       "@lint:php-cs-fixer"
     ],
+    "image": [
+      "@build:image"
+    ],
     "build": [
-      "@build:docker",
+      "@build:images",
       "@build:phar",
       "@build:checksums"
     ],
     "tests:phpunit": "vendor/bin/phpunit",
-    "lint:phpstan": "vendor/bin/phpstan analyse",
+    "lint:phpstan": "vendor/bin/phpstan analyze",
     "lint:php-cs-fixer": "vendor/bin/php-cs-fixer fix --dry-run --diff",
-    "build:docker": "docker buildx bake -f docker/docker-bake.hcl",
+    "build:image": "docker buildx build -t adnoctem/plead:latest -f docker/Dockerfile .",
+    "build:images": "docker buildx bake -f docker/docker-bake.hcl",
     "build:phar": "box compile",
     "build:checksums": "sha256sum dist/* > dist/CHECKSUMS_SHA256.txt"
   },
