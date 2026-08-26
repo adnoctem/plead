@@ -1,0 +1,19 @@
+{
+  "filters": {
+    "comments": true
+  },
+  "rules": {
+    "terminology": {
+      "defaultTerms": false,
+      "terms": [
+        ["\\bAPI\\b", "API"],
+        ["\\bCLI\\b", "CLI"],
+        ["\\bJSON\\b", "JSON"],
+        ["\\bMJML\\b", "MJML"],
+        ["\\bPlesk\\b", "Plesk"],
+        ["\\bSQLite\\b", "SQLite"],
+        ["\\bXML\\b", "XML"]
+      ]
+    }
+  }
+}

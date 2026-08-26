@@ -95,6 +95,9 @@ Full detail: `docs/plesk-xml-api-notes.md`. The short version an agent must not 
 - `tests/Gateway/PleskMailGatewayTest.php` — `FakeClient` (extends `PleskX\Api\Client`) asserts packet shapes and canned responses at the XML level. Its `multiRequest()` override must return plain `SimpleXMLElement` (mirroring the lib).
 - `tests/Support/RecordingGateway.php` — in-memory fake used by command tests (no XML, no network). Command tests build a fake `PathProviderInterface` + `RuntimeContext` and run `CommandTester`.
 - **Never hit the real Plesk server from tests.** Isolate via `HOME`/`XDG_*`/`PLEAD_*` env vars to scratch temp dirs.
+- **The suite must pass on Linux, macOS and Windows.** Tests that go through `PathProviderFactory::create()` must redirect the env vars the _current_ platform reads (`TestEnv` in `tests/Support/`; Windows reads `LOCALAPPDATA`/`APPDATA`/`PLEAD_DATA_DIR`, not `XDG_*`) and derive expected paths from the provider instead of hard-coding the Unix layout.
+  Executable test doubles (fake `editor`, `sqlite3`, `mjml` CLIs) live as committed PHP scripts in `tests/Support/fake-bin/` — never bash scripts — and are installed via `FakeBin::install()` (a `.cmd`→php wrapper on Windows).
+  Note: symfony/process children get the env from `$_ENV`/`$_SERVER`, so `putenv()` alone does not reach them; the launcher (`passthru`/`pcntl_exec`) does inherit it.
 - New repository/reconciler behavior: extend `tests/Repository/*`, `tests/Reconciler/*` (the reconcilers are the safety-critical convergence logic). Rule-engine behavior: `tests/Rule/*`.
 
 ## Live server workflow (when the user asks to verify)

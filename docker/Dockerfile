@@ -19,7 +19,7 @@ RUN apk add --no-cache \
         nodejs \
         npm \
     && rm -rf /var/cache/apk/* \
-    && npm install --global --no-audit --no-fund mjml
+    && npm install --global --no-audit --no-fund mjml@5.4.0
 
 # install `install-php-extensions` to install extensions (and composer) with all dependencies included
 # ref: https://github.com/mlocati/docker-php-extension-installer

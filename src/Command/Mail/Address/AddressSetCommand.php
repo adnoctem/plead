@@ -127,7 +127,10 @@ final class AddressSetCommand extends AbstractMailCommand
         $logId = $context->syncLogRepository()->logPending('mail_address', $email, 'set', $details);
 
         try {
-            if ([] !== $properties) {
+            // count() instead of `[] !== $properties`: the array can be empty
+            // at runtime (quota-only updates), but the inferred shape type
+            // makes a strict comparison statically always true.
+            if (count($properties) > 0) {
                 $context->gateway()->setMailboxProperties($email, $properties);
             }
 

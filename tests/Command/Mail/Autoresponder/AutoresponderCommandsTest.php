@@ -12,6 +12,7 @@ use App\Command\Mail\Autoresponder\AutoresponderSetCommand;
 use App\Config\ConfigFile;
 use App\Config\PathProvider\PathProviderInterface;
 use App\Template\MjmlConverter;
+use App\Tests\Support\FakeBin;
 use App\Tests\Support\RecordingGateway;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
@@ -81,9 +82,10 @@ final class AutoresponderCommandsTest extends TestCase
         // A pass-through "mjml" binary: wraps the input in HTML so the
         // conversion pipeline is exercised without requiring the real npm
         // binary in CI.
-        $this->fakeMjmlBinary = $this->base.'/fake-mjml';
-        file_put_contents($this->fakeMjmlBinary, "#!/bin/sh\nprintf '<!doctype html><html><body>\\n'\ncat\nprintf '\\n</body></html>'\n");
-        chmod($this->fakeMjmlBinary, 0o755);
+        $this->fakeMjmlBinary = FakeBin::install(
+            dirname(__DIR__, 3).'/Support/fake-bin/mjml.php',
+            $this->base.'/fake-mjml',
+        );
         $this->context = new RuntimeContext(
             $this->paths,
             null,

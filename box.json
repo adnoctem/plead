@@ -1,7 +1,12 @@
 {
   "main": "bin/plead",
   "output": "dist/plead.phar",
-  "directories": ["src", "config", "resources/templates", "resources/translations"],
+  "directories": [
+    "src",
+    "config",
+    "resources/templates",
+    "resources/translations"
+  ],
   "files": ["LICENSE"],
   "blacklist": [".git", ".github", "docs", "tests", "secrets", "docker"],
   "compression": "GZ",

@@ -1,0 +1,8 @@
+# configure Trivy
+# ref: https://trivy.dev/docs/guide/references/configuration/config-file/
+# The vendor/ directory contains third-party packages (e.g.
+# plesk/api-php-lib's Dockerfile) that are not owned by this repository.
+scan:
+  # Same as '--skip-dirs'
+  skip-dirs:
+    - vendor

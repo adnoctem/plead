@@ -17,14 +17,22 @@ final class InteractiveProcessLauncher
         // pcntl_exec does no PATH lookup (unlike Python's subprocess), so a
         // bare name like "nvim" or "sqlite3" must be resolved to an absolute
         // path first.
-        if (str_contains($program, '/')) {
-            return is_executable($program) ? $program : null;
+        if (str_contains($program, '/') || str_contains($program, '\\')) {
+            foreach ($this->executableCandidates($program) as $candidate) {
+                if (is_executable($candidate)) {
+                    return $candidate;
+                }
+            }
+
+            return null;
         }
 
         foreach (explode(PATH_SEPARATOR, (string) getenv('PATH')) as $dir) {
-            $candidate = rtrim($dir, '/\\').DIRECTORY_SEPARATOR.$program;
-            if (is_file($candidate) && is_executable($candidate)) {
-                return $candidate;
+            foreach ($this->executableCandidates($program) as $name) {
+                $candidate = rtrim($dir, '/\\').DIRECTORY_SEPARATOR.$name;
+                if (is_file($candidate) && is_executable($candidate)) {
+                    return $candidate;
+                }
             }
         }
 
@@ -60,6 +68,27 @@ final class InteractiveProcessLauncher
         $this->resetTerminalModes();
 
         return $exitCode;
+    }
+
+    /**
+     * Windows executables carry an extension (php.exe, sqlite3.cmd); the
+     * plain program name resolves only when the common extensions are tried.
+     *
+     * @return non-empty-list<string>
+     */
+    private function executableCandidates(string $program): array
+    {
+        if ('Windows' !== PHP_OS_FAMILY) {
+            return [$program];
+        }
+
+        foreach (['.exe', '.com', '.bat', '.cmd'] as $extension) {
+            if (str_ends_with(strtolower($program), $extension)) {
+                return [$program];
+            }
+        }
+
+        return [$program, $program.'.exe', $program.'.com', $program.'.bat', $program.'.cmd'];
     }
 
     /** @param list<string> $argv */

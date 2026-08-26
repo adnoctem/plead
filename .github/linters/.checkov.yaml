@@ -1,0 +1,8 @@
+---
+# Checkov configuration - see
+# https://www.checkov.io/2.Basics/CLI%20Command%20Reference.html
+# The vendor/ directory contains third-party packages (e.g.
+# plesk/api-php-lib's Dockerfile, phar-io's CI workflows) that are
+# not owned by this repository.
+skip-path:
+  - vendor

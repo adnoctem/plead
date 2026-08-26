@@ -39,12 +39,48 @@ repos:
       - id: typos
         exclude: (.*\.yaml|.*rc$|^CHANGELOG.md$)
 
+  - repo: https://github.com/sqlfluff/sqlfluff
+    rev: 4.3.0
+    hooks:
+      - id: sqlfluff-lint
+        args:
+          - "--dialect"
+          - "sqlite"
+  #      - id: sqlfluff-fix
+  #        args:
+  #          - "--dialect"
+  #          - "sqlite"
+
+  # ref: https://www.checkov.io/4.Integrations/pre-commit.html
+  - repo: https://github.com/bridgecrewio/checkov.git
+    rev: 3.3.13
+    hooks:
+      - id: checkov
+        args:
+          - "--config-file"
+          - ".github/linters/.checkov.yaml"
+      - id: checkov_diff
+        args:
+          - "--config-file"
+          - ".github/linters/.checkov.yaml"
+          - "-f"
+  #      - id: checkov_secrets
+  #        args:
+  #          - "--config-file"
+  #          - ".github/linters/.checkov.yaml"
+
   # Local hooks
   - repo: local
     hooks:
+      - id: trivy
+        name: Trivy
+        entry: trivy fs . --skip-dirs "vendor"
+        language: system
+        pass_filenames: false
+
       - id: phpstan
         name: PHPStan
-        entry: vendor/bin/phpstan analyse
+        entry: vendor/bin/phpstan analyze
         language: system
         pass_filenames: false
 

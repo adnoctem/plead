@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Template;
 
 use App\Template\MjmlConverter;
+use App\Tests\Support\FakeBin;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
@@ -14,30 +15,33 @@ use PHPUnit\Framework\TestCase;
 #[CoversNothing]
 final class MjmlConverterTest extends TestCase
 {
+    private string $fixtureDir;
     private string $fakeBinary;
 
     protected function setUp(): void
     {
+        $this->fixtureDir = dirname(__DIR__).'/Support/fake-bin';
         $this->fakeBinary = sys_get_temp_dir().'/plead-mjml-bin-'.bin2hex(random_bytes(4));
     }
 
     protected function tearDown(): void
     {
         @unlink($this->fakeBinary);
+        @unlink($this->fakeBinary.'.cmd');
     }
 
     public function testConvertsViaBinary(): void
     {
-        $this->makeBinary("#!/bin/sh\nprintf '<html>%s</html>' \"$(cat)\"\n");
-        $converter = new MjmlConverter($this->fakeBinary);
+        $binary = FakeBin::install($this->fixtureDir.'/mjml-plain.php', $this->fakeBinary);
+        $converter = new MjmlConverter($binary);
 
         self::assertSame('<html><mjml><mj-body/></mjml></html>', $converter->convert('<mjml><mj-body/></mjml>'));
     }
 
     public function testConversionFailureThrowsWithBinaryName(): void
     {
-        $this->makeBinary("#!/bin/sh\necho 'boom' >&2\nexit 1\n");
-        $converter = new MjmlConverter($this->fakeBinary);
+        $binary = FakeBin::install($this->fixtureDir.'/mjml-failing.php', $this->fakeBinary);
+        $converter = new MjmlConverter($binary);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('boom');
@@ -52,11 +56,5 @@ final class MjmlConverterTest extends TestCase
         $this->expectException(\RuntimeException::class);
 
         $converter->convert('<mjml><mj-body/></mjml>');
-    }
-
-    private function makeBinary(string $body): void
-    {
-        file_put_contents($this->fakeBinary, $body);
-        chmod($this->fakeBinary, 0o755);
     }
 }

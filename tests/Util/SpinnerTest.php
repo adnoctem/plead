@@ -58,7 +58,7 @@ final class SpinnerTest extends TestCase
 
         $display = $output->fetch();
 
-        self::assertSame("plain line\n", $display, 'no terminal control sequences when inactive');
+        self::assertSame('plain line'.PHP_EOL, $display, 'no terminal control sequences when inactive');
     }
 
     public function testInactiveStopIsSilent(): void

@@ -6,6 +6,7 @@ namespace App\Tests\Template;
 
 use App\Template\AutoReplyRenderer;
 use App\Template\MjmlConverter;
+use App\Tests\Support\FakeBin;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
@@ -207,9 +208,7 @@ final class AutoReplyRendererTest extends TestCase
     public function testMjmlOutputIsConvertedToHtml(): void
     {
         $this->writeCatalog('de', ['greeting' => 'Hallo']);
-        $fakeBinary = $this->base.'/fake-mjml';
-        file_put_contents($fakeBinary, "#!/bin/sh\nprintf '<!doctype html><html><body>'\ncat\nprintf '</body></html>'\n");
-        chmod($fakeBinary, 0o755);
+        $fakeBinary = FakeBin::install($this->mjmlFixture(), $this->base.'/fake-mjml');
         $templateFile = $this->base.'/mail.mjml.twig';
         file_put_contents($templateFile, '<mjml><mj-body><mj-section><mj-column><mj-text>{{ "greeting"|trans({}, "autoresponder", language) }}</mj-text></mj-column></mj-section></mj-body></mjml>');
         $renderer = new AutoReplyRenderer($templateFile, $this->catalogs, null, new MjmlConverter($fakeBinary));
@@ -224,14 +223,17 @@ final class AutoReplyRendererTest extends TestCase
     public function testNonMjmlOutputIsLeftUntouched(): void
     {
         $this->writeCatalog('de', ['greeting' => 'Hallo']);
-        $fakeBinary = $this->base.'/fake-mjml';
-        file_put_contents($fakeBinary, "#!/bin/sh\nprintf 'CONVERTED'\n");
-        chmod($fakeBinary, 0o755);
+        $fakeBinary = FakeBin::install($this->mjmlFixture(), $this->base.'/fake-mjml');
         $templateFile = $this->base.'/plain.txt.twig';
         file_put_contents($templateFile, 'Nur Text');
         $renderer = new AutoReplyRenderer($templateFile, $this->catalogs, null, new MjmlConverter($fakeBinary));
 
         self::assertSame('Nur Text', $renderer->renderMessage(null, null, null, null));
+    }
+
+    private function mjmlFixture(): string
+    {
+        return dirname(__DIR__).'/Support/fake-bin/mjml.php';
     }
 
     private function removeDir(string $dir): void

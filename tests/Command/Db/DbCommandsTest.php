@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Command\Db;
 
 use App\Application\PleadApplication;
+use App\Config\PathProvider\PathProviderInterface;
+use App\Tests\Support\FakeBin;
+use App\Tests\Support\TestEnv;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\ApplicationTester;
@@ -15,32 +18,32 @@ use Symfony\Component\Console\Tester\ApplicationTester;
 #[CoversNothing]
 final class DbCommandsTest extends TestCase
 {
-    private string $configDir;
-    private string $dataDir;
+    private PathProviderInterface $paths;
     private string $fakeBin;
+    private string $sqlite3Fixture;
+    private string $originalPath;
     private ApplicationTester $tester;
 
     protected function setUp(): void
     {
         $base = sys_get_temp_dir().'/plead-db-test-'.bin2hex(random_bytes(4));
-        $this->configDir = $base.'/config';
-        $this->dataDir = $base.'/data';
+        $this->paths = TestEnv::paths($base);
         $this->fakeBin = $base.'/bin';
         mkdir($this->fakeBin, 0o777, true);
-
-        putenv('HOME='.$base);
-        putenv('XDG_CONFIG_HOME='.$this->configDir);
-        putenv('XDG_DATA_HOME='.$this->dataDir);
+        $this->sqlite3Fixture = dirname(__DIR__, 2).'/Support/fake-bin/sqlite3.php';
+        // putenv('PATH') without a value would *remove* PATH from the process
+        // environment and break every later child process that resolves php
+        // via `env php`; capture it so tearDown can restore it instead.
+        $this->originalPath = (string) getenv('PATH');
 
         $this->tester = new ApplicationTester(new PleadApplication());
     }
 
     protected function tearDown(): void
     {
-        putenv('HOME');
-        putenv('XDG_CONFIG_HOME');
-        putenv('XDG_DATA_HOME');
-        putenv('PATH');
+        TestEnv::reset();
+        putenv('PATH='.$this->originalPath);
+        putenv('PLEAD_SQLITE3_MARKER');
     }
 
     public function testPathShowsDatabaseLocation(): void
@@ -54,7 +57,8 @@ final class DbCommandsTest extends TestCase
 
     public function testPathShowsExistsAfterDatabaseWasCreated(): void
     {
-        $this->installFakeSqlite3('exit 0');
+        $this->installFakeSqlite3();
+        $this->prependFakeBinToPath();
 
         $this->tester->run(['command' => 'db:query']);
         $this->tester->run(['command' => 'db:path']);
@@ -66,8 +70,9 @@ final class DbCommandsTest extends TestCase
     public function testQueryOpensSqliteShell(): void
     {
         $marker = dirname($this->fakeBin).'/called.txt';
-        $this->installFakeSqlite3(sprintf('echo "$1" > %s', escapeshellarg($marker)));
-        putenv('PATH='.$this->fakeBin);
+        putenv('PLEAD_SQLITE3_MARKER='.$marker);
+        $this->installFakeSqlite3();
+        $this->prependFakeBinToPath();
 
         $this->tester->run(['command' => 'db:query']);
 
@@ -88,13 +93,16 @@ final class DbCommandsTest extends TestCase
 
     private function databasePath(): string
     {
-        return $this->dataDir.'/plead/plead.sqlite';
+        return $this->paths->dataDir().'/plead.sqlite';
     }
 
-    private function installFakeSqlite3(string $body): void
+    private function installFakeSqlite3(): void
     {
-        $script = $this->fakeBin.'/sqlite3';
-        file_put_contents($script, "#!/bin/sh\n".$body."\n");
-        chmod($script, 0o755);
+        FakeBin::install($this->sqlite3Fixture, $this->fakeBin.'/sqlite3');
+    }
+
+    private function prependFakeBinToPath(): void
+    {
+        putenv('PATH='.$this->fakeBin.PATH_SEPARATOR.(string) getenv('PATH'));
     }
 }

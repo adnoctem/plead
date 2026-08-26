@@ -10,6 +10,7 @@ use App\Repository\SyncLogRepository;
 use App\Rule\AutoReplyRuleEngine;
 use App\Template\AutoReplyRenderer;
 use App\Template\MjmlConverter;
+use App\Tests\Support\FakeBin;
 use App\Util\DateNormalizer;
 use Monolog\Logger;
 use PHPUnit\Framework\Attributes\CoversNothing;
@@ -184,9 +185,10 @@ final class AutoReplyRuleEngineTest extends TestCase
     {
         // Single-language templates (e.g. MJML) honor the entry language;
         // the txt template renders every language regardless.
-        $fakeBinary = sys_get_temp_dir().'/plead-fake-mjml-'.bin2hex(random_bytes(4));
-        file_put_contents($fakeBinary, "#!/bin/sh\nprintf '<!doctype html><html><body>'\ncat\nprintf '</body></html>'\n");
-        chmod($fakeBinary, 0o755);
+        $fakeBinary = FakeBin::install(
+            dirname(__DIR__).'/Support/fake-bin/mjml.php',
+            sys_get_temp_dir().'/plead-fake-mjml-'.bin2hex(random_bytes(4)),
+        );
         $engine = new AutoReplyRuleEngine(
             $this->repository,
             $this->syncLog,
