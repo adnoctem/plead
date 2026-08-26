@@ -95,3 +95,9 @@ repos:
         entry: bun x prettier --write "**/*.md"
         language: system
         pass_filenames: false
+
+      - id: textlint
+        name: Textlint
+        entry: bun x textlint --config .github/linters/.textlintrc
+        language: system
+        pass_filenames: false

@@ -97,17 +97,13 @@ final class InteractiveProcessLauncher
         if (!function_exists('pcntl_fork')) {
             // Fallback for hosts without pcntl: shell-mediated spawn with the
             // same inherited fds.
-            passthru(implode(' ', array_map('escapeshellarg', $argv)), $exitCode);
-
-            return $exitCode;
+            return $this->passthruSpawn($argv);
         }
 
         $pid = pcntl_fork();
         if (-1 === $pid) {
             // Fork failed; degrade to the shell-mediated spawn rather than fail.
-            passthru(implode(' ', array_map('escapeshellarg', $argv)), $exitCode);
-
-            return $exitCode;
+            return $this->passthruSpawn($argv);
         }
 
         if (0 === $pid) {
@@ -138,6 +134,27 @@ final class InteractiveProcessLauncher
         $signal = pcntl_wtermsig($status);
 
         return 128 + (is_int($signal) && $signal > 0 ? $signal : 0);
+    }
+
+    /**
+     * Shell-mediated spawn without pcntl. On Windows, .cmd/.bat files (the
+     * executable-script equivalent) can only be launched through cmd.exe -
+     * CreateProcess alone resolves bare names to .exe files only. The extra
+     * quote pair around the whole command line keeps cmd /c from stripping
+     * the argument quotes (see `cmd /?` quote rules).
+     *
+     * @param list<string> $argv
+     */
+    private function passthruSpawn(array $argv): int
+    {
+        $command = implode(' ', array_map('escapeshellarg', $argv));
+        if ('Windows' === PHP_OS_FAMILY) {
+            $command = 'cmd /c "'.$command.'"';
+        }
+
+        passthru($command, $exitCode);
+
+        return $exitCode;
     }
 
     private function stdinIsTerminal(): bool
