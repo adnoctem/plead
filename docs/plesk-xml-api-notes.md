@@ -25,7 +25,7 @@ Empirically-verified facts about the Plesk XML API (tested against **Plesk Obsid
 
 - **`mail-get_info` filter**: `<site-id>` + optional `<name>`; data tags `<mailbox/>`, `<forwarding/>`, `<autoresponder/>` may be combined. A site without mail returns `status ok` with no `<mailname>` (not an error). A **non-existent mailname throws `mail does not exist`** — treat that (and `not found`) as "null" in read methods.
 - **`mail-update set` properties** (the full allowed list, verbatim from the server): `forwarding, alias, autoresponder, password, user-guid, antivir, outgoing-messages-mbox-limit, description`.
-- **`mailbox/quota` IS settable** on existing mailboxes via `<mailbox><quota>N</quota>` inside `update/set` — validated live (256 → 512 MiB on admin@delta4x4.net, status ok). Earlier notes claiming "mailbox is not settable" were wrong: the likely reject was the `enabled` child, not the whole node. `mailbox<enabled>` on existing mailboxes: not tested separately; treat as unsupported (the GUI has no
+- **`mailbox/quota` IS settable** on existing mailboxes via `<mailbox><quota>N</quota>` inside `update/set` — validated live (256 → 512 MiB on a test mailbox, status ok). Earlier notes claiming "mailbox is not settable" were wrong: the likely reject was the `enabled` child, not the whole node. `mailbox<enabled>` on existing mailboxes: not tested separately; treat as unsupported (the GUI has no
   per-mailbox disable either).
   - **Schema vs server, both ways:** the published XSD (1.6.9.1, `plesk/api-schemas` repo) defines `mailbox{enabled: boolean, quota: long}` AND `cp-access` in `mailnameUpdateType` — the server additionally accepts `password` and `user-guid`, which the XSD omits. Treat the **server as truth**; the XSD is a hint, not a contract.
   - `password` is element-only: `<password><value>…</value><type>plain|crypt</type></password>` (`crypt` is Linux-only).
@@ -58,7 +58,7 @@ Empirically-verified facts about the Plesk XML API (tested against **Plesk Obsid
 - **`antivir` values are an enum**: `off | in | out | inout` (NOT `on`/`off` — `on` is rejected with errcode 1014). Flat element in `update/set`; the response reports it as `<antivir>off</antivir>`.
 - **`autoresponder` in `update/set` accepts**: `enabled, subject, text, charset, end_date, attachment, forward` — **`start_date` is REJECTED** (1014: "Expected is one of ( attachment, forward, end_date )"). Window-start scheduling must be computed client-side (as plead
   does).
-  - **`content_type` IS settable** (validated live 2026-08-25 on testing@delta4x4.net) — but **element order matters
+  - **`content_type` IS settable** (validated live 2026-08-25 on a test mailbox) — but **element order matters
     (XSD sequence)**: `enabled, subject, content_type, charset, text, ...` — `content_type` placed _after_ `text` is
     rejected with "Element 'content_type': This element is not expected. Expected is one of ( attachment, forward,
     end_date )" (this is why the 2026-08-20 probe reported it as unsupported). Allowed values round-trip:

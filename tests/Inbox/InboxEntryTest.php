@@ -82,12 +82,12 @@ final class InboxEntryTest extends TestCase
     {
         $entry = $this->entry([
             'samAccountName' => 'CFischer',
-            'domain' => 'Delta4x4.com',
+            'domain' => 'Example.com',
             'startDate' => '2026-09-17',
             'endDate' => '2026-09-18',
         ], 'ignored.example');
 
-        self::assertSame('cfischer@delta4x4.com', $entry->email);
+        self::assertSame('cfischer@example.com', $entry->email);
         self::assertSame('CFischer', $entry->samAccountName);
     }
 
@@ -97,9 +97,9 @@ final class InboxEntryTest extends TestCase
             'samAccountName' => 'RHippmann',
             'startDate' => '2026-09-17',
             'endDate' => '2026-09-18',
-        ], 'delta4x4.de');
+        ], 'example.net');
 
-        self::assertSame('rhippmann@delta4x4.de', $entry->email);
+        self::assertSame('rhippmann@example.net', $entry->email);
     }
 
     public function testEmailWinsOverSamAccountName(): void

@@ -8,9 +8,9 @@ department:
   de: Buchhaltung
   en: accounting
 email:
-  de: "buchhaltung@delta4x4.com"
-  en: "invoices@delta4x4.com"
+  de: "buchhaltung@example.com"
+  en: "invoices@example.com"
 phonenumber:
-  de: "+49 8134 930217"
+  de: "+49 123 456789"
   en: "+49 8134 930299"
 # logo_url: "https://example.com/christmas-logo.png"

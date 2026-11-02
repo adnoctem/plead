@@ -15,7 +15,7 @@ final class DomainGetCommand extends AbstractPleadCommand
 {
     protected function configure(): void
     {
-        $this->addArgument('domain', InputArgument::REQUIRED, 'Domain name, e.g. delta4x4.net');
+        $this->addArgument('domain', InputArgument::REQUIRED, 'Domain name, e.g. example.com');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

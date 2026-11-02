@@ -99,14 +99,14 @@ final class AutoReplyRendererTest extends TestCase
         $dataFile = $this->base.'/data.yaml';
         file_put_contents($dataFile, implode("\n", [
             'email:',
-            '    de: buchhaltung@delta4x4.com',
-            '    en: invoices@delta4x4.com',
-            'phonenumber: "+49 8134 930217"',
+            '    de: buchhaltung@example.com',
+            '    en: invoices@example.com',
+            'phonenumber: "+49 123 456789"',
         ]));
 
         $out = $renderer->renderMessage($dataFile, null, null);
 
-        self::assertSame('buchhaltung@delta4x4.com|+49 8134 930217;invoices@delta4x4.com|+49 8134 930217;', $out);
+        self::assertSame('buchhaltung@example.com|+49 123 456789;invoices@example.com|+49 123 456789;', $out);
     }
 
     public function testFlatDataFallsBackForEveryLanguage(): void
@@ -117,11 +117,11 @@ final class AutoReplyRendererTest extends TestCase
         file_put_contents($templateFile, '{% for lang in languages %}{{ email[lang] ?? email }};{% endfor %}');
         $renderer = new AutoReplyRenderer($templateFile, $this->catalogs);
         $dataFile = $this->base.'/data.yaml';
-        file_put_contents($dataFile, 'email: "office@delta4x4.com"'."\n");
+        file_put_contents($dataFile, 'email: "office@example.com"'."\n");
 
         $out = $renderer->renderMessage($dataFile, null, null);
 
-        self::assertSame('office@delta4x4.com;office@delta4x4.com;', $out);
+        self::assertSame('office@example.com;office@example.com;', $out);
     }
 
     public function testDateFormatResolvedPerLocale(): void

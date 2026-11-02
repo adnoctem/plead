@@ -122,8 +122,8 @@ plead mail:alias:list
 
 # domains
 plead domain:list
-plead domain:get delta4x4.net
-plead domain:set delta4x4.net --description="Main company domain"
+plead domain:get example.com
+plead domain:set example.com --description="Main company domain"
 ```
 
 ## 🧰 Commands
@@ -220,7 +220,7 @@ Configuration is discovered from per-user and system-wide locations, in most-spe
 
 ```yaml
 servers:
-  - host: dellius.delta4x4.net
+  - host: plesk.example.com
     secret_key: <key>
   - host: prod.example.com
     login: admin # or credentials instead of a secret key
@@ -259,14 +259,14 @@ mail:
     quota: 512MB # parsed to bytes; also accepts 1GB, 2 GB, 1048576
     antivirus: off # off|in|out|inout; default quota/antivirus for mail:address:set
   group:
-    - address: all@delta4x4.net
+    - address: all@example.com
       pattern: "^(1und1|payments|info|support|shop|noreply|marketing|bestellungen)@"
-    - address: group2@delta4x4.net
+    - address: group2@example.com
       recipients:
         - user1@example.com
         - user2@example.com
   autoresponder:
-    - address: user@delta4x4.net
+    - address: user@example.com
       data_file: /etc/plead/replies/vacation-data.yaml # optional: JSON/YAML template variables
       start_date: "2026-08-20T08:00:00+02:00" # optional; quote to keep the offset
       end_date: "2026-08-30T18:00:00+02:00"
@@ -274,11 +274,11 @@ mail:
       subject: "Automatische Antwort" # optional: reply subject (default: Re: <request_subject>)
       format: html # optional: plain|html (default: server default)
 
-# per-server overrides: this section only applies to dellius.delta4x4.net
-dellius.delta4x4.net:
+# per-server overrides: this section only applies to plesk.example.com
+plesk.example.com:
   mail:
     group:
-      - address: group@delta4x4.net
+      - address: group@example.com
         pattern: "^(info|support)@"
 ```
 
@@ -317,7 +317,7 @@ The scheduling window is injected
 automatically as `startDate`/`endDate` (ISO 8601) and always wins over data-file values, so the rendered text can
 never drift from the actual activation window; `--inclusive`/`--no-inclusive` (or an `inclusive` config entry) is
 authoritative the same way. Any value that differs per language is a locale map, resolved as `key[lang] ?? key.de ?? key`
-inside the language loop: `email: {de: buchhaltung@delta4x4.com, en: invoices@delta4x4.com}` renders the German
+inside the language loop: `email: {de: buchhaltung@example.com, en: invoices@example.com}` renders the German
 address in the German section and the English one in the English section (a plain string applies to every
 language, and a locale missing from the map falls back to the German value). The same works for `department`,
 `phonenumber` and any future field. `logo_url` optionally overrides

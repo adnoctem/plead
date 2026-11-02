@@ -24,7 +24,7 @@ final class DomainSetCommand extends AbstractPleadCommand
     protected function configure(): void
     {
         $this
-            ->addArgument('domain', InputArgument::REQUIRED, 'Domain name, e.g. delta4x4.net')
+            ->addArgument('domain', InputArgument::REQUIRED, 'Domain name, e.g. example.com')
             ->addOption('description', null, InputOption::VALUE_REQUIRED, 'New description for the domain')
             ->addOption('status', null, InputOption::VALUE_REQUIRED, 'Domain status: enabled|disabled (0/16 via gen_setup, validated live)')
             ->addOption('type', null, InputOption::VALUE_REQUIRED, 'Hosting type: virtual-host|forwarding|frame-forwarding|none')

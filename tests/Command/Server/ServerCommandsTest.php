@@ -104,7 +104,7 @@ final class ServerCommandsTest extends TestCase
     public function testServerInfoDisplaysEverything(): void
     {
         $this->gateway->serverInfo = [
-            'server_name' => 'dellius.delta4x4.net',
+            'server_name' => 'plesk.example.com',
             'plesk_version' => '18.0.80',
             'plesk_os' => 'Ubuntu',
             'os_release' => '22.04.4',
@@ -120,7 +120,7 @@ final class ServerCommandsTest extends TestCase
         $tester->execute([]);
 
         self::assertSame(0, $tester->getStatusCode());
-        self::assertStringContainsString('dellius.delta4x4.net', $tester->getDisplay());
+        self::assertStringContainsString('plesk.example.com', $tester->getDisplay());
         self::assertStringContainsString('18.0.80', $tester->getDisplay());
         self::assertStringContainsString('Ubuntu', $tester->getDisplay());
         self::assertStringContainsString('0.10', $tester->getDisplay());
@@ -206,11 +206,11 @@ final class ServerCommandsTest extends TestCase
     public function testServerAdminDisplaysPersonalInformation(): void
     {
         $this->gateway->adminInfo = [
-            'cname' => 'Delta 4x4',
+            'cname' => 'Example Corp',
             'pname' => 'John Doe',
             'phone' => '+49 89 123',
             'fax' => '',
-            'email' => 'admin@delta4x4.net',
+            'email' => 'admin@example.com',
             'address' => 'Baker Street',
             'city' => 'Munich',
             'state' => 'Bavaria',
@@ -225,7 +225,7 @@ final class ServerCommandsTest extends TestCase
 
         self::assertSame(0, $tester->getStatusCode());
         self::assertStringContainsString('John Doe', $tester->getDisplay());
-        self::assertStringContainsString('admin@delta4x4.net', $tester->getDisplay());
+        self::assertStringContainsString('admin@example.com', $tester->getDisplay());
         self::assertStringContainsString('DE', $tester->getDisplay());
     }
 

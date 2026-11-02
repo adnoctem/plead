@@ -27,7 +27,7 @@ final class PleskRestGatewayTest extends TestCase
         self::assertSame(['extension', 'domain', 'mail'], $commands);
         self::assertCount(1, $this->requests);
         self::assertSame('GET', $this->requests[0]['method']);
-        self::assertSame('https://dellius.delta4x4.net:8443/api/v2/cli/commands', $this->requests[0]['url']);
+        self::assertSame('https://plesk.example.com:8443/api/v2/cli/commands', $this->requests[0]['url']);
         self::assertStringContainsString('X-API-Key: secret-key', implode("\n", $this->requests[0]['headers']));
     }
 
@@ -39,7 +39,7 @@ final class PleskRestGatewayTest extends TestCase
 
         self::assertArrayHasKey('allowed_commands', $ref);
         self::assertSame('--call <name> <command>', $ref['allowed_commands']['call']['usage']);
-        self::assertSame('https://dellius.delta4x4.net:8443/api/v2/cli/extension/ref', $this->requests[0]['url']);
+        self::assertSame('https://plesk.example.com:8443/api/v2/cli/extension/ref', $this->requests[0]['url']);
     }
 
     public function testCliCallBuildsJsonBodyAndParses(): void
@@ -52,7 +52,7 @@ final class PleskRestGatewayTest extends TestCase
         self::assertSame('Done', $result['stdout']);
 
         self::assertSame('POST', $this->requests[0]['method']);
-        self::assertSame('https://dellius.delta4x4.net:8443/api/v2/cli/extension/call', $this->requests[0]['url']);
+        self::assertSame('https://plesk.example.com:8443/api/v2/cli/extension/call', $this->requests[0]['url']);
         self::assertStringContainsString('Content-Type: application/json', implode("\n", $this->requests[0]['headers']));
 
         $body = json_decode((string) $this->requests[0]['body'], true);
@@ -96,7 +96,7 @@ final class PleskRestGatewayTest extends TestCase
     public function testCliCallDryRunSkipsHttp(): void
     {
         $gateway = new PleskRestGateway(
-            'dellius.delta4x4.net',
+            'plesk.example.com',
             8443,
             'https',
             'secret-key',
@@ -131,7 +131,7 @@ final class PleskRestGatewayTest extends TestCase
         $this->requests = [];
 
         return new PleskRestGateway(
-            'dellius.delta4x4.net',
+            'plesk.example.com',
             8443,
             'https',
             'secret-key',

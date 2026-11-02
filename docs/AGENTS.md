@@ -115,7 +115,7 @@ Full detail: `docs/plesk-xml-api-notes.md`. The short version an agent must not 
 
 - Real credentials live in `~/.config/plead/plead.yaml` (`servers[].host`, `servers[].secret_key`; select with `--server`). **Never print the key**; probe scripts read it from config or env.
 - Read-only commands (`*:list`, `*:get`, `domain:get`, `db:*`) are safe to run against the live server.
-- **Mutation probes require explicit user confirmation first** and should target a designated disposable resource (e.g. `probe@delta4x4.net`, `4x4d.de` description). Revert afterwards. The server is the user's production mail infrastructure.
+- **Mutation probes require explicit user confirmation first** and should target a designated disposable resource (e.g. a `probe@example.com` mailbox and a disposable test domain's description). Revert afterwards. The server is the user's production mail infrastructure.
 - `--dry-run` skips all RPCs structurally in the gateway — use it for mutation dry checks.
 
 ## Environment gotchas

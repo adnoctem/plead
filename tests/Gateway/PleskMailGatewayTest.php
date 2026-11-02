@@ -351,7 +351,7 @@ final class PleskMailGatewayTest extends TestCase
         self::assertStringContainsString('<server><get>', $packet);
         self::assertStringContainsString('<gen_info/><stat/><updates/>', $packet);
 
-        self::assertSame('dellius.delta4x4.net', $info['server_name']);
+        self::assertSame('plesk.example.com', $info['server_name']);
         self::assertSame('18.0.80', $info['plesk_version']);
         self::assertSame('Ubuntu', $info['plesk_os']);
         self::assertSame('22.04.4', $info['os_release']);
@@ -394,11 +394,11 @@ final class PleskMailGatewayTest extends TestCase
 
     public function testSetDomainStatusBuildsGenSetupPacket(): void
     {
-        $this->gateway->setDomainStatus('delta4x4.net', 16);
+        $this->gateway->setDomainStatus('example.com', 16);
 
         $packet = $this->client->requests[0];
         self::assertStringContainsString('<webspace><set>', $packet);
-        self::assertStringContainsString('<filter><name>delta4x4.net</name></filter>', $packet);
+        self::assertStringContainsString('<filter><name>example.com</name></filter>', $packet);
         self::assertStringContainsString('<values><gen_setup><status>16</status>', $packet);
     }
 
@@ -410,8 +410,8 @@ final class PleskMailGatewayTest extends TestCase
         self::assertStringContainsString('<server><get><admin/>', $packet);
 
         self::assertSame('John Doe', $admin['pname']);
-        self::assertSame('Delta 4x4', $admin['cname']);
-        self::assertSame('admin@delta4x4.net', $admin['email']);
+        self::assertSame('Example Corp', $admin['cname']);
+        self::assertSame('admin@example.com', $admin['email']);
         self::assertSame('DE', $admin['country']);
         self::assertSame('en-US', $admin['locale']);
         self::assertSame('true', $admin['multiple_sessions']);
@@ -554,11 +554,11 @@ final class PleskMailGatewayTest extends TestCase
 
     public function testGetSiteTrafficBuildsPacketAndParses(): void
     {
-        $rows = $this->gateway->getSiteTraffic('delta4x4.net', '2026-08-01', '2026-08-20');
+        $rows = $this->gateway->getSiteTraffic('example.com', '2026-08-01', '2026-08-20');
 
         $packet = $this->client->requests[0];
         self::assertStringContainsString('<site><get_traffic>', $packet);
-        self::assertStringContainsString('<filter><name>delta4x4.net</name></filter>', $packet);
+        self::assertStringContainsString('<filter><name>example.com</name></filter>', $packet);
         self::assertStringContainsString('<since_date>2026-08-01</since_date>', $packet);
         self::assertStringContainsString('<to_date>2026-08-20</to_date>', $packet);
 
@@ -582,11 +582,11 @@ final class PleskMailGatewayTest extends TestCase
 
     public function testGetHostingDescriptorBuildsPacketAndParses(): void
     {
-        $properties = $this->gateway->getHostingDescriptor('delta4x4.net');
+        $properties = $this->gateway->getHostingDescriptor('example.com');
 
         $packet = $this->client->requests[0];
         self::assertStringContainsString('<site><get-physical-hosting-descriptor>', $packet);
-        self::assertStringContainsString('<filter><name>delta4x4.net</name></filter>', $packet);
+        self::assertStringContainsString('<filter><name>example.com</name></filter>', $packet);
 
         self::assertCount(2, $properties);
         self::assertSame('ftp_login', $properties[0]['name']);
@@ -982,11 +982,11 @@ final class FakeClient extends Client
 
     public string $aliasesXml = '<packet><mail><get_info><result><status>ok</status><mailname><id>42</id><name>group</name><alias>info@company.com</alias></mailname></result></get_info></mail></packet>';
 
-    public string $serverInfoXml = '<packet><server><get><result><status>ok</status><gen_info><server_name>dellius.delta4x4.net</server_name></gen_info><stat><version><plesk_version>18.0.80</plesk_version><plesk_os>Ubuntu</plesk_os><os_release>22.04.4</os_release><plesk_build>1800240510.34</plesk_build></version><other><cpu>2</cpu><uptime>42331</uptime></other><load_avg><l1>0.10</l1><l5>0.20</l5><l15>0.15</l15></load_avg><objects><domains>34</domains><mail_boxes>42</mail_boxes></objects></stat><updates><available_update>18.0.81</available_update><security_updates>0</security_updates></updates></result></get></server></packet>';
+    public string $serverInfoXml = '<packet><server><get><result><status>ok</status><gen_info><server_name>plesk.example.com</server_name></gen_info><stat><version><plesk_version>18.0.80</plesk_version><plesk_os>Ubuntu</plesk_os><os_release>22.04.4</os_release><plesk_build>1800240510.34</plesk_build></version><other><cpu>2</cpu><uptime>42331</uptime></other><load_avg><l1>0.10</l1><l5>0.20</l5><l15>0.15</l15></load_avg><objects><domains>34</domains><mail_boxes>42</mail_boxes></objects></stat><updates><available_update>18.0.81</available_update><security_updates>0</security_updates></updates></result></get></server></packet>';
 
     public string $sessionsXml = '<packet><session><get><result><status>ok</status><session><id>abc123</id><type>admin</type><ip-address>192.0.2.1</ip-address><login>admin</login><login-time>2026-08-20T08:00:00</login-time><idle>2026-08-20T08:30:00</idle></session><session><id>def456</id><type>client</type><ip-address>192.0.2.2</ip-address><login>jdoe</login><login-time>2026-08-20T07:00:00</login-time><idle>2026-08-20T07:05:00</idle></session></result></get></session></packet>';
 
-    public string $adminXml = '<packet><server><get><result><status>ok</status><admin><admin_cname>Delta 4x4</admin_cname><admin_pname>John Doe</admin_pname><admin_phone>+49 89 123</admin_phone><admin_fax/><admin_email>admin@delta4x4.net</admin_email><admin_address>Baker Street</admin_address><admin_city>Munich</admin_city><admin_state>Bavaria</admin_state><admin_pcode>80333</admin_pcode><admin_country>DE</admin_country><admin_locale>en-US</admin_locale><admin_multiple_sessions>true</admin_multiple_sessions></admin></result></get></server></packet>';
+    public string $adminXml = '<packet><server><get><result><status>ok</status><admin><admin_cname>Example Corp</admin_cname><admin_pname>John Doe</admin_pname><admin_phone>+49 89 123</admin_phone><admin_fax/><admin_email>admin@example.com</admin_email><admin_address>Baker Street</admin_address><admin_city>Munich</admin_city><admin_state>Bavaria</admin_state><admin_pcode>80333</admin_pcode><admin_country>DE</admin_country><admin_locale>en-US</admin_locale><admin_multiple_sessions>true</admin_multiple_sessions></admin></result></get></server></packet>';
 
     public string $servicesXml = '<packet><server><get><result><status>ok</status><services_state><srv><id>web</id><title>Web server</title><state>running</state><error/></srv><srv><id>mail</id><title>Mail server</title><state>stopped</state><error>some failure</error></srv></services_state></result></get></server></packet>';
 

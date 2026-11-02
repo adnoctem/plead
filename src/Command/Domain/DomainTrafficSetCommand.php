@@ -17,7 +17,7 @@ final class DomainTrafficSetCommand extends AbstractPleadCommand
     protected function configure(): void
     {
         $this
-            ->addArgument('domain', InputArgument::REQUIRED, 'Domain name, e.g. delta4x4.net')
+            ->addArgument('domain', InputArgument::REQUIRED, 'Domain name, e.g. example.com')
             ->addOption('date', null, InputOption::VALUE_REQUIRED, 'Traffic date, YYYY-MM-DD')
             ->addOption('smtp-in', null, InputOption::VALUE_REQUIRED, 'SMTP inbound bytes')
             ->addOption('smtp-out', null, InputOption::VALUE_REQUIRED, 'SMTP outbound bytes')
