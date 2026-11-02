@@ -62,7 +62,7 @@ same before building. `git-version` injects the git tag/commit into `src/Applica
   `data_file` entries (`--data-file` on the CLI) via `AutoReplyRenderer::renderMessage()`, which injects
   `startDate`/`endDate` from the real schedule. The reply `subject` ('' = Plesk default `Re: <request_subject>`)
   and `format` (`plain`/`html` → `text/plain`/`text/html`) ride along in the same rows; the gateway emits
-  `content_type` BEFORE `text` (XSD sequence — see `docs/plesk-xml-api-notes.md`).
+  `content_type` BEFORE `text` (XSD sequence — see `docs/NOTES.md`).
   Multi-language text is catalog-driven: `resources/translations/autoresponder.{locale}.yaml` holds all sentences
   (`template.translations_path`; 'de' is the fallback locale - missing entries degrade to German, never a
   raw key, so renders cannot fail), templates loop over the discovered `languages` and resolve per-language
@@ -89,13 +89,13 @@ Uniform verbs per namespace: `list` (enumerate), `get <target>` (single resource
 
 ## Plesk XML API hard truths (all empirically validated)
 
-Full detail: `docs/plesk-xml-api-notes.md`. The short version an agent must not re-learn the hard way:
+Full detail: `docs/NOTES.md`. The short version an agent must not re-learn the hard way:
 
 - **Enumerate WEBSPACES, not sites.** On Obsidian-with-subscriptions setups an unfiltered `site-get` returns zero results; domains live at the webspace level and the main site shares the webspace id. `listDomains()` uses `<webspace><get>` with a site fallback.
 - **Packet shape rules.** `<filter>` first, `<dataset>` after. An **empty `<dataset/>` makes the server omit ids** — always request `<dataset><gen_info/></dataset>`. Never send a site/webspace id of `0` (schema rejects it) — skip id-less results.
 - **`mail-update set` allowed properties** (verbatim): `forwarding, alias, autoresponder, password, user-guid, antivir, outgoing-messages-mbox-limit, description`. `mailbox{quota}` is ALSO settable (nested `<mailbox><quota>N</quota></mailbox>`, bytes) — validated live. `mailbox{enabled}` is NOT settable on existing mailboxes (and the GUI has no per-mailbox disable anyway) — `enable`/`disable`
   toggle the whole site's mail service (site-id only), not one mailbox.
-  - NOTE: the published XSD (1.6.9.1) allows `mailbox{enabled,quota}` in `mailnameUpdateType` — server behavior differs on `enabled` only; the server wins (see `docs/plesk-xml-api-notes.md`).
+  - NOTE: the published XSD (1.6.9.1) allows `mailbox{enabled,quota}` in `mailnameUpdateType` — server behavior differs on `enabled` only; the server wins (see `docs/NOTES.md`).
 - **Password shape:** `<password><value>…</value><type>plain|crypt</type></password>` inside `update/set`. There is no `set-password` operation.
 - **Not-found semantics:** a read of a non-existent mailname throws `PleskX\Api\Exception: mail does not exist` (the lib's `verifyResponse`). `PleskMailGateway::requestOrNull()` maps that ("does not exist|not found") to `null`; genuine errors rethrow.
 - **`multiRequest` returns plain `\SimpleXMLElement` per op** (NOT `XmlResponse`) — type batch handlers accordingly, and per-op errors do NOT throw (must be checked via `okResults()`).
@@ -127,8 +127,9 @@ Full detail: `docs/plesk-xml-api-notes.md`. The short version an agent must not 
 
 ## Docs map
 
-- `README.md` — usage, command reference, configuration, audit-trail model
+- `README.md` — overview, install, command reference, audit-trail model
+- `docs/USAGE.md` — configuration guide and deep dives (groups, auto-replies, inbox, watch)
 - `docs/CONTRIBUTING.md` — commit format (semantic-release/Conventional Commits), PR process, layout
-- `docs/plesk-xml-api-notes.md` — **canonical empirically-verified API facts** (read before touching the gateway)
+- `docs/NOTES.md` — **canonical empirically-verified API facts** (read before touching the gateway)
 - `docs/AGENTS.md` — this file (symlinked to repo root)
 - `docs/ACKNOWLEDGEMENTS.md` — sources the project learned from

@@ -305,7 +305,7 @@ it), and `watch` re-records diverging definitions every pass.
 
 `--subject` sets the reply subject (default: Plesk's `Re: <request_subject>`); `--format plain|html` selects the
 autoresponder content type (Plesk stores `text/plain`/`text/html`; the element order in the XML packet matters,
-see `docs/plesk-xml-api-notes.md`). A rendered message that is HTML (e.g. the MJML template) is rejected unless
+see `docs/NOTES.md`). A rendered message that is HTML (e.g. the MJML template) is rejected unless
 the format is `html` — pass `--force` to store it with a non-html format anyway. `--language de|en` selects the render language (default: `template.language` or the first catalog language) —
 both the txt and the HTML templates render exactly one language per invocation.
 `--template` renders a specific template for this invocation instead of
@@ -407,7 +407,8 @@ Data (SQLite database and log file) lives under the platform data directory — 
 
 ## 📚 Documentation
 
-- [`docs/plesk-xml-api-notes.md`](docs/plesk-xml-api-notes.md) — empirically-verified Plesk XML API facts (packet shapes, quirks, batching) collected against Obsidian 18.0.80
+- [`docs/USAGE.md`](docs/USAGE.md) — configuration guide and deep dives on the complex commands (groups, auto-replies, the inbox, watch)
+- [`docs/NOTES.md`](docs/NOTES.md) — empirically-verified Plesk XML API facts (packet shapes, quirks, batching) collected against Obsidian 18.0.80
 - [`docs/AGENTS.md`](docs/AGENTS.md) — agent/contributor cheat sheet (symlinked to the repo root as `AGENTS.md`)
 - [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) — commit format, PR process, repository layout
 - [`docs/ACKNOWLEDGEMENTS.md`](docs/ACKNOWLEDGEMENTS.md) — sources the project learned from

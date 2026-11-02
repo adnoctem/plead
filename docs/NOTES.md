@@ -1,27 +1,33 @@
-# Plesk XML API notes
+# Technical notes
+
+Empirically-verified facts that the code and its agent instructions rely on. The
+Plesk XML API section is the canonical reference for `src/Gateway/`; where this
+file and the published docs disagree, the server's schema validator wins.
+
+## Plesk XML API
 
 Empirically-verified facts about the Plesk XML API (tested against **Plesk Obsidian 18.0.80 Update 3, XML API 1.6.9.1**). Complements the official docs at <https://docs.plesk.com/en-US/obsidian/api-rpc/about-xml-api/reference/managing-mail.34477/> — where a conflict exists, the server's schema validator wins (see the `mailbox` discrepancy below).
 
-## Authentication (API key)
+### Authentication (API key)
 
 - Secret-key auth is **NOT HTTP Basic**. The server wants a custom **`KEY: <secret>` HTTP header** — HTTP Basic (or no auth at all) yields `<system><status>error</status><errcode>1029</errcode><errtext>Authentication method is not specified</errtext></system>`.
 - Account credentials use two other custom headers: `HTTP_AUTH_LOGIN: <login>` + `HTTP_AUTH_PASSWD: <password>`.
 - The lib (`plesk/api-php-lib`, `Client::getHeaders()`) sends `KEY: $this->secretKey` when a key is set, otherwise the two `HTTP_AUTH_*` headers — plus `Content-Type: text/xml` and `HTTP_PRETTY_PRINT: TRUE`.
 - In Postman, this means: plain headers, **no Basic-auth helper** (Postman's Basic auth would otherwise be the natural-but-wrong choice).
 
-## Object model
+### Object model
 
 - Plesk distinguishes **webspace** (subscription) from **site** (domain) objects.
 - On the tested server each domain is its own webspace, and the **main site of a webspace shares the webspace id** (`webspace-guid == guid`, `webspace-id == id`).
 - **Unfiltered `site-get` returns zero results** on this setup; enumerate **webspaces** instead: `<webspace><get><filter/><dataset><gen_info/></dataset></get></webspace>`.
 
-## Request packet rules
+### Request packet rules
 
 - `<filter>` must be the **first** child of `<get>`; `<dataset>` comes after. An empty `<dataset/>` makes the server **omit per-result ids** — always request at least one data tag (`<dataset><gen_info/></dataset>`).
 - Site/webspace ids that come back as `0` are rejected by follow-up requests (`id_type` validation) — skip id-less results.
 - Errors: the lib's `verifyResponse` throws `PleskX\Api\Exception` on the first `status=error` result. **`multiRequest` skips that check** — per-operation errors must be inspected individually (our `okResults()` pattern).
 
-## mail operator
+### mail operator
 
 - **`mail-get_info` filter**: `<site-id>` + optional `<name>`; data tags `<mailbox/>`, `<forwarding/>`, `<autoresponder/>` may be combined. A site without mail returns `status ok` with no `<mailname>` (not an error). A **non-existent mailname throws `mail does not exist`** — treat that (and `not found`) as "null" in read methods.
 - **`mail-update set` properties** (the full allowed list, verbatim from the server): `forwarding, alias, autoresponder, password, user-guid, antivir, outgoing-messages-mbox-limit, description`.
@@ -36,24 +42,24 @@ Empirically-verified facts about the Plesk XML API (tested against **Plesk Obsid
 - Forwarding: `<mail><update><add|remove>…<forwarding><address>…</address></forwarding>` (idempotent; safe to retry).
 - Removal: `<mail><remove><filter><site-id>N</site-id><name>X</name></filter></remove></mail>` (bare `<name>`, not `<mailname>`).
 
-## webspace operator
+### webspace operator
 
 - Enumeration and reads as above; `domain:get` requests `gen_info + hosting + limits + prefs` datasets.
 - Update shape (from the Plesk library's `Webspace::setProperties`, validated live): `<webspace><set><filter><name>…</name></filter><values><gen_setup><description>…</description></gen_setup></values></set></webspace>`.
 - Status convention: `0` = enabled, `16` = disabled (via `gen_setup`).
 
-## Batching (`Client::multiRequest`)
+### Batching (`Client::multiRequest`)
 
 - Accepts array-form requests, builds one `<packet>` with N top-level operations, one HTTP POST.
 - Returns **plain `SimpleXMLElement` per operation** (rebuilt via `simplexml_load_string`), NOT `XmlResponse` — type your batch handlers against `\SimpleXMLElement`.
 - Live list commands use it: `mail:address:list` = 2 round trips, `mail:group:list`/`mail:autoresponder:list`/`mail:address:export` = 3.
 
-## Misc
+### Misc
 
 - `curl_close()` is deprecated on PHP 8.5 (vendor lib noise) — `bin/plead` suppresses deprecations.
 - The official docs for `mail-update` (modifying-mail-account-settings) describe the `set` sub-operation semantics correctly: it _replaces_ all settings mentioned, keeps others untouched — and samples match the validated shapes.
 
-## More empirically-validated shapes (2026-08-20)
+### More empirically-validated shapes (2026-08-20)
 
 - **`antivir` values are an enum**: `off | in | out | inout` (NOT `on`/`off` — `on` is rejected with errcode 1014). Flat element in `update/set`; the response reports it as `<antivir>off</antivir>`.
 - **`autoresponder` in `update/set` accepts**: `enabled, subject, text, charset, end_date, attachment, forward` — **`start_date` is REJECTED** (1014: "Expected is one of ( attachment, forward, end_date )"). Window-start scheduling must be computed client-side (as plead
@@ -66,7 +72,7 @@ Empirically-verified facts about the Plesk XML API (tested against **Plesk Obsid
   - `subject` round-trips; omitting it leaves Plesk's default `Re: <request_subject>`.
   - `end_date` is `Y-m-d`; an empty value is rejected — clear a set end date by sending `1970-01-01` (the server normalizes past dates to no end date).
 - **`forwarding.enabled` IS settable** in `update/set` (`<forwarding><enabled>false</enabled>` → ok). Whether `set` wipes the address list alongside is untested — assume yes (set = replace-all-mentioned), test on a forwarding-free mailbox.
-- **Webspace `status` IS settable** via `<webspace><set><values><gen_setup><status>0|16</status>` (0 = enabled, 16 = disabled) — validated live on 4wd.de.
+- **Webspace `status` IS settable** via `<webspace><set><values><gen_setup><status>0|16</status>` (0 = enabled, 16 = disabled) — validated live on a test domain.
 - **`server/get` data tags** (all optional, combinable): `key, gen_info, components, stat, admin, interfaces, services_state, prefs, shells, session_setup, site-isolation-config, updates, admin-domain-list, certificates`.
   - `stat` → `version{plesk_version, plesk_os, plesk_os_version, plesk_build, os_release, veid}`, `objects{clients, domains, active_domains, mail_boxes, mail_redirects, mail_groups, mail_responders, web_users, databases, ...}`, `other{cpu, uptime}`, `load_avg{l1,l5,l15}`, `mem/swap/diskspace`.
   - `updates` → `available_update, available_update_type, security_updates, last_installed_update, install_updates_automatically, ...`.
