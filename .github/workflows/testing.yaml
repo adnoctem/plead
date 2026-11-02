@@ -17,7 +17,7 @@ jobs:
           persist-credentials: false
 
       - name: Install PHP with extensions
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           coverage: none
           extensions: "intl, mbstring, pdo_sqlite, zip, pcntl"
@@ -64,7 +64,7 @@ jobs:
           persist-credentials: false
 
       - name: Install PHP with extensions
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           coverage: none
           extensions: ${{ matrix.operating-system == 'windows-latest' && 'intl, mbstring, pdo_sqlite, zip' || 'intl, mbstring, pdo_sqlite, zip, pcntl' }}
