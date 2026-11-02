@@ -48,10 +48,15 @@ Rows are never deleted: auto-replies carry a `status` (`scheduled`/`disabled`) a
 
 Three ways to run `plead`, all behaving identically:
 
-- **Standalone phar (any platform, no install)** — download `plead.phar` from the [latest release][github_releases], `chmod +x` it and run `./plead.phar list` (Windows: `php plead.phar`). The phar is self-contained: config, SQLite state and logs live in the usual XDG locations, never inside the archive. It needs PHP 8.4+ with `ext-ctype`, `ext-curl`, `ext-dom`, `ext-iconv`, `ext-pdo_sqlite`, `ext-phar`,
+- **Standalone phar (any platform, no install)** — download `plead.phar` from the [latest release][github_releases], `chmod +x` it and run `./plead.phar list` (Windows: `php plead.phar`). The phar is self-contained: config, SQLite state and logs live in the usual XDG locations, never inside the archive.
+  It needs PHP 8.4.27+ (or 8.5.12+) with `ext-ctype`, `ext-curl`, `ext-dom`, `ext-iconv`, `ext-pdo_sqlite`, `ext-phar`,
   `ext-simplexml`, `ext-xml` and `ext-zlib` (the embedded requirement checker enforces these); `ext-pcntl` is additionally required for `watch -d`. `plead.phar --version` reports the git tag (or commit hash) it was built from.
 - **Docker** — `docker pull ghcr.io/adnoctem/plead` (image tags cover the PHP 8.4/8.5 variants); `PLEAD_DATA_DIR=/data` is the persistent volume.
-- **From source** — `composer install` in a checkout; `bin/plead` runs directly on PHP 8.4+.
+- **From source** — `composer install` in a checkout; `bin/plead` runs directly on PHP 8.4.27+ (or 8.5.12+).
+
+> **PHP security floor:** PHP2Shell (CVE-2026-109618 / CVE-2026-109619) is fixed in PHP 8.4.27 and 8.5.12.
+> `plead` is a CLI and never serves HTTP requests, but it requires a patched runtime regardless — older
+> patch releases are unsupported.
 
 ## ✨ TL;DR
 

@@ -88,6 +88,9 @@ final class AddressCommandsTest extends TestCase
             'mailbox_enabled' => true,
             'forwarding' => [],
             'autoresponder_enabled' => false,
+            'quota' => 0,
+            'antivir' => '',
+            'outgoing-messages-mbox-limit' => '',
         ];
 
         $this->tester(new AddressSetCommand())->execute([
@@ -126,6 +129,9 @@ final class AddressCommandsTest extends TestCase
             'mailbox_enabled' => true,
             'forwarding' => [],
             'autoresponder_enabled' => false,
+            'quota' => 0,
+            'antivir' => '',
+            'outgoing-messages-mbox-limit' => '',
         ];
 
         $tester = $this->tester(new AddressSetCommand());
@@ -144,6 +150,9 @@ final class AddressCommandsTest extends TestCase
             'mailbox_enabled' => true,
             'forwarding' => [],
             'autoresponder_enabled' => false,
+            'quota' => 0,
+            'antivir' => '',
+            'outgoing-messages-mbox-limit' => '',
         ];
 
         $tester = $this->tester(new AddressSetCommand());
@@ -161,6 +170,9 @@ final class AddressCommandsTest extends TestCase
             'mailbox_enabled' => true,
             'forwarding' => [],
             'autoresponder_enabled' => false,
+            'quota' => 0,
+            'antivir' => '',
+            'outgoing-messages-mbox-limit' => '',
         ];
 
         $tester = $this->tester(new AddressSetCommand());
@@ -180,6 +192,9 @@ final class AddressCommandsTest extends TestCase
             'mailbox_quota' => 268435456,
             'forwarding' => [],
             'autoresponder_enabled' => false,
+            'quota' => 0,
+            'antivir' => '',
+            'outgoing-messages-mbox-limit' => '',
         ];
 
         $tester = $this->tester(new AddressSetCommand());
@@ -209,6 +224,9 @@ final class AddressCommandsTest extends TestCase
             'mailbox_enabled' => true,
             'forwarding' => [],
             'autoresponder_enabled' => false,
+            'quota' => 0,
+            'antivir' => '',
+            'outgoing-messages-mbox-limit' => '',
         ];
 
         $tester = $this->tester(new AddressSetCommand());
@@ -226,6 +244,9 @@ final class AddressCommandsTest extends TestCase
             'mailbox_enabled' => true,
             'forwarding' => [],
             'autoresponder_enabled' => false,
+            'quota' => 0,
+            'antivir' => '',
+            'outgoing-messages-mbox-limit' => '',
         ];
 
         $tester = $this->tester(new AddressSetCommand());
@@ -259,6 +280,9 @@ final class AddressCommandsTest extends TestCase
             'mailbox_enabled' => true,
             'forwarding' => [],
             'autoresponder_enabled' => false,
+            'quota' => 0,
+            'antivir' => '',
+            'outgoing-messages-mbox-limit' => '',
         ];
 
         $tester = $this->tester(new AddressSetCommand());
@@ -282,6 +306,9 @@ final class AddressCommandsTest extends TestCase
             'mailbox_enabled' => true,
             'forwarding' => [],
             'autoresponder_enabled' => false,
+            'quota' => 0,
+            'antivir' => '',
+            'outgoing-messages-mbox-limit' => '',
         ];
 
         // Local rows plead tracks under the old address.
@@ -366,6 +393,9 @@ final class AddressCommandsTest extends TestCase
             'mailbox_enabled' => true,
             'forwarding' => [],
             'autoresponder_enabled' => false,
+            'quota' => 0,
+            'antivir' => '',
+            'outgoing-messages-mbox-limit' => '',
         ];
 
         $this->tester(new AddressSetCommand())->execute(['email' => 'user@company.com', '--description' => 'Desc']);

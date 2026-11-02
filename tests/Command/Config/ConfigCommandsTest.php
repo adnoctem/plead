@@ -36,35 +36,27 @@ final class ConfigCommandsTest extends TestCase
 
     public function testSetGetListRoundtrip(): void
     {
-        $this->tester->run(['command' => 'config:set', 'key' => 'servers.0.host', 'value' => 'mail.company.com']);
-        self::assertSame(0, $this->tester->getStatusCode());
+        self::assertSame(0, $this->tester->run(['command' => 'config:set', 'key' => 'servers.0.host', 'value' => 'mail.company.com']));
 
-        $this->tester->run(['command' => 'config:set', 'key' => 'servers.0.secret_key', 'value' => 's3cret']);
-        self::assertSame(0, $this->tester->getStatusCode());
+        self::assertSame(0, $this->tester->run(['command' => 'config:set', 'key' => 'servers.0.secret_key', 'value' => 's3cret']));
 
-        $this->tester->run(['command' => 'config:get', 'key' => 'servers.0.host']);
-        self::assertSame(0, $this->tester->getStatusCode());
+        self::assertSame(0, $this->tester->run(['command' => 'config:get', 'key' => 'servers.0.host']));
         self::assertStringContainsString('mail.company.com', $this->tester->getDisplay());
 
-        $this->tester->run(['command' => 'config:list']);
-        self::assertSame(0, $this->tester->getStatusCode());
+        self::assertSame(0, $this->tester->run(['command' => 'config:list']));
         self::assertStringContainsString('mail.company.com', $this->tester->getDisplay());
         self::assertStringNotContainsString('s3cret', $this->tester->getDisplay());
     }
 
     public function testListFailsGracefullyWithoutConfig(): void
     {
-        $this->tester->run(['command' => 'config:list']);
-
-        self::assertNotSame(0, $this->tester->getStatusCode());
+        self::assertNotSame(0, $this->tester->run(['command' => 'config:list']));
         self::assertStringContainsString('No complete configuration found', $this->tester->getDisplay());
     }
 
     public function testRejectsUnknownKey(): void
     {
-        $this->tester->run(['command' => 'config:set', 'key' => 'plesk.wrong', 'value' => 'x']);
-
-        self::assertNotSame(0, $this->tester->getStatusCode());
+        self::assertNotSame(0, $this->tester->run(['command' => 'config:set', 'key' => 'plesk.wrong', 'value' => 'x']));
         self::assertStringContainsString('is not writable', $this->tester->getDisplay());
     }
 
@@ -72,29 +64,22 @@ final class ConfigCommandsTest extends TestCase
     {
         $this->tester->run(['command' => 'config:set', 'key' => 'servers.0.host', 'value' => 'mail.company.com']);
         $this->tester->run(['command' => 'config:set', 'key' => 'servers.0.secret_key', 'value' => 'k']);
-        $this->tester->run(['command' => 'config:set', 'key' => 'watch.interval', 'value' => '90']);
-
-        self::assertSame(0, $this->tester->getStatusCode());
+        self::assertSame(0, $this->tester->run(['command' => 'config:set', 'key' => 'watch.interval', 'value' => '90']));
 
         // The stored value must survive config validation (int, not string).
-        $this->tester->run(['command' => 'config:get', 'key' => 'watch.interval']);
-        self::assertSame(0, $this->tester->getStatusCode());
+        self::assertSame(0, $this->tester->run(['command' => 'config:get', 'key' => 'watch.interval']));
         self::assertStringContainsString('90', $this->tester->getDisplay());
     }
 
     public function testWatchIntervalRejectsNonInteger(): void
     {
-        $this->tester->run(['command' => 'config:set', 'key' => 'watch.interval', 'value' => 'abc']);
-
-        self::assertNotSame(0, $this->tester->getStatusCode());
+        self::assertNotSame(0, $this->tester->run(['command' => 'config:set', 'key' => 'watch.interval', 'value' => 'abc']));
         self::assertStringContainsString('positive integer', $this->tester->getDisplay());
     }
 
     public function testGetUnknownKeyFails(): void
     {
-        $this->tester->run(['command' => 'config:get', 'key' => 'nope.missing']);
-
-        self::assertNotSame(0, $this->tester->getStatusCode());
+        self::assertNotSame(0, $this->tester->run(['command' => 'config:get', 'key' => 'nope.missing']));
     }
 
     public function testViewShowsMergedConfigurationWithEnvOverride(): void
@@ -106,21 +91,19 @@ final class ConfigCommandsTest extends TestCase
         putenv('PLEAD_PLESK_SECRET_KEY=env-secret');
 
         try {
-            $this->tester->run(['command' => 'config:view']);
+            $status = $this->tester->run(['command' => 'config:view']);
         } finally {
             putenv('PLEAD_PLESK_SECRET_KEY');
         }
 
-        self::assertSame(0, $this->tester->getStatusCode());
+        self::assertSame(0, $status);
         self::assertStringContainsString('env-secret', $this->tester->getDisplay());
         self::assertStringContainsString('debug', $this->tester->getDisplay());
     }
 
     public function testViewFailsGracefullyWithoutConfig(): void
     {
-        $this->tester->run(['command' => 'config:view']);
-
-        self::assertNotSame(0, $this->tester->getStatusCode());
+        self::assertNotSame(0, $this->tester->run(['command' => 'config:view']));
         self::assertStringContainsString('No complete configuration found', $this->tester->getDisplay());
     }
 }
