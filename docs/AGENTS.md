@@ -37,10 +37,21 @@ same before building. `git-version` injects the git tag/commit into `src/Applica
   dirty-only by default (`reconciled = 0` / `unreconciledLists()`), `--full` sweeps everything,
   `-d/--detached` spawns itself via `proc_open` with stdio on the log file (explicit argv, no shell;
   the old `fclose(STDOUT)`/`fopen` fd-reuse trick no longer frees the stdio fds on PHP 8.5; pid file
-  `plead-<host>.watch.pid`), interval from `watch.interval` config. Each pass: auto-reply definitions
-  first (re-record diverging `mail.autoresponder` entries), then rule engine (derives desired recipients
+  `plead-<host>.watch.pid`), interval from `watch.interval` config. Each pass: inbox files first
+  (`watch.inbox`, see below), then inbox expiry, then auto-reply definitions (re-record diverging
+  `mail.autoresponder` entries), then rule engine (derives desired recipients
   of `mail.group` entries from live addresses, writes intents), then autoresponder/group/alias
   reconcilers push. `Spinner` (braille frames, CR+`ESC[2K`) animates the wait; only when stdout is a TTY.
+- **Inbox (`watch.inbox`).** External tools drop one absence JSON per mailbox into a watched
+  directory (`src/Inbox/`): `InboxEntry` parses/validates schema v1 (`email` or `samAccountName`+`domain`,
+  `startDate`/`endDate` + optional times, optional `deputyEmail`, per-entry `timezone`/`language`/`subject`/
+  `format`/`inclusive`, arbitrary `data`; UTF-8 BOM tolerated), `InboxProcessor` verifies the mailbox
+  exists, renders the forwarding template when a deputy is set (and queues a forwarding intent) or the
+  normal template otherwise, records the auto-reply intent, and archives the file (`processed/`; malformed
+  files/unknown mailboxes go to `failed/` with an `.error.txt`). `InboxExpiry` removes the deputy
+  forwarding once `end_date` has passed (Plesk's native end_date only stops the reply). Existing forwarding
+  is adopted before the deputy is added, so only the deputy is removed on expiry. The format is deliberately
+  directory-service agnostic; the AD scripts are just one generator.
 - **Rule-driven groups.** `src/Rule/` — `GroupRule` (address/domain + `pattern` and/or `recipients`,
   `GroupPattern::compile()` adds `~…~` delimiters when missing), `GroupRuleSet` (config → rules),
   `GroupRuleEngine` (live `listAddresses()` → filtered set, manual recipients appended verbatim — foreign

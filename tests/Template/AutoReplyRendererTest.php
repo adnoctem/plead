@@ -19,9 +19,14 @@ final class AutoReplyRendererTest extends TestCase
     private string $base;
     private string $templateFile;
     private string $catalogs;
+    private string $defaultTimezone;
 
     protected function setUp(): void
     {
+        // bin/plead pins the runtime timezone; Twig's date filter uses it.
+        $this->defaultTimezone = date_default_timezone_get();
+        date_default_timezone_set('Europe/Berlin');
+
         $this->base = sys_get_temp_dir().'/plead-renderer-'.bin2hex(random_bytes(4));
         $this->catalogs = $this->base.'/translations';
         mkdir($this->catalogs, 0o777, true);
@@ -34,6 +39,7 @@ final class AutoReplyRendererTest extends TestCase
 
     protected function tearDown(): void
     {
+        date_default_timezone_set($this->defaultTimezone);
         foreach (glob($this->base.'/*') ?: [] as $file) {
             is_dir($file) ? $this->removeDir($file) : @unlink($file);
         }
@@ -229,6 +235,57 @@ final class AutoReplyRendererTest extends TestCase
         $renderer = new AutoReplyRenderer($templateFile, $this->catalogs, null, new MjmlConverter($fakeBinary));
 
         self::assertSame('Nur Text', $renderer->renderMessage(null, null, null, null));
+    }
+
+    public function testForwardingTemplateRendersTheDeputyFromExtraData(): void
+    {
+        $this->writeCatalog('de', [
+            'greeting' => 'Hallo',
+            'date_format' => 'd.m.Y',
+            'period_inclusive' => 'vom %start% bis einschließlich %end%',
+            'forwarded_to' => 'weitergeleitet an %deputy%',
+            'regards' => 'Gruß',
+        ]);
+        $template = dirname(__DIR__, 2).'/resources/templates/autoresponder-forwarding.txt.twig';
+        $renderer = new AutoReplyRenderer($template, $this->catalogs);
+
+        $out = $renderer->renderMessage(
+            null,
+            '2026-09-17T00:00:00+02:00',
+            '2026-09-18T23:59:59+02:00',
+            true,
+            'de',
+            ['deputyEmail' => 'deputy@company.com', 'firstname' => 'Erika', 'surname' => 'Muster'],
+        );
+
+        self::assertStringContainsString('weitergeleitet an deputy@company.com', $out);
+        self::assertStringContainsString('Erika Muster', $out);
+        self::assertStringContainsString('17.09.2026', $out);
+    }
+
+    public function testScheduleValuesWinOverInlineData(): void
+    {
+        $this->writeCatalog('de', [
+            'greeting' => '%start%',
+            'date_format' => 'd.m.Y',
+            'period_inclusive' => 'x',
+            'forwarded_to' => 'z',
+            'regards' => 'y',
+        ]);
+        $template = dirname(__DIR__, 2).'/resources/templates/autoresponder-forwarding.txt.twig';
+        $renderer = new AutoReplyRenderer($template, $this->catalogs);
+
+        $out = $renderer->renderMessage(
+            null,
+            '2026-09-17T00:00:00+02:00',
+            '2026-09-18T23:59:59+02:00',
+            true,
+            'de',
+            ['startDate' => 'DATA-FILE-WINS'],
+        );
+
+        self::assertStringContainsString('17.09.2026', $out);
+        self::assertStringNotContainsString('DATA-FILE-WINS', $out);
     }
 
     private function mjmlFixture(): string

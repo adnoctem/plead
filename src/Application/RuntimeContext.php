@@ -10,6 +10,9 @@ use App\Database\Connection;
 use App\Gateway\PleskEndpoint;
 use App\Gateway\PleskMailGateway;
 use App\Gateway\PleskRestGateway;
+use App\Inbox\InboxExpiry;
+use App\Inbox\InboxProcessor;
+use App\Inbox\InboxSettings;
 use App\Logging\ContextInterpolatingFormatter;
 use App\Reconciler\AutoReplyReconciler;
 use App\Reconciler\MailAliasReconciler;
@@ -49,6 +52,8 @@ final class RuntimeContext
     private ?GroupRuleEngine $groupRuleEngine = null;
     private ?AutoReplyRuleEngine $autoReplyRuleEngine = null;
     private ?AutoReplyRenderer $renderer = null;
+    private ?InboxProcessor $inboxProcessor = null;
+    private ?InboxExpiry $inboxExpiry = null;
     private ?LoggerInterface $logger = null;
     private ?MjmlConverter $mjmlConverter = null;
 
@@ -204,6 +209,46 @@ final class RuntimeContext
             $this->autoReplyRepository(),
             $this->syncLogRepository(),
             $this->renderer(),
+            $this->logger(),
+            $this->dryRun,
+        );
+    }
+
+    /**
+     * The inbox processor, or null when `watch.inbox.path` is not configured.
+     */
+    public function inboxProcessor(): ?InboxProcessor
+    {
+        if (null !== $this->inboxProcessor) {
+            return $this->inboxProcessor;
+        }
+
+        $settings = InboxSettings::fromConfig($this->config());
+        if (null === $settings) {
+            return null;
+        }
+
+        return $this->inboxProcessor = new InboxProcessor(
+            $settings,
+            $this->autoReplyRepository(),
+            $this->mailGroupRepository(),
+            $this->reconcilerMail(),
+            $this->syncLogRepository(),
+            $this->gateway(),
+            null === $settings->templateAutoreply ? $this->renderer() : $this->renderer($settings->templateAutoreply),
+            $this->renderer($settings->templateForwarding),
+            $this->logger(),
+            $this->dryRun,
+        );
+    }
+
+    /** Expires ended inbox absences (deputy forwardings); always available. */
+    public function inboxExpiry(): InboxExpiry
+    {
+        return $this->inboxExpiry ??= new InboxExpiry(
+            $this->autoReplyRepository(),
+            $this->mailGroupRepository(),
+            $this->syncLogRepository(),
             $this->logger(),
             $this->dryRun,
         );

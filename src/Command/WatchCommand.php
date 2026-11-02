@@ -50,6 +50,15 @@ final class WatchCommand extends AbstractPleadCommand
         $context = $this->context();
         $changed = 0;
 
+        // Inbox: absence files dropped by external tools (directory scripts,
+        // HR exports, hand-written JSON) become auto-reply + forwarding
+        // intents. Disabled unless watch.inbox.path is configured.
+        $changed += $context->inboxProcessor()?->process() ?? 0;
+
+        // Inbox expiry: Plesk disables the reply itself via end_date, but a
+        // deputy forwarding has no end date and must be removed explicitly.
+        $changed += $context->inboxExpiry()->expire();
+
         // Config-defined auto-replies: re-record intents when the rendered
         // message or dates diverged from the local state.
         $autoresponders = $context->config()['mail']['autoresponder'] ?? [];

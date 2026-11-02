@@ -74,9 +74,12 @@ final class AutoReplyRenderer
      * maps resolved as key[lang] ?? key. The logo URL is config-backed but a
      * data-file value may override it.
      *
-     * @param null|string $language the render language (e.g. 'de'); null =
-     *                              first catalog language. The txt template
-     *                              ignores it and renders every language.
+     * @param null|string          $language  the render language (e.g. 'de'); null =
+     *                                        first catalog language. The txt template
+     *                                        ignores it and renders every language.
+     * @param array<string, mixed> $extraData inline template data merged over the
+     *                                        data file (used by the inbox); the
+     *                                        schedule values stay authoritative
      */
     public function renderMessage(
         ?string $dataFile,
@@ -84,6 +87,7 @@ final class AutoReplyRenderer
         ?string $endDate,
         ?bool $inclusive = null,
         ?string $language = null,
+        array $extraData = [],
     ): string {
         if (null !== $language && !in_array($language, $this->languages, true)) {
             throw new \RuntimeException(sprintf(
@@ -108,8 +112,11 @@ final class AutoReplyRenderer
             $context['inclusive'] = $inclusive;
         }
 
-        if (null !== $dataFile) {
-            $context = array_merge($this->loadDataFile($dataFile), $context);
+        if (null !== $dataFile || [] !== $extraData) {
+            $data = null !== $dataFile ? $this->loadDataFile($dataFile) : [];
+            // Inline data (e.g. one inbox entry) wins over the baseline data
+            // file; the schedule values merged after it stay authoritative.
+            $context = array_merge($data, $extraData, $context);
         }
 
         // The logo is per installation (template.logo_url); the data file may

@@ -225,6 +225,21 @@ default_server: prod.example.com # used when neither --server nor PLEAD_SERVER i
 
 watch:
   interval: 60 # default interval of `plead watch` (--interval overrides)
+  # optional: ingest absence JSON files dropped by external tools
+  # (directory scripts, HR exports, ...) - disabled unless `path` is set
+  inbox:
+    path: /srv/plead/inbox # watched for *.json; processed/ and failed/ live inside
+    # processed_path: done # optional (default: <path>/processed)
+    # failed_path: failed # optional (default: <path>/failed)
+    domain: company.com # mail domain for entries that use samAccountName
+    timezone: Europe/Berlin # optional; defaults to the process TZ (match the Plesk server!)
+    # data_file: /etc/plead/absence-data.yaml # baseline template variables
+    # template_autoreply: resources/templates/autoresponder.txt.twig # "not forwarded" variant
+    # template_forwarding: resources/templates/autoresponder-forwarding.txt.twig # deputy variant
+    # language: de
+    # subject: "Automatische Antwort"
+    # format: plain # plain|html; default: inferred from the rendered message
+    # inclusive: true # end date counts as absence (template wording)
 
 # optional: template + translation catalog locations (defaults shown)
 template:
@@ -327,6 +342,54 @@ to 56px and the card tightens its padding. Note that the mjml.io try-it-live pan
 preview the mobile layout, shrink your browser window below 650px.
 Template authors should note that Twig consumes one newline after every `{% %}` tag — keep two blank source lines
 where the message should show a blank line (the shipped template documents this in its header comment).
+
+### Inbox — absence files from external tools
+
+`watch.inbox` turns `plead watch` into a drop-folder processor: every `*.json` file in
+`watch.inbox.path` describes one absence and is applied as an auto-reply (plus an optional
+deputy forwarding). The format is intentionally **not tied to a directory service** — `email`
+addresses a mailbox directly, `samAccountName` + `domain` is a convenience for AD-driven
+generators. Schema v1:
+
+```json
+{
+  "schemaVersion": 1,
+  "action": "schedule",
+  "email": "erika.mustermann@example.com",
+  "startDate": "2026-09-17",
+  "startTime": "17:00",
+  "endDate": "2026-09-22",
+  "endTime": "12:00",
+  "deputyEmail": "vertretung@example.com",
+  "timezone": "Europe/Berlin",
+  "language": "de",
+  "subject": "Automatische Antwort",
+  "format": "html",
+  "inclusive": true,
+  "data": {
+    "firstname": "Erika",
+    "surname": "Mustermann",
+    "department": { "de": "Vertrieb" }
+  },
+  "submittedAt": "2026-09-17T16:57:46.987+02:00"
+}
+```
+
+- **Identity** — `email` wins; otherwise `samAccountName` + `domain` (entry or `watch.inbox.domain`).
+- **Schedule** — `startDate`/`endDate` required (`YYYY-MM-DD`); `startTime`/`endTime` optional
+  (`HH:mm`; defaults: start of day / end of day). Times are interpreted in `timezone`, then the
+  process timezone (Plesk exposes no server timezone — align `TZ` with the server).
+- **Two modes** — with `deputyEmail` the _forwarding_ template is used (the reply says the mail
+  is forwarded) and a forwarding to the deputy is configured; without it the usual out-of-office
+  template is used and nothing is forwarded. Plesk forwarding keeps a local copy in the mailbox.
+- **Expiry** — Plesk disables the reply itself via `end_date`, but forwarding has no end date, so
+  `watch` removes the deputy forwarding once the absence has ended (and records it in the audit trail).
+- **`action: "cancel"`** — ends an absence immediately (disables the reply, removes the deputy).
+- **`data`** — arbitrary template variables, merged over `watch.inbox.data_file`; per-language maps
+  resolve as `key[lang] ?? key.de ?? key`.
+- **File lifecycle** — valid files move to `processed/`; malformed files and unknown mailboxes move
+  to `failed/` with a `<name>.json.error.txt` sidecar. `--dry-run` leaves files in place.
+  Writers should emit UTF-8 without BOM and write atomically (`.tmp` + rename).
 
 Environment variables override everything:
 

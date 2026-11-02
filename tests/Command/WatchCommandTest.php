@@ -185,6 +185,45 @@ final class WatchCommandTest extends TestCase
         self::assertSame('2099-01-01T08:00:00+02:00', $row['start_date']);
     }
 
+    public function testWatchProcessesInboxFiles(): void
+    {
+        $inbox = $this->base.'/inbox';
+        mkdir($inbox, 0o777, true);
+        $this->gateway->mailboxes['user@company.com'] = [];
+        file_put_contents($inbox.'/user.json', json_encode([
+            'schemaVersion' => 1,
+            'email' => 'user@company.com',
+            'startDate' => '2099-09-17',
+            'endDate' => '2099-09-18',
+            'deputyEmail' => 'deputy@company.com',
+        ], JSON_THROW_ON_ERROR));
+
+        file_put_contents($this->base.'/config/plead.yaml', implode("\n", [
+            'servers:',
+            '    - host: fake.local',
+            '      secret_key: test-key',
+            'watch:',
+            '    inbox:',
+            '        path: '.$inbox,
+        ]));
+
+        $killer = $this->spawnKiller(2.0);
+
+        $command = new WatchCommand();
+        $command->setContext($this->context);
+        $tester = new CommandTester($command);
+        $tester->execute(['--interval' => '60']);
+
+        $this->reap($killer);
+
+        self::assertSame(0, $tester->getStatusCode());
+        $row = $this->context->autoReplyRepository()->find('user@company.com');
+        self::assertNotNull($row);
+        self::assertSame('deputy@company.com', $row['deputy_email']);
+        self::assertSame(['deputy@company.com'], $this->gateway->forwarding['user@company.com']);
+        self::assertFileExists($inbox.'/processed/user.json');
+    }
+
     /**
      * Spawn a child that SIGTERMs this process after $seconds. The watch loop
      * must already be running (handlers installed) when the signal lands, so

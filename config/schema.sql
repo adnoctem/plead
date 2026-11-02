@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS auto_replies (
     subject TEXT NOT NULL DEFAULT '',
     -- '' | 'plain' | 'html' (autoresponder content type)
     format TEXT NOT NULL DEFAULT '',
+    -- deputy address the mailbox forwards to for this absence; '' = none
+    deputy_email TEXT NOT NULL DEFAULT '',
     -- 'scheduled' | 'disabled'; rows are never deleted (audit trail)
     status TEXT NOT NULL DEFAULT 'scheduled',
     -- 0 = intent recorded but not yet confirmed on Plesk
