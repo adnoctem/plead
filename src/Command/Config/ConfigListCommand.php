@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace App\Command\Config;
 
 use App\Command\AbstractPleadCommand;
+use App\Config\ConfigPresenter;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
 
-#[AsCommand(name: 'config:list', description: 'Show the resolved configuration')]
+#[AsCommand(name: 'config:list', description: 'Show the resolved configuration (credentials masked)')]
 final class ConfigListCommand extends AbstractPleadCommand
 {
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -27,30 +28,7 @@ final class ConfigListCommand extends AbstractPleadCommand
             return self::FAILURE;
         }
 
-        if (!empty($config['plesk']['secret_key'])) {
-            $config['plesk']['secret_key'] = '***';
-        }
-        if (!empty($config['plesk']['password'])) {
-            $config['plesk']['password'] = '***';
-        }
-        foreach (['server'] as $block) {
-            if (!empty($config[$block]['secret_key'])) {
-                $config[$block]['secret_key'] = '***';
-            }
-            if (!empty($config[$block]['password'])) {
-                $config[$block]['password'] = '***';
-            }
-        }
-        foreach ($config['servers'] ?? [] as $index => $server) {
-            if (!empty($server['secret_key'])) {
-                $config['servers'][$index]['secret_key'] = '***';
-            }
-            if (!empty($server['password'])) {
-                $config['servers'][$index]['password'] = '***';
-            }
-        }
-
-        $output->writeln(Yaml::dump($config, 8, 4));
+        $output->writeln(Yaml::dump(ConfigPresenter::forOutput($config, true), 8, 4));
 
         return self::SUCCESS;
     }

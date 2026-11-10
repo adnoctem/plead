@@ -107,10 +107,14 @@ plesk.example.com:
         pattern: "^(info|support)@"
 ```
 
-Every value is validated by the config tree on load (`config:view` shows the
-merged result). `config:set <key> <value>` writes one key into the persisted
-config file — the file `config:edit`/`config:set` targets is the first existing
-config path, or the first candidate when none exists.
+Every value is validated by the config tree on load. `config:list` shows the
+resolved configuration with credentials masked; `config:view` shows the same
+view including environment overrides (and therefore secrets). Both print the
+configured `servers` list plus `selected_server` / `default_server`; the
+internal `server` and `plesk` blocks are not displayed. `config:set <key>
+<value>` writes one key into the persisted config file — the file
+`config:edit`/`config:set` targets is the first existing config path, or the
+first candidate when none exists.
 
 ### Environment variables
 

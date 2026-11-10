@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace App\Command\Config;
 
 use App\Command\AbstractPleadCommand;
+use App\Config\ConfigPresenter;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
 
-#[AsCommand(name: 'config:view', description: 'Show the resolved configuration after merging all sources')]
+#[AsCommand(name: 'config:view', description: 'Show the resolved configuration including environment overrides')]
 final class ConfigViewCommand extends AbstractPleadCommand
 {
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -27,7 +28,7 @@ final class ConfigViewCommand extends AbstractPleadCommand
             return self::FAILURE;
         }
 
-        $output->writeln(Yaml::dump($config, 8, 4));
+        $output->writeln(Yaml::dump(ConfigPresenter::forOutput($config, false), 8, 4));
 
         return self::SUCCESS;
     }

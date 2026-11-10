@@ -44,8 +44,12 @@ final class ConfigCommandsTest extends TestCase
         self::assertStringContainsString('mail.company.com', $this->tester->getDisplay());
 
         self::assertSame(0, $this->tester->run(['command' => 'config:list']));
-        self::assertStringContainsString('mail.company.com', $this->tester->getDisplay());
-        self::assertStringNotContainsString('s3cret', $this->tester->getDisplay());
+        $display = $this->tester->getDisplay();
+        self::assertStringContainsString('mail.company.com', $display);
+        self::assertStringContainsString('selected_server: mail.company.com', $display);
+        self::assertStringNotContainsString('s3cret', $display);
+        self::assertStringNotContainsString("\nplesk:", $display);
+        self::assertStringNotContainsString("\nserver:", $display);
     }
 
     public function testListFailsGracefullyWithoutConfig(): void
@@ -97,8 +101,12 @@ final class ConfigCommandsTest extends TestCase
         }
 
         self::assertSame(0, $status);
-        self::assertStringContainsString('env-secret', $this->tester->getDisplay());
-        self::assertStringContainsString('debug', $this->tester->getDisplay());
+        $display = $this->tester->getDisplay();
+        self::assertStringContainsString('env-secret', $display);
+        self::assertStringContainsString('debug', $display);
+        self::assertStringContainsString('selected_server: file.example.com', $display);
+        self::assertStringNotContainsString("\nplesk:", $display);
+        self::assertStringNotContainsString("\nserver:", $display);
     }
 
     public function testViewFailsGracefullyWithoutConfig(): void
