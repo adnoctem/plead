@@ -13,12 +13,15 @@ final class UnixPathProvider implements PathProviderInterface
 
     public function dataHome(): string
     {
-        return $this->env('PLEAD_DATA_DIR', $this->env('XDG_DATA_HOME', $this->home().'/.local/share'));
+        return $this->env('XDG_DATA_HOME', $this->home().'/.local/share');
     }
 
     public function dataDir(): string
     {
-        return $this->dataHome().'/plead';
+        // PLEAD_DATA_DIR names the state directory itself (the container sets
+        // it to the mounted /data volume); XDG_DATA_HOME is a parent and gets
+        // the application directory appended.
+        return $this->env('PLEAD_DATA_DIR', $this->dataHome().'/plead');
     }
 
     public function cacheHome(): string

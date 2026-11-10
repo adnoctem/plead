@@ -15,6 +15,12 @@ final class Connection
             throw new \RuntimeException(sprintf('Unable to create data directory: %s', $directory));
         }
 
+        // A read-only bind mount is the usual cause; name the directory here
+        // instead of letting PDO report a less actionable SQLite error.
+        if (!is_writable($directory)) {
+            throw new \RuntimeException(sprintf('Data directory is not writable: %s', $directory));
+        }
+
         $this->pdo = new \PDO('sqlite:'.$databasePath);
         $this->pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
         $this->pdo->exec('PRAGMA journal_mode=WAL;');

@@ -54,6 +54,7 @@ final class UnixPathProviderTest extends TestCase
 
         self::assertSame('/tmp/xdg-config', $provider->configHome());
         self::assertSame('/tmp/xdg-data', $provider->dataHome());
+        self::assertSame('/tmp/xdg-data/plead', $provider->dataDir());
     }
 
     public function testConfigDirsMostSpecificFirst(): void
@@ -82,14 +83,14 @@ final class UnixPathProviderTest extends TestCase
         self::assertSame($this->home.'/.local/share/plead/plead.log', $provider->logFile());
     }
 
-    public function testPleadDataDirOverridesDataHome(): void
+    public function testPleadDataDirOverridesTheDataDirectory(): void
     {
         putenv('PLEAD_DATA_DIR=/data');
 
         $provider = new UnixPathProvider();
 
-        self::assertSame('/data', $provider->dataHome());
-        self::assertSame('/data/plead', $provider->dataDir());
-        self::assertSame('/data/plead/plead.log', $provider->logFile());
+        self::assertSame($this->home.'/.local/share', $provider->dataHome());
+        self::assertSame('/data', $provider->dataDir());
+        self::assertSame('/data/plead.log', $provider->logFile());
     }
 }
