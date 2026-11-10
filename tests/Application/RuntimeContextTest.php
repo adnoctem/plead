@@ -66,6 +66,33 @@ final class RuntimeContextTest extends TestCase
         self::assertSame(Level::Info, $context->logLevel());
     }
 
+    public function testReloadConfigPicksUpFileChanges(): void
+    {
+        $configHome = $this->paths->configHome();
+        if (!is_dir($configHome)) {
+            mkdir($configHome, 0o777, true);
+        }
+        $path = $configHome.'/plead.yaml';
+        $firstHost = 'one-'.bin2hex(random_bytes(3)).'.example.com';
+        $secondHost = 'two-'.bin2hex(random_bytes(3)).'.example.com';
+
+        file_put_contents($path, "servers:\n  - host: {$firstHost}\n    secret_key: test\n");
+
+        $context = new RuntimeContext($this->paths, null, false, null, OutputInterface::VERBOSITY_NORMAL);
+
+        self::assertNotSame($secondHost, $context->config()['server']['host']);
+
+        file_put_contents($path, "servers:\n  - host: {$secondHost}\n    secret_key: test\n");
+
+        self::assertNotSame($secondHost, $context->config()['server']['host']);
+
+        $context->reloadConfig();
+
+        self::assertSame($secondHost, $context->config()['server']['host']);
+
+        unlink($path);
+    }
+
     public function testVerboseRaisesFileLevelToDebug(): void
     {
         $context = new RuntimeContext($this->paths, null, false, 'info', OutputInterface::VERBOSITY_VERBOSE);

@@ -48,6 +48,7 @@ final class WatchCommand extends AbstractPleadCommand
     private function runPass(bool $full): int
     {
         $context = $this->context();
+        $context->reloadConfig();
         $changed = 0;
 
         // Inbox: absence files dropped by external tools (directory scripts,

@@ -99,6 +99,21 @@ final class RuntimeContext
         return $this->config ??= $this->configLoader()->load($this->explicitConfigPath, $this->serverOption);
     }
 
+    /**
+     * Drop config-derived state so a long-running watcher picks up edits to
+     * mail.group, mail.autoresponder, watch.inbox or the templates on its next
+     * pass. Server selection and the SQLite connection stay fixed for the
+     * lifetime of the process.
+     */
+    public function reloadConfig(): void
+    {
+        $this->config = null;
+        $this->inboxProcessor = null;
+        $this->inboxExpiry = null;
+        $this->renderer = null;
+        $this->autoReplyRuleEngine = null;
+    }
+
     /** The host of the server selected via --server/PLEAD_SERVER (first by default). */
     public function serverHost(): string
     {
