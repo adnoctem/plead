@@ -94,9 +94,12 @@ abstract class AbstractTemplateCommand extends AbstractPleadCommand
 
     protected function openTarget(string $target): bool
     {
-        $command = match (PHP_OS_FAMILY) {
-            'Windows' => ['cmd', '/c', 'start', '', $target],
-            'Darwin' => ['open', $target],
+        $wsl = false !== getenv('WSL_DISTRO_NAME') || false !== getenv('WSL_INTEROP');
+
+        $command = match (true) {
+            'Windows' === PHP_OS_FAMILY => ['cmd', '/c', 'start', '', $target],
+            $wsl => ['cmd.exe', '/c', 'start', '', $target],
+            'Darwin' === PHP_OS_FAMILY => ['open', $target],
             default => ['xdg-open', $target],
         };
 

@@ -48,6 +48,19 @@ final class TemplateServeCommand extends AbstractTemplateCommand
             return self::FAILURE;
         }
 
+        $probe = @stream_socket_server('tcp://'.$host.':'.$port, $errorCode, $errorMessage);
+        if (false === $probe) {
+            $output->writeln(sprintf(
+                '<error>Cannot bind %s:%d: %s</error>',
+                $host,
+                $port,
+                '' !== $errorMessage ? $errorMessage : 'port is unavailable',
+            ));
+
+            return self::FAILURE;
+        }
+        fclose($probe);
+
         $configOption = $input->getOption('config');
         $state = [
             'config_file' => is_string($configOption) && '' !== $configOption ? $configOption : null,

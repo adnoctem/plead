@@ -23,9 +23,9 @@
             }
         }
 
-        if ($('deputy-enabled').checked && '' !== $('deputy').value.trim()) {
-            query.set('deputy', $('deputy').value.trim());
-        }
+        // Always send the key: an empty value explicitly clears the state
+        // default and selects the absence body when deputy mode is off.
+        query.set('deputy', $('deputy-enabled').checked ? $('deputy').value.trim() : '');
 
         query.set('inclusive', $('inclusive').checked ? '1' : '0');
 

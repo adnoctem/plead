@@ -27,7 +27,10 @@ final class ServerTest extends TestCase
         mkdir($this->base.'/translations', 0o777, true);
 
         $this->template = $this->base.'/templates/message.txt.twig';
-        file_put_contents($this->template, "{{ 'absence'|trans({}, 'autoresponder', language) }}");
+        file_put_contents(
+            $this->template,
+            "{% if deputyEmail is defined and deputyEmail %}forwarding:{{ deputyEmail }}{% else %}{{ 'absence'|trans({}, 'autoresponder', language) }}{% endif %}",
+        );
 
         file_put_contents($this->base.'/translations/autoresponder.de.yaml', 'absence: "nicht weitergeleitet"');
 
@@ -82,6 +85,37 @@ final class ServerTest extends TestCase
         self::assertSame('text', $data['kind']);
         self::assertStringContainsString('nicht weitergeleitet', $data['source']);
         self::assertSame($data['source'], $data['html']);
+    }
+
+    public function testExplicitEmptyDeputyClearsTheStateDefault(): void
+    {
+        $server = new Server([
+            'config_file' => $this->configFile,
+            'inbox' => true,
+            'template' => $this->template,
+            'data_file' => $this->dataFile,
+            'translations' => $this->base.'/translations',
+            'logo_url' => null,
+            'language' => 'de',
+            'deputy_email' => 'deputy@example.com',
+            'start_date' => '2026-11-10T00:00:00+01:00',
+            'end_date' => '2026-11-17T23:59:59+01:00',
+            'inclusive' => true,
+            'watch' => true,
+        ]);
+
+        ob_start();
+        $server->handle(['REQUEST_URI' => '/api/render'], ['language' => 'de']);
+        $default = json_decode((string) ob_get_clean(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertStringContainsString('forwarding:deputy@example.com', $default['source']);
+
+        ob_start();
+        $server->handle(['REQUEST_URI' => '/api/render'], ['language' => 'de', 'deputy' => '']);
+        $data = json_decode((string) ob_get_clean(), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertTrue($data['ok']);
+        self::assertStringContainsString('nicht weitergeleitet', $data['source']);
+        self::assertStringNotContainsString('forwarding:', $data['source']);
     }
 
     public function testStateListsTemplatesDataFilesAndLanguages(): void
