@@ -108,13 +108,13 @@ plesk.example.com:
 ```
 
 Every value is validated by the config tree on load. `config:list` shows the
-resolved configuration with credentials masked; `config:view` shows the same
-view including environment overrides (and therefore secrets). Both print the
-configured `servers` list plus `selected_server` / `default_server`; the
-internal `server` and `plesk` blocks are not displayed. `config:set <key>
-<value>` writes one key into the persisted config file — the file
-`config:edit`/`config:set` targets is the first existing config path, or the
-first candidate when none exists.
+resolved configuration with credentials masked; it prints the configured
+`servers` list plus `selected_server` / `default_server`, and never the
+internal `server` / `plesk` blocks. To inspect effective credentials, read the
+loaded configuration file (`config:path`). `config:set <key> <value>` writes
+one key into the persisted config file — the file `config:edit`/`config:set`
+targets is the first existing config path, or the first candidate when none
+exists.
 
 ### Environment variables
 
@@ -220,6 +220,11 @@ reserved exception). The format is deliberately not tied to a directory
 service — `email` addresses a mailbox directly, while `samAccountName` is
 resolved through `ad-account-map.json` (when present) or a `domain` fallback.
 
+The machine-readable contract is
+[`resources/schema/inbox-entry.schema.json`](../resources/schema/inbox-entry.schema.json)
+(JSON Schema draft 2020-12, schema v1). Point generators and UI validators at
+that file rather than reimplementing the table below.
+
 ```json
 {
   "schemaVersion": 1,
@@ -263,6 +268,17 @@ resolved through `ad-account-map.json` (when present) or a `domain` fallback.
 | `inclusive`      | no                      | template wording only                                              |
 | `data`           | no                      | arbitrary template variables, merged over `watch.inbox.data_file`  |
 | `submittedAt`    | no                      | ISO 8601 timestamp (audit/ordering only)                           |
+
+A `cancel` entry only needs the identity fields — the schedule fields are
+ignored:
+
+```json
+{
+  "schemaVersion": 1,
+  "action": "cancel",
+  "email": "erika.mustermann@example.com"
+}
+```
 
 **Two modes.** With `deputyEmail` the _forwarding_ template is rendered (the
 reply says the mail is forwarded) and a forwarding to the deputy is configured.
@@ -390,7 +406,7 @@ systemd or `restart: unless-stopped` in Docker) rather than with `-d`.
 
 ### Local commands
 
-- `config:get|set|list|view|path|edit` — inspect/edit the merged configuration.
+- `config:get|set|list|path|edit` — inspect/edit the merged configuration.
 - `db:path|query` — locate/open the SQLite database (needs the `sqlite3` CLI).
 - `audit:trail` — TUI pager over the audit log (plain table fallback);
   `audit:export` dumps it as JSON/YAML.

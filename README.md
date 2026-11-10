@@ -66,8 +66,8 @@ plead config:set servers.0.host mail.company.com
 plead config:set servers.0.secret_key <secret-key>
 plead config:edit          # open the config file in $EDITOR instead
 
-# see the resolved configuration (post-merge) and where files live
-plead config:view
+# see the resolved configuration (post-merge, credentials masked) and where files live
+plead config:list
 plead config:path
 
 # schedule an auto-reply (the configured template renders the message;
@@ -164,7 +164,6 @@ Read commands query the **live Plesk server** by default; add `--local` to read 
 | `config:get <dotted.key>`               | Show the resolved value of one configuration key                                                                                                       |
 | `config:set <dotted.key> <value>`       | Write a configuration key to the user config file                                                                                                      |
 | `config:list`                           | Show the resolved configuration with secrets masked                                                                                                    |
-| `config:view`                           | Show the full resolved configuration (post-merge, including secrets)                                                                                   |
 | `config:edit`                           | Open the user config file in `$EDITOR` and validate it afterwards                                                                                      |
 | `config:path`                           | Show where plead stores configuration, data, and logs                                                                                                  |
 | `db:path`                               | Show the location of the SQLite database                                                                                                               |
@@ -396,6 +395,8 @@ directly, `samAccountName` resolves through the account map or a domain fallback
 - **File lifecycle** — valid files move to `processed/`; malformed files and unknown mailboxes move
   to `failed/` with a `<name>.json.error.txt` sidecar. `--dry-run` leaves files in place.
   Writers should emit UTF-8 without BOM and write atomically (`.tmp` + rename).
+- **Schema** — the machine-readable contract is
+  [`resources/schema/inbox-entry.schema.json`](resources/schema/inbox-entry.schema.json) (JSON Schema draft 2020-12, schema v1).
 - **AD generators** — see [Using the inbox in an AD environment](docs/USAGE.md#using-the-inbox-in-an-ad-environment)
   for a rough GPO → invocation script → server share workflow and how
   `ad-account-map.json` resolves `samAccountName`.
