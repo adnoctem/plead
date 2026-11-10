@@ -65,6 +65,8 @@ use App\Command\Server\Service\ServiceStopCommand;
 use App\Command\Server\Session\SessionGetCommand;
 use App\Command\Server\Session\SessionListCommand;
 use App\Command\Server\Session\SessionTerminateCommand;
+use App\Command\Template\TemplateRenderCommand;
+use App\Command\Template\TemplateServeCommand;
 use App\Command\WatchCommand;
 use App\Config\PathProvider\PathProviderFactory;
 use Symfony\Component\Console\Application;
@@ -87,6 +89,8 @@ final class PleadApplication extends Application
         $this->setAutoExit(false);
         $this->addCommands([
             new WatchCommand(),
+            new TemplateRenderCommand(),
+            new TemplateServeCommand(),
             new AuditExportCommand(),
             new AuditTrailCommand(),
             new ConfigEditCommand(),

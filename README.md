@@ -166,6 +166,8 @@ Read commands query the **live Plesk server** by default; add `--local` to read 
 | `config:list`                           | Show the resolved configuration with secrets masked                                                                                                    |
 | `config:edit`                           | Open the user config file in `$EDITOR` and validate it afterwards                                                                                      |
 | `config:path`                           | Show where plead stores configuration, data, and logs                                                                                                  |
+| `template:render`                       | Render one template to MJML, HTML or text                                                                                                              |
+| `template:serve`                        | Hot-reloading local template studio                                                                                                                    |
 | `db:path`                               | Show the location of the SQLite database                                                                                                               |
 | `db:query`                              | Open an interactive `sqlite3` shell on the database                                                                                                    |
 | `server:info`                           | Server identity, versions, object counts, resources and update status                                                                                  |

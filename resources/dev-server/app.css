@@ -1,0 +1,260 @@
+:root {
+    color-scheme: dark;
+    --bg: #0c0d12;
+    --surface: #15171f;
+    --surface-2: #1c1f29;
+    --border: #2b2f3d;
+    --text: #eceef6;
+    --muted: #8c92a6;
+    --accent: #f39200;
+    --accent-soft: rgba(243, 146, 0, 0.14);
+    --error: #ff7a85;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.45 "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+}
+
+header strong {
+    color: var(--accent);
+    font-size: 18px;
+}
+
+.muted {
+    color: var(--muted);
+}
+
+main {
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+    height: calc(100vh - 57px);
+}
+
+aside {
+    overflow: auto;
+    padding: 18px;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+}
+
+aside label {
+    display: block;
+    margin-bottom: 13px;
+    color: var(--muted);
+    font-size: 12px;
+    letter-spacing: 0.02em;
+}
+
+aside label.check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text);
+    font-size: 13px;
+}
+
+aside input,
+aside select {
+    display: block;
+    width: 100%;
+    margin-top: 5px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+}
+
+aside input[type="checkbox"] {
+    display: inline-block;
+    width: auto;
+    margin: 0;
+    accent-color: var(--accent);
+}
+
+aside input:disabled {
+    opacity: 0.45;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin: 18px 0;
+}
+
+button {
+    cursor: pointer;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface-2);
+    color: var(--text);
+    padding: 8px 10px;
+    font: inherit;
+}
+
+button:hover {
+    border-color: var(--accent);
+}
+
+#reload {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.hint {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.hint a {
+    color: var(--accent);
+}
+
+.error {
+    margin: 12px 0;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 122, 133, 0.5);
+    border-radius: 8px;
+    background: rgba(255, 122, 133, 0.08);
+    color: var(--error);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+dl {
+    display: grid;
+    grid-template-columns: 74px minmax(0, 1fr);
+    gap: 5px 10px;
+    margin: 16px 0 0;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+dt {
+    color: var(--muted);
+}
+
+dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+    color: var(--text);
+}
+
+.stage {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex-direction: column;
+}
+
+.tabs {
+    display: flex;
+    gap: 2px;
+    padding: 10px 14px 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.tabs button {
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 6px 6px 0 0;
+    background: transparent;
+    color: var(--muted);
+    padding: 9px 14px;
+}
+
+.tabs button.active {
+    border-bottom-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-soft);
+}
+
+.panels {
+    flex: 1;
+    min-height: 0;
+    padding: 14px;
+}
+
+.panel {
+    display: none;
+    height: 100%;
+}
+
+.panel.active {
+    display: block;
+}
+
+iframe {
+    width: 100%;
+    height: 100%;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+}
+
+textarea,
+pre {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-2);
+    color: #d9deed;
+    font: 12px/1.55 "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+    resize: none;
+    white-space: pre;
+    overflow: auto;
+}
+
+pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 860px) {
+    main {
+        grid-template-columns: 1fr;
+        height: auto;
+    }
+
+    aside {
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .stage {
+        min-height: 70vh;
+    }
+}

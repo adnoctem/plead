@@ -4,6 +4,7 @@
   "directories": [
     "src",
     "config",
+    "resources/dev-server",
     "resources/schema",
     "resources/templates",
     "resources/translations"

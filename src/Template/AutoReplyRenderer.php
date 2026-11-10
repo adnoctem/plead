@@ -89,6 +89,31 @@ final class AutoReplyRenderer
         ?string $language = null,
         array $extraData = [],
     ): string {
+        return $this->convert($this->renderMessageSource(
+            $dataFile,
+            $startDate,
+            $endDate,
+            $inclusive,
+            $language,
+            $extraData,
+        ));
+    }
+
+    /**
+     * Render the raw template source without converting MJML markup. This is
+     * what the template studio uses to show the MJML that would be pasted into
+     * the try-it-live editor; the production path uses renderMessage().
+     *
+     * @param array<string, mixed> $extraData
+     */
+    public function renderMessageSource(
+        ?string $dataFile,
+        ?string $startDate,
+        ?string $endDate,
+        ?bool $inclusive = null,
+        ?string $language = null,
+        array $extraData = [],
+    ): string {
         if (null !== $language && !in_array($language, $this->languages, true)) {
             throw new \RuntimeException(sprintf(
                 'Unknown autoresponder language "%s". Available: %s',
@@ -137,18 +162,24 @@ final class AutoReplyRenderer
             );
         }
 
-        // Templates that render MJML markup (e.g. the MJML autoresponder) are
-        // converted to the final HTML here, so the stored message is ready
-        // for Plesk; a missing mjml binary surfaces as a clear error.
-        if (str_starts_with(ltrim($message), '<mjml')) {
-            try {
-                $message = $this->mjmlConverter->convert($message);
-            } catch (\Throwable $e) {
-                throw new \RuntimeException(sprintf('Unable to convert the MJML template to HTML: %s', $e->getMessage()), 0, $e);
-            }
+        return $message;
+    }
+
+    /**
+     * Convert rendered MJML markup to final HTML. Text templates pass through
+     * unchanged.
+     */
+    public function convert(string $message): string
+    {
+        if (!str_starts_with(ltrim($message), '<mjml')) {
+            return $message;
         }
 
-        return $message;
+        try {
+            return $this->mjmlConverter->convert($message);
+        } catch (\Throwable $e) {
+            throw new \RuntimeException(sprintf('Unable to convert the MJML template to HTML: %s', $e->getMessage()), 0, $e);
+        }
     }
 
     /**

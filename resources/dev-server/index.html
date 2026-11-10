@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>plead template studio</title>
+    <link rel="stylesheet" href="/assets/app.css" />
+  </head>
+  <body>
+    <header>
+      <div>
+        <strong>plead</strong> <span class="muted">template studio</span>
+      </div>
+      <div id="status" class="muted">Loading…</div>
+    </header>
+
+    <main>
+      <aside>
+        <label
+          >Template
+          <select id="template"></select>
+        </label>
+
+        <label
+          >Data file
+          <select id="data"></select>
+        </label>
+
+        <label
+          >Language
+          <select id="language"></select>
+        </label>
+
+        <div class="row">
+          <label
+            >Start
+            <input type="date" id="start" />
+          </label>
+          <label
+            >End
+            <input type="date" id="end" />
+          </label>
+        </div>
+
+        <label class="check">
+          <input type="checkbox" id="inclusive" /> End date is inclusive
+        </label>
+
+        <label class="check">
+          <input type="checkbox" id="deputy-enabled" /> Deputy / forwarding mode
+        </label>
+
+        <label
+          >Deputy email
+          <input
+            type="email"
+            id="deputy"
+            placeholder="deputy@example.com"
+            disabled
+          />
+        </label>
+
+        <label
+          >Logo URL
+          <input type="url" id="logo" placeholder="optional override" />
+        </label>
+
+        <div class="actions">
+          <button id="reload" type="button">Render now</button>
+          <button id="open-html" type="button">Open HTML</button>
+          <button id="copy-mjml" type="button">Copy MJML</button>
+        </div>
+
+        <p class="hint">
+          Edit the template, translations or data file in your editor; the
+          preview refreshes automatically. Use
+          <a href="https://mjml.io/try-it-live" target="_blank" rel="noreferrer"
+            >MJML try-it-live</a
+          >
+          for the source in the MJML tab.
+        </p>
+
+        <div id="error" class="error" hidden></div>
+
+        <dl id="meta"></dl>
+      </aside>
+
+      <section class="stage">
+        <nav class="tabs">
+          <button type="button" data-tab="preview" class="active">
+            Preview
+          </button>
+          <button type="button" data-tab="mjml" id="tab-mjml">MJML</button>
+          <button type="button" data-tab="html" id="tab-html">HTML</button>
+          <button type="button" data-tab="text" id="tab-text">Text</button>
+        </nav>
+
+        <div class="panels">
+          <div class="panel active" data-panel="preview">
+            <iframe
+              id="preview"
+              title="Rendered template preview"
+              sandbox=""
+            ></iframe>
+          </div>
+          <div class="panel" data-panel="mjml">
+            <textarea id="mjml" readonly spellcheck="false"></textarea>
+          </div>
+          <div class="panel" data-panel="html">
+            <textarea id="html" readonly spellcheck="false"></textarea>
+          </div>
+          <div class="panel" data-panel="text">
+            <pre id="text"></pre>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="/assets/app.js" defer></script>
+  </body>
+</html>

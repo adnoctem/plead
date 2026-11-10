@@ -161,7 +161,8 @@ which skips all RPCs.
 | `mail:autoresponder` | `list`, `get`, `set`                                                                            |
 | `domain`             | `list`, `get`, `set`, `add`, `remove`, `traffic:get`, `traffic:set`, `descriptor`               |
 | `server`             | `info`, `admin`, `session:*`, `service:*`, `ip:*`, `components:*`, `extension:*`, `ref`, `exec` |
-| `config`             | `get`, `set`, `list`, `view`, `path`, `edit`                                                    |
+| `config`             | `get`, `set`, `list`, `path`, `edit`                                                            |
+| `template`           | `render`, `serve`                                                                               |
 | `db`                 | `path`, `query`                                                                                 |
 | `audit`              | `trail`, `export`                                                                               |
 | —                    | `watch`                                                                                         |
@@ -437,6 +438,57 @@ to HTML automatically by the render pipeline (via the `mjml` CLI); the stored
 message is ready for Plesk. The single template chooses the body sentence:
 `absence` when no deputy is present, and `forwarded_to` with `%deputy%` when
 the absence carries a deputy.
+
+### Template development
+
+Two commands make the templates workable without touching Plesk:
+
+```bash
+# Render the configured global template (text by default).
+plead template:render --data-file=resources/templates/data/autoresponder.yaml \
+  --language=de --format=html
+
+# Render the production inbox template in forwarding mode.
+plead template:render --inbox --deputy-email=deputy@example.com --format=html
+
+# Print the MJML source for the try-it-live editor.
+plead template:render --inbox --format=mjml --output=preview.mjml
+
+# Write both the MJML source and the converted HTML.
+plead template:render --inbox --output-dir=var/template-preview
+```
+
+- `--template=PATH` overrides the template; `--inbox` selects
+  `watch.inbox.template` and `watch.inbox.data_file`.
+- `--translations=PATH`, `--language`, `--logo-url` and `--data-file` override
+  the configured sources; useful for previewing templates outside the
+  configured installation.
+- `--start-date`/`--end-date` accept `YYYY-MM-DD` or ISO 8601; the default is
+  today through seven days from now.
+- `--deputy-email` renders the forwarding body; omit it for the `absence`
+  body.
+- `--format=mjml|html|text` selects stdout output; `--output=FILE` writes one
+  file, `--output-dir=DIR` writes `preview.mjml`, `preview.html` and/or
+  `preview.txt` as applicable.
+
+`template:serve` starts a local, hot-reloading studio:
+
+```bash
+plead template:serve --inbox --port=8080 --open
+```
+
+The browser page provides template/data/language selectors, the deputy toggle,
+dates, the inclusive flag, an HTML preview, the rendered MJML source (with a
+copy button for the MJML try-it-live editor), the converted HTML and the text
+output. Edits to the selected template, its translation catalogs, the data file
+or the config are picked up automatically; `--no-watch` disables that polling.
+The server binds to `127.0.0.1` by default. Use `--host=0.0.0.0` only inside a
+container or on a trusted network:
+
+```bash
+docker compose run --rm -p 8080:8080 cli \
+  template:serve --host=0.0.0.0 --port=8080
+```
 
 ## Timezones
 
