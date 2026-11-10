@@ -21,8 +21,14 @@ tools. Local desired state and the full audit trail live in SQLite; a single
 
 - **Phar** — download `plead.phar` from the latest release, `chmod +x`, run it.
 - **Docker** — `ghcr.io/adnoctem/plead` (PHP 8.4/8.5 tags); `/data` is the
-  persistent volume (`PLEAD_DATA_DIR=/data`).
+  persistent volume (`PLEAD_DATA_DIR=/data` names the state directory itself).
 - **Source** — `composer install`, then `bin/plead`.
+
+> **Docker volume permissions.** The image runs as UID/GID **1001**
+> (`plead:plead`). Bind-mounted host directories must be writable by that
+> user, e.g. `sudo chown -R 1001:1001 data archive`. If you see
+> `mkdir(): Permission denied` or `Data directory is not writable` for
+> `/data`, the mounted volume is still owned by another user.
 
 ## Configuration
 
@@ -111,16 +117,17 @@ config path, or the first candidate when none exists.
 - `PLEAD_SERVER` — selects the server (same as `--server`; host or index)
 - `PLEAD_PLESK_SECRET_KEY` — overrides the selected server's secret key
 - `PLEAD_PLESK_LOGIN` / `PLEAD_PLESK_PASSWORD` — override credentials
-- `PLEAD_DATA_DIR` — overrides the data directory (e.g. `/data` in Docker)
+- `PLEAD_DATA_DIR` — overrides the data directory itself (e.g. `/data` in Docker)
 - `MJML_BINARY_PATH` — explicit `mjml` binary (needed inside the phar)
 - `TZ` — process timezone; must match the Plesk server (see "Timezones")
 
 ### Data and audit trail
 
 The SQLite database (`plead.sqlite`) and `plead.log` live in the platform data
-directory (`~/.local/share/plead` on Linux). Every row is scoped to its server,
-so desired state and history of multiple servers coexist. The database is the
-authoritative record of what `plead` intends and what it did:
+directory (`~/.local/share/plead` on Linux; `PLEAD_DATA_DIR` overrides the
+directory itself, e.g. `/data` in the container). Every row is scoped to its
+server, so desired state and history of multiple servers coexist. The database
+is the authoritative record of what `plead` intends and what it did:
 
 1. a mutation records the intent (`reconciled = 0` plus a `pending` audit row),
 2. the RPC is issued,
@@ -172,6 +179,10 @@ lists every pass, so new mailboxes join automatically and leavers drop out.
 Adoption: the first time `plead` touches a list it imports the current Plesk
 recipients, so pre-existing forwarding is preserved rather than purged.
 
+If the group address does not exist as a mailname on Plesk yet, the first push
+creates it as a **forward-only** mailname with the computed recipients. It is
+not a mailbox; mail is delivered to the recipients only.
+
 ### Auto-replies
 
 Plesk supports `end_date` natively but has no concept of a **start date** —
@@ -200,9 +211,10 @@ plead mail:autoresponder:set user@example.com --enabled=false
 ### The inbox (absence files)
 
 `watch.inbox` turns `watch` into a drop-folder processor: every `*.json` file
-in `watch.inbox.path` describes one absence. The format is deliberately not
-tied to a directory service — `email` addresses a mailbox directly, while
-`samAccountName` + `domain` is a convenience for directory-driven generators.
+in `watch.inbox.path` describes one absence (`ad-account-map.json` is the one
+reserved exception). The format is deliberately not tied to a directory
+service — `email` addresses a mailbox directly, while `samAccountName` is
+resolved through `ad-account-map.json` (when present) or a `domain` fallback.
 
 ```json
 {
@@ -233,8 +245,8 @@ tied to a directory service — `email` addresses a mailbox directly, while
 | `schemaVersion`  | no (default `1`)        | unknown versions are rejected                                      |
 | `action`         | no (`schedule`)         | `schedule` or `cancel` (cancel needs only the identity fields)     |
 | `email`          | one of both             | target mailbox; wins over `samAccountName`                         |
-| `samAccountName` | ″                       | resolved with `domain` (entry) or `watch.inbox.domain`             |
-| `domain`         | no                      | per-entry mail domain for `samAccountName`                         |
+| `samAccountName` | ″                       | resolved through `ad-account-map.json`, else `domain`/config       |
+| `domain`         | no                      | fallback mail domain for `samAccountName`                          |
 | `startDate`      | yes                     | `YYYY-MM-DD`                                                       |
 | `startTime`      | no (default `00:00`)    | `HH:mm` (`HH:mm:ss` accepted)                                      |
 | `endDate`        | yes                     | `YYYY-MM-DD`                                                       |
@@ -265,6 +277,74 @@ unknown mailboxes move to `failed/` with a `<name>.json.error.txt` sidecar.
 Render/RPC failures leave the file in place for the next pass. `--dry-run`
 leaves files untouched. Writers should emit **UTF-8 without BOM** and write
 atomically (`.tmp` + rename) so a half-written file is never read.
+
+#### Using the inbox in an AD environment
+
+`plead` does not query Active Directory itself, but it can read an optional
+`ad-account-map.json` in the inbox directory to resolve entries that only
+carry a `sAMAccountName`. This is useful when the AD `mail` attribute is
+missing or stale.
+
+1. **Account map.** Put `ad-account-map.json` in the inbox directory, next to
+   the per-user JSON files. It is a JSON object mapping each `sAMAccountName`
+   to its mailbox address:
+
+   ```json
+   {
+     "erika.mustermann": "erika.mustermann@example.com",
+     "jdoe": "john.doe@example.org"
+   }
+   ```
+
+   `plead` reads it on every pass and never treats it as an absence entry (it
+   is not archived). Lookups are case-insensitive. If the map contains entries
+   but not the entry's `sAMAccountName`, the entry is rejected instead of
+   guessing `<sAMAccountName>@<domain>`; update the map when users join. An
+   explicit `email` in the entry always wins.
+
+2. **Invocation script.** Publish a small script on a server share and run it
+   from a GPO logon script or a published shortcut. The script resolves the
+   current user's `sAMAccountName`, prompts for the absence window and
+   optional deputy, and writes `<sAMAccountName>.json` in schema v1 to the
+   inbox. It may emit `email` directly or only `samAccountName`; `plead`
+   resolves the latter from the map. Write atomically (`.tmp` + rename), use
+   UTF-8 without BOM, and sign the script or allow it through the execution
+   policy so the GPO/shortcut can run it.
+
+3. **Server share.** Keep the script, the map and the inbox in one place:
+
+   ```text
+   \\fileserver\absence\OOOConfiguration\
+   ├── Invoke-OutOfOfficePrompt.ps1
+   ├── ad-account-map.json        <- read by plead, never archived
+   └── erika.mustermann.json      <- absence entry
+   ```
+
+   CIFS-mount `OOOConfiguration` on the host that runs `watch` and bind-mount
+   it into the container. The mount must be writable by the container user:
+   `watch` moves each processed file to the local archive and removes the
+   source from the share.
+
+   ```yaml
+   volumes:
+     - /mnt/absence/OOOConfiguration:/inbox
+   ```
+
+   ```yaml
+   watch:
+     inbox:
+       path: /inbox
+   ```
+
+4. **Keep the map current.** Regenerate it when users join or leave (for
+   example from an AD export) and replace the file on the share atomically
+   (`.tmp` + rename) so a pass never reads a half-written map. The watcher
+   reloads it on the next pass; no restart is required.
+
+If every user shares one mail domain, an entry can emit `samAccountName` +
+`domain` instead of `email`; `plead` uses `domain` (or `watch.inbox.domain`)
+when the map is absent or empty. With multiple domains, keep the map current
+and let it resolve the address — one configured domain cannot cover them.
 
 ### The watcher
 

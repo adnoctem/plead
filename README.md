@@ -51,7 +51,7 @@ Three ways to run `plead`, all behaving identically:
 - **Standalone phar (any platform, no install)** — download `plead.phar` from the [latest release][github_releases], `chmod +x` it and run `./plead.phar list` (Windows: `php plead.phar`). The phar is self-contained: config, SQLite state and logs live in the usual XDG locations, never inside the archive.
   It needs PHP 8.4.27+ (or 8.5.12+) with `ext-ctype`, `ext-curl`, `ext-dom`, `ext-iconv`, `ext-pdo_sqlite`, `ext-phar`,
   `ext-simplexml`, `ext-xml` and `ext-zlib` (the embedded requirement checker enforces these); `ext-pcntl` is additionally required for `watch -d`. `plead.phar --version` reports the git tag (or commit hash) it was built from.
-- **Docker** — `docker pull ghcr.io/adnoctem/plead` (image tags cover the PHP 8.4/8.5 variants); `PLEAD_DATA_DIR=/data` is the persistent volume.
+- **Docker** — `docker pull ghcr.io/adnoctem/plead` (image tags cover the PHP 8.4/8.5 variants); `PLEAD_DATA_DIR=/data` is the persistent volume. The image runs as UID 1001, so bind-mounted state directories must be writable by that user.
 - **From source** — `composer install` in a checkout; `bin/plead` runs directly on PHP 8.4.27+ (or 8.5.12+).
 
 > **PHP security floor:** PHP2Shell (CVE-2026-109618 / CVE-2026-109619) is fixed in PHP 8.4.27 and 8.5.12.
@@ -292,7 +292,8 @@ Group entries define the **desired recipients** of a mail group:
   the exclusion pattern. Without a `pattern`, the manual list is the whole set.
 - An entry with neither is a configuration error; `pattern` and `recipients` freely combine.
 
-`watch` re-derives every configured group every pass: new mailboxes join `all@…` automatically, disabled ones drop out, and `pbx@…`-style addresses never get in. The same definition can be applied once via `mail:group:set <email> --rule='…' --recipients=…` (both flags combine; with neither, the configured entry for that address is used).
+`watch` re-derives every configured group every pass: new mailboxes join `all@…` automatically, disabled ones drop out, and `pbx@…`-style addresses never get in. If the group address does not exist on Plesk yet, the first push creates it as a forward-only mailname with the computed recipients (not a mailbox). The same definition can be applied once via
+`mail:group:set <email> --rule='…' --recipients=…` (both flags combine; with neither, the configured entry for that address is used).
 
 Add `--write-config` and the applied definition is written into the config file's `mail.group` (replacing an existing entry for the address), so the watcher keeps maintaining the list without a manual edit.
 
@@ -352,9 +353,9 @@ where the message should show a blank line (the shipped template documents this 
 
 `watch.inbox` turns `plead watch` into a drop-folder processor: every `*.json` file in
 `watch.inbox.path` describes one absence and is applied as an auto-reply (plus an optional
-deputy forwarding). The format is intentionally **not tied to a directory service** — `email`
-addresses a mailbox directly, `samAccountName` + `domain` is a convenience for AD-driven
-generators. Schema v1:
+deputy forwarding). `ad-account-map.json` is reserved and never processed as an entry. The
+format is intentionally **not tied to a directory service** — `email` addresses a mailbox
+directly, `samAccountName` resolves through the account map or a domain fallback. Schema v1:
 
 ```json
 {
@@ -380,7 +381,7 @@ generators. Schema v1:
 }
 ```
 
-- **Identity** — `email` wins; otherwise `samAccountName` + `domain` (entry or `watch.inbox.domain`).
+- **Identity** — `email` wins; otherwise `samAccountName` through `ad-account-map.json`, then `domain` (entry or `watch.inbox.domain`).
 - **Schedule** — `startDate`/`endDate` required (`YYYY-MM-DD`); `startTime`/`endTime` optional
   (`HH:mm`; defaults: start of day / end of day). Times are interpreted in `timezone`, then the
   process timezone (Plesk exposes no server timezone — align `TZ` with the server).
@@ -395,13 +396,16 @@ generators. Schema v1:
 - **File lifecycle** — valid files move to `processed/`; malformed files and unknown mailboxes move
   to `failed/` with a `<name>.json.error.txt` sidecar. `--dry-run` leaves files in place.
   Writers should emit UTF-8 without BOM and write atomically (`.tmp` + rename).
+- **AD generators** — see [Using the inbox in an AD environment](docs/USAGE.md#using-the-inbox-in-an-ad-environment)
+  for a rough GPO → invocation script → server share workflow and how
+  `ad-account-map.json` resolves `samAccountName`.
 
 Environment variables override everything:
 
 - `PLEAD_SERVER` — selects the server (same as `--server`; host or index)
 - `PLEAD_PLESK_SECRET_KEY` — overrides the selected server's secret key
 - `PLEAD_PLESK_LOGIN` / `PLEAD_PLESK_PASSWORD` — override the selected server's credentials
-- `PLEAD_DATA_DIR` — overrides the data directory (used by the containerized deployment, e.g. `/data`)
+- `PLEAD_DATA_DIR` — overrides the data directory itself (used by the containerized deployment, e.g. `/data`)
 
 Data (SQLite database and log file) lives under the platform data directory — on Linux `~/.local/share/plead/`. Every row in the database is scoped to its server (`server` column), so the desired state and audit trail of multiple servers coexist without collisions. The SQLite database is the authoritative record of the desired state and the full audit trail.
 
