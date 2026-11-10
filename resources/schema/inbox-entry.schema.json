@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/adnoctem/plead/main/resources/schema/inbox-entry.schema.json",
+  "title": "plead inbox absence entry (schema v1)",
+  "description": "One JSON file dropped into watch.inbox.path. The file describes a scheduled auto-reply/forwarding or cancels an active absence. Unknown properties are ignored for forward compatibility.",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": ["integer", "null"],
+      "enum": [1, null],
+      "default": 1,
+      "description": "Schema version. Omit (or null) for version 1."
+    },
+    "action": {
+      "type": ["string", "null"],
+      "enum": ["schedule", "cancel", null],
+      "default": "schedule",
+      "description": "schedule creates or replaces an absence; cancel disables the reply and removes the deputy forwarding immediately."
+    },
+    "email": {
+      "type": ["string", "null"],
+      "format": "email",
+      "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+      "description": "Target mailbox. Wins over samAccountName; null is treated as absent."
+    },
+    "samAccountName": {
+      "type": ["string", "null"],
+      "pattern": "^[A-Za-z0-9._-]+$",
+      "description": "AD account name (null treated as absent). Resolved through ad-account-map.json when present, otherwise through domain or watch.inbox.domain."
+    },
+    "domain": {
+      "type": ["string", "null"],
+      "format": "hostname",
+      "description": "Mail domain for samAccountName (null treated as absent). Required when neither ad-account-map.json nor watch.inbox.domain provides the address."
+    },
+    "startDate": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "First day of the absence (YYYY-MM-DD). Required for schedule."
+    },
+    "startTime": {
+      "type": ["string", "null"],
+      "pattern": "^([01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?$",
+      "default": "00:00:00",
+      "description": "Start time (HH:mm or HH:mm:ss); null treated as absent. Defaults to 00:00:00."
+    },
+    "endDate": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "Last day of the absence (YYYY-MM-DD). Required for schedule."
+    },
+    "endTime": {
+      "type": ["string", "null"],
+      "pattern": "^([01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?$",
+      "default": "23:59:59",
+      "description": "End time (HH:mm or HH:mm:ss); null treated as absent. Defaults to 23:59:59."
+    },
+    "deputyEmail": {
+      "type": ["string", "null"],
+      "format": "email",
+      "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+      "description": "Optional deputy (null treated as absent). Presence switches to forwarding mode; must differ from the target mailbox."
+    },
+    "timezone": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "description": "IANA timezone for naive date/time values (null treated as absent). Defaults to watch.inbox.timezone, then the process TZ."
+    },
+    "language": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "description": "Render language, e.g. de or en (null treated as absent). Defaults to watch.inbox.language or template.language."
+    },
+    "subject": {
+      "type": ["string", "null"],
+      "description": "Reply subject (null treated as absent). Empty or omitted uses Plesk's default Re: <request_subject>."
+    },
+    "format": {
+      "type": ["string", "null"],
+      "enum": ["plain", "html", null],
+      "description": "Reply content type (null treated as absent). Omit to infer from the rendered message."
+    },
+    "inclusive": {
+      "type": ["boolean", "null"],
+      "description": "Template wording: true means through endDate, false means until endDate (null treated as absent). Defaults to watch.inbox.inclusive."
+    },
+    "data": {
+      "type": ["object", "null"],
+      "propertyNames": {
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": ["string", "number", "boolean", "null"]
+          },
+          {
+            "type": "object",
+            "additionalProperties": {
+              "type": ["string", "number", "boolean", "null"]
+            }
+          }
+        ]
+      },
+      "description": "Arbitrary template variables merged over watch.inbox.data_file. Values are scalars or locale maps."
+    },
+    "submittedAt": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Optional ISO 8601 timestamp (null treated as absent; audit/ordering only)."
+    }
+  },
+  "anyOf": [
+    {
+      "properties": {
+        "email": {
+          "type": "string"
+        }
+      },
+      "required": ["email"]
+    },
+    {
+      "properties": {
+        "samAccountName": {
+          "type": "string"
+        }
+      },
+      "required": ["samAccountName"]
+    }
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "const": "cancel"
+          }
+        },
+        "required": ["action"]
+      },
+      "else": {
+        "required": ["startDate", "endDate"]
+      }
+    }
+  ],
+  "additionalProperties": true,
+  "examples": [
+    {
+      "schemaVersion": 1,
+      "action": "schedule",
+      "email": "erika.mustermann@example.com",
+      "startDate": "2026-09-17",
+      "startTime": "17:00",
+      "endDate": "2026-09-22",
+      "endTime": "12:00",
+      "deputyEmail": "vertretung@example.com",
+      "timezone": "Europe/Berlin",
+      "language": "de",
+      "subject": "Automatische Antwort",
+      "format": "html",
+      "inclusive": true,
+      "data": {
+        "firstname": "Erika",
+        "surname": "Mustermann",
+        "department": {
+          "de": "Vertrieb"
+        }
+      },
+      "submittedAt": "2026-09-17T16:57:46.987+02:00"
+    },
+    {
+      "schemaVersion": 1,
+      "action": "cancel",
+      "email": "erika.mustermann@example.com"
+    }
+  ]
+}
