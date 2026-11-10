@@ -34,8 +34,7 @@ final class InboxProcessor
         private readonly MailGroupReconciler $forwardingReconciler,
         private readonly SyncLogRepository $syncLog,
         private readonly PleskMailGateway $gateway,
-        private readonly AutoReplyRenderer $autoreplyRenderer,
-        private readonly AutoReplyRenderer $forwardingRenderer,
+        private readonly AutoReplyRenderer $renderer,
         private readonly LoggerInterface $logger,
         private readonly bool $dryRun,
     ) {}
@@ -184,8 +183,7 @@ final class InboxProcessor
             $this->forwardings->remove($entry->email, $previousDeputy);
         }
 
-        $renderer = null !== $entry->deputyEmail ? $this->forwardingRenderer : $this->autoreplyRenderer;
-        $message = $renderer->renderMessage(
+        $message = $this->renderer->renderMessage(
             $this->settings->dataFile,
             $entry->startDate,
             $entry->endDate,

@@ -21,17 +21,20 @@ final class InboxConfigTest extends TestCase
     {
         $config = $this->resolve($this->servers());
 
-        self::assertNull($config['watch']['inbox']['path']);
+        self::assertNull($config['watch']['inbox']['paths']['root']);
+        self::assertNull($config['watch']['inbox']['template']);
+        self::assertNull($config['watch']['inbox']['translations']);
         self::assertNull(InboxSettings::fromConfig($config));
     }
 
     public function testInboxDefaultsAndArchiveLocations(): void
     {
         $config = $this->resolve($this->servers() + [
-            'watch' => ['inbox' => ['path' => '/srv/inbox', 'timezone' => 'Europe/Berlin']],
+            'watch' => ['inbox' => ['paths' => ['root' => '/srv/inbox'], 'timezone' => 'Europe/Berlin']],
         ]);
 
-        self::assertSame('resources/templates/autoresponder-forwarding.txt.twig', $config['watch']['inbox']['template_forwarding']);
+        self::assertNull($config['watch']['inbox']['template']);
+        self::assertNull($config['watch']['inbox']['translations']);
         self::assertTrue($config['watch']['inbox']['inclusive']);
 
         $settings = InboxSettings::fromConfig($config);
@@ -40,15 +43,19 @@ final class InboxConfigTest extends TestCase
         self::assertSame('/srv/inbox/processed', $settings->processedDirectory);
         self::assertSame('/srv/inbox/failed', $settings->failedDirectory);
         self::assertSame('Europe/Berlin', $settings->timezone->getName());
+        self::assertNull($settings->template);
+        self::assertNull($settings->translations);
     }
 
     public function testRelativeArchivePathsResolveAgainstTheInbox(): void
     {
         $config = $this->resolve($this->servers() + [
             'watch' => ['inbox' => [
-                'path' => '/srv/inbox',
-                'processed_path' => 'done',
-                'failed_path' => '/var/tmp/plead-failed',
+                'paths' => [
+                    'root' => '/srv/inbox',
+                    'processed' => 'done',
+                    'failed' => '/var/tmp/plead-failed',
+                ],
             ]],
         ]);
 
@@ -58,20 +65,45 @@ final class InboxConfigTest extends TestCase
         self::assertSame('/var/tmp/plead-failed', $settings->failedDirectory);
     }
 
+    public function testTemplateAndTranslationOverridesAreRead(): void
+    {
+        $config = $this->resolve($this->servers() + [
+            'watch' => ['inbox' => [
+                'paths' => ['root' => '/srv/inbox'],
+                'template' => '/etc/plead/templates/autoresponder.mjml.twig',
+                'translations' => '/etc/plead/translations',
+            ]],
+        ]);
+
+        $settings = InboxSettings::fromConfig($config);
+        self::assertNotNull($settings);
+        self::assertSame('/etc/plead/templates/autoresponder.mjml.twig', $settings->template);
+        self::assertSame('/etc/plead/translations', $settings->translations);
+    }
+
+    public function testLegacyFlatInboxKeysAreRejected(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+
+        $this->resolve($this->servers() + [
+            'watch' => ['inbox' => ['path' => '/srv/inbox']],
+        ]);
+    }
+
     public function testInvalidFormatIsRejected(): void
     {
         $this->expectException(InvalidConfigurationException::class);
         $this->expectExceptionMessage('watch.inbox.format');
 
         $this->resolve($this->servers() + [
-            'watch' => ['inbox' => ['path' => '/srv/inbox', 'format' => 'markdown']],
+            'watch' => ['inbox' => ['paths' => ['root' => '/srv/inbox'], 'format' => 'markdown']],
         ]);
     }
 
     public function testInvalidTimezoneIsRejectedWhenBuildingSettings(): void
     {
         $config = $this->resolve($this->servers() + [
-            'watch' => ['inbox' => ['path' => '/srv/inbox', 'timezone' => 'Mars/Olympus']],
+            'watch' => ['inbox' => ['paths' => ['root' => '/srv/inbox'], 'timezone' => 'Mars/Olympus']],
         ]);
 
         $this->expectException(\InvalidArgumentException::class);

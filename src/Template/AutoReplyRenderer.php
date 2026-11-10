@@ -133,7 +133,7 @@ final class AutoReplyRenderer
         if ('' === $message && [] === $this->languages) {
             throw new \RuntimeException(
                 'No autoresponder translation catalogs found - the template sentences come from '
-                .'resources/translations/autoresponder.{locale}.yaml (see template.translations_path).',
+                .'resources/translations/autoresponder.{locale}.yaml (see template.paths.translations).',
             );
         }
 

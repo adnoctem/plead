@@ -204,7 +204,8 @@ final class WatchCommandTest extends TestCase
             '      secret_key: test-key',
             'watch:',
             '    inbox:',
-            '        path: '.$inbox,
+            '        paths:',
+            '            root: '.$inbox,
         ]));
 
         $killer = $this->spawnKiller(2.0);

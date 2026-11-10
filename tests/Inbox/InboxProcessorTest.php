@@ -49,7 +49,11 @@ final class InboxProcessorTest extends TestCase
         $this->logger = new Logger('test', [new NullHandler()]);
 
         $this->settings = InboxSettings::fromConfig([
-            'watch' => ['inbox' => ['path' => $this->inbox, 'domain' => 'company.com', 'timezone' => 'Europe/Berlin']],
+            'watch' => ['inbox' => [
+                'paths' => ['root' => $this->inbox],
+                'domain' => 'company.com',
+                'timezone' => 'Europe/Berlin',
+            ]],
         ]) ?? throw new \RuntimeException('inbox settings were not built');
 
         $this->processor = $this->makeProcessor($this->settings, false);
@@ -381,7 +385,6 @@ final class InboxProcessorTest extends TestCase
             $this->syncLog,
             $this->gateway,
             new AutoReplyRenderer($templates.'/autoresponder.txt.twig', $translations),
-            new AutoReplyRenderer($templates.'/autoresponder-forwarding.txt.twig', $translations),
             $this->logger,
             $dryRun,
         );

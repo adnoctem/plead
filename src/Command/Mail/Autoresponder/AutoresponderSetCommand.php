@@ -21,7 +21,7 @@ final class AutoresponderSetCommand extends AbstractMailCommand
         $this
             ->addArgument('email', InputArgument::REQUIRED, 'Email address, e.g. user@company.com')
             ->addOption('enabled', null, InputOption::VALUE_REQUIRED, 'Whether the auto-reply should be enabled: true|false|yes|no|1|0 (default: true)')
-            ->addOption('template', null, InputOption::VALUE_REQUIRED, 'Template to render for this invocation (default: template.auto_reply_path from the config)')
+            ->addOption('template', null, InputOption::VALUE_REQUIRED, 'Template to render for this invocation (default: template.paths.auto_reply from the config)')
             ->addOption('data-file', null, InputOption::VALUE_REQUIRED, 'JSON or YAML file with template data (e.g. firstname, phoneNumber); the schedule dates are injected automatically')
             ->addOption('start-date', null, InputOption::VALUE_REQUIRED, 'When the auto-reply becomes active (default: now). Any date string is accepted and normalized to ISO 8601 with offset.')
             ->addOption('end-date', null, InputOption::VALUE_REQUIRED, 'When the auto-reply stops. Plesk handles the turn-off natively.')

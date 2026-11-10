@@ -237,16 +237,17 @@ final class AutoReplyRendererTest extends TestCase
         self::assertSame('Nur Text', $renderer->renderMessage(null, null, null, null));
     }
 
-    public function testForwardingTemplateRendersTheDeputyFromExtraData(): void
+    public function testSingleTemplateUsesTheForwardingSentenceWithADeputy(): void
     {
         $this->writeCatalog('de', [
             'greeting' => 'Hallo',
             'date_format' => 'd.m.Y',
             'period_inclusive' => 'vom %start% bis einschließlich %end%',
+            'absence' => 'nicht weitergeleitet',
             'forwarded_to' => 'weitergeleitet an %deputy%',
             'regards' => 'Gruß',
         ]);
-        $template = dirname(__DIR__, 2).'/resources/templates/autoresponder-forwarding.txt.twig';
+        $template = dirname(__DIR__, 2).'/resources/templates/autoresponder.txt.twig';
         $renderer = new AutoReplyRenderer($template, $this->catalogs);
 
         $out = $renderer->renderMessage(
@@ -259,8 +260,35 @@ final class AutoReplyRendererTest extends TestCase
         );
 
         self::assertStringContainsString('weitergeleitet an deputy@company.com', $out);
+        self::assertStringNotContainsString('nicht weitergeleitet', $out);
         self::assertStringContainsString('Erika Muster', $out);
         self::assertStringContainsString('17.09.2026', $out);
+    }
+
+    public function testSingleTemplateUsesTheAbsenceSentenceWithoutADeputy(): void
+    {
+        $this->writeCatalog('de', [
+            'greeting' => 'Hallo',
+            'date_format' => 'd.m.Y',
+            'period_inclusive' => 'vom %start% bis einschließlich %end%',
+            'absence' => 'nicht weitergeleitet',
+            'forwarded_to' => 'weitergeleitet an %deputy%',
+            'regards' => 'Gruß',
+        ]);
+        $template = dirname(__DIR__, 2).'/resources/templates/autoresponder.txt.twig';
+        $renderer = new AutoReplyRenderer($template, $this->catalogs);
+
+        $out = $renderer->renderMessage(
+            null,
+            '2026-09-17T00:00:00+02:00',
+            '2026-09-18T23:59:59+02:00',
+            true,
+            'de',
+            ['firstname' => 'Erika', 'surname' => 'Muster'],
+        );
+
+        self::assertStringContainsString('nicht weitergeleitet', $out);
+        self::assertStringNotContainsString('weitergeleitet an', $out);
     }
 
     public function testScheduleValuesWinOverInlineData(): void
@@ -269,10 +297,11 @@ final class AutoReplyRendererTest extends TestCase
             'greeting' => '%start%',
             'date_format' => 'd.m.Y',
             'period_inclusive' => 'x',
+            'absence' => 'y',
             'forwarded_to' => 'z',
             'regards' => 'y',
         ]);
-        $template = dirname(__DIR__, 2).'/resources/templates/autoresponder-forwarding.txt.twig';
+        $template = dirname(__DIR__, 2).'/resources/templates/autoresponder.txt.twig';
         $renderer = new AutoReplyRenderer($template, $this->catalogs);
 
         $out = $renderer->renderMessage(

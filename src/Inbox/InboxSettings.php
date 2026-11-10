@@ -14,8 +14,6 @@ namespace App\Inbox;
  */
 final class InboxSettings
 {
-    public const DEFAULT_TEMPLATE_FORWARDING = 'resources/templates/autoresponder-forwarding.txt.twig';
-
     public function __construct(
         public readonly string $directory,
         public readonly string $processedDirectory,
@@ -23,8 +21,8 @@ final class InboxSettings
         public readonly ?string $domain,
         public readonly \DateTimeZone $timezone,
         public readonly ?string $dataFile,
-        public readonly ?string $templateAutoreply,
-        public readonly string $templateForwarding,
+        public readonly ?string $template,
+        public readonly ?string $translations,
         public readonly ?string $language,
         public readonly ?string $subject,
         public readonly ?string $format,
@@ -34,7 +32,7 @@ final class InboxSettings
     /**
      * @param array<string, mixed> $config the merged configuration
      *
-     * @return null|self null when `watch.inbox.path` is not configured
+     * @return null|self null when `watch.inbox.paths.root` is not configured
      */
     public static function fromConfig(array $config): ?self
     {
@@ -44,7 +42,8 @@ final class InboxSettings
             return null;
         }
 
-        $directory = trim((string) ($inbox['path'] ?? ''));
+        $paths = is_array($inbox['paths'] ?? null) ? $inbox['paths'] : [];
+        $directory = trim((string) ($paths['root'] ?? ''));
         if ('' === $directory) {
             return null;
         }
@@ -60,20 +59,20 @@ final class InboxSettings
             ), 0, $e);
         }
 
-        $templateAutoreply = trim((string) ($inbox['template_autoreply'] ?? ''));
-        $templateForwarding = trim((string) ($inbox['template_forwarding'] ?? ''));
+        $template = trim((string) ($inbox['template'] ?? ''));
+        $translations = trim((string) ($inbox['translations'] ?? ''));
 
         $directory = rtrim($directory, '/\\');
 
         return new self(
             $directory,
-            self::subdirectory($directory, (string) ($inbox['processed_path'] ?? ''), 'processed'),
-            self::subdirectory($directory, (string) ($inbox['failed_path'] ?? ''), 'failed'),
+            self::subdirectory($directory, (string) ($paths['processed'] ?? ''), 'processed'),
+            self::subdirectory($directory, (string) ($paths['failed'] ?? ''), 'failed'),
             self::nullable($inbox['domain'] ?? null),
             $timezone,
             self::nullable($inbox['data_file'] ?? null),
-            '' === $templateAutoreply ? null : $templateAutoreply,
-            '' === $templateForwarding ? self::DEFAULT_TEMPLATE_FORWARDING : $templateForwarding,
+            '' === $template ? null : $template,
+            '' === $translations ? null : $translations,
             self::nullable($inbox['language'] ?? null),
             self::nullable($inbox['subject'] ?? null),
             self::nullable($inbox['format'] ?? null),

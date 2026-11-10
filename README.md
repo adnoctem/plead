@@ -161,7 +161,7 @@ Read commands query the **live Plesk server** by default; add `--local` to read 
 | `domain:traffic:get <domain>`           | Traffic usage in a window (`--from=`, `--to=`, YYYY-MM-DD)                                                                                             |
 | `domain:traffic:set <domain>`           | Record traffic counters manually (`--date=`, `--smtp-in=`, ...)                                                                                        |
 | `domain:descriptor <domain>`            | Hosting settings descriptor (property names, types, defaults)                                                                                          |
-| `config:get <dotted.key>`               | Show the resolved value of one configuration key (secrets masked)                                                                                      |
+| `config:get <dotted.key>`               | Show the resolved value (secrets masked; `--expose-secrets` bypasses)                                                                                  |
 | `config:set <dotted.key> <value>`       | Write a configuration key to the user config file                                                                                                      |
 | `config:list`                           | Show the resolved configuration with secrets masked                                                                                                    |
 | `config:edit`                           | Open the user config file in `$EDITOR` and validate it afterwards                                                                                      |
@@ -230,16 +230,17 @@ default_server: prod.example.com # used when neither --server nor PLEAD_SERVER i
 watch:
   interval: 60 # default interval of `plead watch` (--interval overrides)
   # optional: ingest absence JSON files dropped by external tools
-  # (directory scripts, HR exports, ...) - disabled unless `path` is set
+  # (directory scripts, HR exports, ...) - disabled unless `paths.root` is set
   inbox:
-    path: /srv/plead/inbox # watched for *.json; processed/ and failed/ live inside
-    # processed_path: done # optional (default: <path>/processed)
-    # failed_path: failed # optional (default: <path>/failed)
+    paths:
+      root: /srv/plead/inbox # watched for *.json; processed/ and failed/ live inside
+      # processed: done # optional (default: <root>/processed)
+      # failed: failed # optional (default: <root>/failed)
+    # template: resources/templates/autoresponder.txt.twig # default: template.paths.auto_reply
+    # translations: resources/translations # default: template.paths.translations
     domain: company.com # mail domain for entries that use samAccountName
     timezone: Europe/Berlin # optional; defaults to the process TZ (match the Plesk server!)
     # data_file: /etc/plead/absence-data.yaml # baseline template variables
-    # template_autoreply: resources/templates/autoresponder.txt.twig # "not forwarded" variant
-    # template_forwarding: resources/templates/autoresponder-forwarding.txt.twig # deputy variant
     # language: de
     # subject: "Automatische Antwort"
     # format: plain # plain|html; default: inferred from the rendered message
@@ -247,8 +248,9 @@ watch:
 
 # optional: template + translation catalog locations (defaults shown)
 template:
-  auto_reply_path: resources/templates/autoresponder.txt.twig
-  translations_path: resources/translations
+  paths:
+    auto_reply: resources/templates/autoresponder.txt.twig
+    translations: resources/translations
   logo_url: "https://example.com/logo.png" # optional: logo for HTML templates
   language: de # optional: render language for single-language templates
 
@@ -309,7 +311,7 @@ see `docs/NOTES.md`). A rendered message that is HTML (e.g. the MJML template) i
 the format is `html` — pass `--force` to store it with a non-html format anyway. `--language de|en` selects the render language (default: `template.language` or the first catalog language) —
 both the txt and the HTML templates render exactly one language per invocation.
 `--template` renders a specific template for this invocation instead of
-`template.auto_reply_path` — handy to preview the MJML variant before switching it in the config.
+`template.paths.auto_reply` — handy to preview the MJML variant before switching it in the config.
 
 `--data-file` (or `data_file`) sources template variables from a JSON or YAML file — e.g. `firstname`, `surname`,
 `phonenumber`, `department`, `email`. The file is a flat map of Twig variables merged into the render context.
@@ -328,7 +330,7 @@ Pass `--preview` to print the rendered message without recording an intent, touc
 a pure dry check before anything goes live. It honors the same config fallback as a regular run, so
 `mail:autoresponder:set <email> --preview` shows exactly what `watch` would push for a configured entry.
 
-**Translations.** All sentences live in catalog files under `template.translations_path` (default `translations`,
+**Translations.** All sentences live in catalog files under `template.paths.translations` (default `translations`,
 may point outside the phar): `resources/translations/autoresponder.de.yaml`, `autoresponder.en.yaml`, and so on — one file
 per language. The templates are pure structure: they loop over the languages found in the catalog directory, so
 **adding a language is a single new file** — no template or config edits. German (`de`) is the fallback locale: a
@@ -336,7 +338,8 @@ missing entry in any catalog degrades to the German text, so raw keys are never 
 a stale catalog cannot break the watcher. Each catalog also carries a `date_format` entry (e.g. `d.m.Y` vs
 `F j, Y`) so dates render locale-appropriately. The `resources/translations/` folder ships the German and English catalogs;
 the MJML template (`resources/templates/autoresponder.mjml.twig`) shares the same sentences and adds `phone_button` /
-`email_button` labels. Templates that render MJML markup are **converted to final HTML automatically** by the
+`email_button` labels. The single template picks the body sentence from the catalog: `absence` when no deputy is
+present, and `forwarded_to` with `%deputy%` when the absence carries one. Templates that render MJML markup are **converted to final HTML automatically** by the
 rendering pipeline (via the `mjml` CLI binary — install it with `npm install -g mjml` or set `MJML_BINARY_PATH`;
 the container image ships it), so the message stored on Plesk is ready to send. Both templates render
 **one language per invocation** (the `language` context variable — `--language`, `template.language` or a
@@ -351,7 +354,7 @@ where the message should show a blank line (the shipped template documents this 
 ### Inbox — absence files from external tools
 
 `watch.inbox` turns `plead watch` into a drop-folder processor: every `*.json` file in
-`watch.inbox.path` describes one absence and is applied as an auto-reply (plus an optional
+`watch.inbox.paths.root` describes one absence and is applied as an auto-reply (plus an optional
 deputy forwarding). `ad-account-map.json` is reserved and never processed as an entry. The
 format is intentionally **not tied to a directory service** — `email` addresses a mailbox
 directly, `samAccountName` resolves through the account map or a domain fallback. Schema v1:

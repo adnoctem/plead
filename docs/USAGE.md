@@ -60,23 +60,25 @@ log_level: info # debug|info|notice|warning|error
 
 watch:
   interval: 60
-  inbox: # optional; disabled unless path is set
-    path: /srv/plead/inbox
-    # processed_path: processed # default: <path>/processed
-    # failed_path: failed # default: <path>/failed
+  inbox: # optional; disabled unless paths.root is set
+    paths:
+      root: /srv/plead/inbox
+      # processed: processed # default: <root>/processed
+      # failed: failed # default: <root>/failed
+    # template: resources/templates/autoresponder.txt.twig # default: template.paths.auto_reply
+    # translations: resources/translations # default: template.paths.translations
     domain: example.com # for entries that use samAccountName
     timezone: Europe/Berlin # default: process TZ (Plesk exposes no timezone)
     # data_file: /etc/plead/absence-data.yaml
-    # template_autoreply: resources/templates/autoresponder.txt.twig
-    # template_forwarding: resources/templates/autoresponder-forwarding.txt.twig
     # language: de
     # subject: "Automatische Antwort"
     # format: plain # plain|html; default: inferred from the rendered message
     # inclusive: true
 
 template:
-  auto_reply_path: resources/templates/autoresponder.txt.twig
-  translations_path: resources/translations
+  paths:
+    auto_reply: resources/templates/autoresponder.txt.twig
+    translations: resources/translations
   logo_url: "https://example.com/logo.png"
   language: de
 
@@ -111,11 +113,13 @@ Every value is validated by the config tree on load. `config:list` shows the
 resolved configuration with credentials masked; it prints the configured
 `servers` list plus `selected_server` / `default_server`, and never the
 internal `server` / `plesk` blocks. `config:get` also masks `secret_key` and
-`password` values (including when the requested value is an array). To inspect
-effective credentials, read the loaded configuration file (`config:path`).
-`config:set <key> <value>` writes one key into the persisted config file — the
-file `config:edit`/`config:set` targets is the first existing config path, or
-the first candidate when none exists.
+`password` values (including when the requested value is an array);
+`config:get --expose-secrets <key>` bypasses that masking when the actual value
+is genuinely needed (it will appear in shell history/logs). To inspect effective
+credentials without a command, read the loaded configuration file
+(`config:path`). `config:set <key> <value>` writes one key into the persisted
+config file — the file `config:edit`/`config:set` targets is the first existing
+config path, or the first candidate when none exists.
 
 ### Environment variables
 
@@ -203,7 +207,7 @@ plead mail:autoresponder:set user@example.com --enabled=false
 ```
 
 - `--template` renders a specific template for this invocation (falling back to
-  `template.auto_reply_path`); `--data-file` supplies template variables;
+  `template.paths.auto_reply`); `--data-file` supplies template variables;
   `--language de|en` selects the render language; `--inclusive/--no-inclusive`
   chooses the "through %end%" vs "until %end%" wording.
 - Without options, the command borrows the configured `mail.autoresponder`
@@ -216,7 +220,7 @@ plead mail:autoresponder:set user@example.com --enabled=false
 ### The inbox (absence files)
 
 `watch.inbox` turns `watch` into a drop-folder processor: every `*.json` file
-in `watch.inbox.path` describes one absence (`ad-account-map.json` is the one
+in `watch.inbox.paths.root` describes one absence (`ad-account-map.json` is the one
 reserved exception). The format is deliberately not tied to a directory
 service — `email` addresses a mailbox directly, while `samAccountName` is
 resolved through `ad-account-map.json` (when present) or a `domain` fallback.
@@ -354,7 +358,8 @@ missing or stale.
    ```yaml
    watch:
      inbox:
-       path: /inbox
+       paths:
+         root: /inbox
    ```
 
 4. **Keep the map current.** Regenerate it when users join or leave (for
@@ -423,15 +428,15 @@ variables the shipped templates use: `firstname`, `surname`, `phonenumber`,
 (`{de: …, en: …}`), resolved as `key[lang] ?? key.de ?? key`.
 
 All sentences live in `resources/translations/autoresponder.{locale}.yaml`
-(`template.translations_path`). German is the fallback locale — a missing entry
+(`template.paths.translations`). German is the fallback locale — a missing entry
 degrades to German, never to a raw key, so rendering cannot fail. Adding a
 language is a single new catalog file. Each catalog also carries `date_format`.
 
 The MJML template (`resources/templates/autoresponder.mjml.twig`) is converted
 to HTML automatically by the render pipeline (via the `mjml` CLI); the stored
-message is ready for Plesk. The forwarding variants
-(`autoresponder-forwarding.{txt,mjml}.twig`) use the `forwarded_to` sentence
-with `%deputy%`.
+message is ready for Plesk. The single template chooses the body sentence:
+`absence` when no deputy is present, and `forwarded_to` with `%deputy%` when
+the absence carries a deputy.
 
 ## Timezones
 

@@ -1,8 +1,10 @@
-{# All sentences come from resources/translations/autoresponder.{locale}.yaml; this
-   template only holds structure. Like the MJML template it renders ONE
-   language per invocation, chosen via the 'language' context variable
-   (--language / template.language / a per-entry language / the first
-   catalog language); 'de' is the fallback locale for missing entries.
+{# Single absence/forwarding template. All sentences come from
+   resources/translations/autoresponder.{locale}.yaml; this template only holds
+   structure. When a deputy is present the body uses 'forwarded_to'; otherwise
+   it uses 'absence'. Like the MJML template it renders ONE language per
+   invocation, chosen via the 'language' context variable (--language /
+   template.language / a per-entry language / the first catalog language);
+   'de' is the fallback locale for missing entries.
    Data values that differ per language use locale maps resolved as
    key[lang] ?? key.de ?? key (e.g. email: {de: ..., en: ...}); a missing
    locale falls back to the German value, scalars to themselves.
@@ -16,6 +18,7 @@
     '%phone%': phonenumber[lang] ?? phonenumber.de ?? phonenumber,
     '%department%': department[lang] ?? department.de ?? department,
     '%email%': email[lang] ?? email.de ?? email,
+    '%deputy%': deputyEmail ?? '',
     '%firstname%': firstname,
     '%surname%': surname,
 } %}
@@ -23,7 +26,7 @@
 
 {% if inclusive -%}{{ 'period_inclusive'|trans(vars, 'autoresponder', lang) }}{%- else -%}{{ 'period_until'|trans(vars, 'autoresponder', lang) }}{%- endif %}
 
-{{ 'forwarded'|trans(vars, 'autoresponder', lang) }}
+{% if deputyEmail is defined and deputyEmail -%}{{ 'forwarded_to'|trans(vars, 'autoresponder', lang) }}{%- else -%}{{ 'absence'|trans(vars, 'autoresponder', lang) }}{%- endif %}
 
 {{ 'regards'|trans(vars, 'autoresponder', lang) }}
 

@@ -46,8 +46,8 @@ same before building. `git-version` injects the git tag/commit into `src/Applica
   directory (`src/Inbox/`): `InboxEntry` parses/validates schema v1 (`email` or `samAccountName`+`domain`,
   `startDate`/`endDate` + optional times, optional `deputyEmail`, per-entry `timezone`/`language`/`subject`/
   `format`/`inclusive`, arbitrary `data`; UTF-8 BOM tolerated), `InboxProcessor` verifies the mailbox
-  exists, renders the forwarding template when a deputy is set (and queues a forwarding intent) or the
-  normal template otherwise, records the auto-reply intent, and archives the file (`processed/`; malformed
+  exists, renders the single template with the `forwarded_to` body when a deputy is set (and queues a
+  forwarding intent) or the `absence` body otherwise, records the auto-reply intent, and archives the file (`processed/`; malformed
   files/unknown mailboxes go to `failed/` with an `.error.txt`). `InboxExpiry` removes the deputy
   forwarding once `end_date` has passed (Plesk's native end_date only stops the reply). Existing forwarding
   is adopted before the deputy is added, so only the deputy is removed on expiry. The format is deliberately
@@ -64,7 +64,7 @@ same before building. `git-version` injects the git tag/commit into `src/Applica
   and `format` (`plain`/`html` → `text/plain`/`text/html`) ride along in the same rows; the gateway emits
   `content_type` BEFORE `text` (XSD sequence — see `docs/NOTES.md`).
   Multi-language text is catalog-driven: `resources/translations/autoresponder.{locale}.yaml` holds all sentences
-  (`template.translations_path`; 'de' is the fallback locale - missing entries degrade to German, never a
+  (`template.paths.translations`; 'de' is the fallback locale - missing entries degrade to German, never a
   raw key, so renders cannot fail), templates loop over the discovered `languages` and resolve per-language
   data values as `key[lang] ?? key.de ?? key`. Both templates render ONE language per invocation via the
   `language` context variable (`--language` / `template.language` / per-entry `language`). MJML output is

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/adnoctem/plead/main/resources/schema/inbox-entry.schema.json",
   "title": "plead inbox absence entry (schema v1)",
-  "description": "One JSON file dropped into watch.inbox.path. The file describes a scheduled auto-reply/forwarding or cancels an active absence. Unknown properties are ignored for forward compatibility.",
+  "description": "One JSON file dropped into watch.inbox.paths.root. The file describes a scheduled auto-reply/forwarding or cancels an active absence. Unknown properties are ignored for forward compatibility.",
   "type": "object",
   "properties": {
     "schemaVersion": {

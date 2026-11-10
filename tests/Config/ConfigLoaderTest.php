@@ -92,8 +92,8 @@ final class ConfigLoaderTest extends TestCase
         $config = $this->loader->load();
 
         self::assertSame('info', $config['log_level']);
-        self::assertSame('resources/templates/autoresponder.txt.twig', $config['template']['auto_reply_path']);
-        self::assertSame('resources/translations', $config['template']['translations_path']);
+        self::assertSame('resources/templates/autoresponder.txt.twig', $config['template']['paths']['auto_reply']);
+        self::assertSame('resources/translations', $config['template']['paths']['translations']);
         self::assertNull($config['mail']['defaults']['antivirus']);
         self::assertNull($config['mail']['defaults']['quota']);
         self::assertSame(60, $config['watch']['interval']);

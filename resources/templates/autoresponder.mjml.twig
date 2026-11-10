@@ -1,9 +1,11 @@
-{# Renders MJML markup for ONE language - convert it with spatie/mjml (or
-   mjml.io) before handing it to Plesk. The language comes from the
-   'language' context variable (--language / template.language / the first
-   catalog language); the txt template renders every language instead.
-   Sentences come from resources/translations/autoresponder.{locale}.yaml, per-language
-   data values resolve as key[lang] ?? key.de ?? key, and the logo comes from
+{# Single absence/forwarding MJML template. When a deputy is present the body
+   uses 'forwarded_to'; otherwise it uses 'absence'. Renders MJML markup for
+   ONE language - convert it with spatie/mjml (or mjml.io) before handing it
+   to Plesk. The language comes from the 'language' context variable
+   (--language / template.language / the first catalog language); the txt
+   template renders every language instead. Sentences come from
+   resources/translations/autoresponder.{locale}.yaml, per-language data values
+   resolve as key[lang] ?? key.de ?? key, and the logo comes from
    template.logo_url (overridable per campaign via a data-file logo_url). #}
 {% set lang = language ?? languages|first %}
 {% set fmt = 'date_format'|trans({}, 'autoresponder', lang) %}
@@ -15,6 +17,7 @@
     '%phone%': '<a href="tel:' ~ phone ~ '" style="text-decoration:none;color:#F39200">' ~ phone ~ '</a>',
     '%department%': department[lang] ?? department.de ?? department,
     '%email%': '<a href="mailto:' ~ email ~ '" style="text-decoration:none;color:#F39200">' ~ email ~ '</a>',
+    '%deputy%': '<a href="mailto:' ~ (deputyEmail ?? '') ~ '" style="text-decoration:none;color:#F39200">' ~ (deputyEmail ?? '') ~ '</a>',
     '%firstname%': firstname,
     '%surname%': surname,
 } %}
@@ -57,7 +60,7 @@
                 <mj-spacer height="24px"></mj-spacer>
                 <mj-text>{% if inclusive -%}{{ 'period_inclusive'|trans(vars, 'autoresponder', lang) }}{%- else -%}{{ 'period_until'|trans(vars, 'autoresponder', lang) }}{%- endif %}</mj-text>
                 <mj-spacer height="24px"></mj-spacer>
-                <mj-text>{{ 'forwarded'|trans(vars, 'autoresponder', lang) }}</mj-text>
+                <mj-text>{% if deputyEmail is defined and deputyEmail -%}{{ 'forwarded_to'|trans(vars, 'autoresponder', lang) }}{%- else -%}{{ 'absence'|trans(vars, 'autoresponder', lang) }}{%- endif %}</mj-text>
                 <mj-spacer height="24px"></mj-spacer>
                 <mj-text>{{ 'regards'|trans(vars, 'autoresponder', lang) }}</mj-text>
                 <mj-text font-weight="600">{{ firstname }} {{ surname }}</mj-text>

@@ -230,7 +230,7 @@ final class RuntimeContext
     }
 
     /**
-     * The inbox processor, or null when `watch.inbox.path` is not configured.
+     * The inbox processor, or null when `watch.inbox.paths.root` is not configured.
      */
     public function inboxProcessor(): ?InboxProcessor
     {
@@ -243,6 +243,10 @@ final class RuntimeContext
             return null;
         }
 
+        $renderer = null === $settings->template && null === $settings->translations
+            ? $this->renderer()
+            : $this->renderer($settings->template, $settings->translations);
+
         return $this->inboxProcessor = new InboxProcessor(
             $settings,
             $this->autoReplyRepository(),
@@ -250,8 +254,7 @@ final class RuntimeContext
             $this->reconcilerMail(),
             $this->syncLogRepository(),
             $this->gateway(),
-            null === $settings->templateAutoreply ? $this->renderer() : $this->renderer($settings->templateAutoreply),
-            $this->renderer($settings->templateForwarding),
+            $renderer,
             $this->logger(),
             $this->dryRun,
         );
@@ -269,9 +272,9 @@ final class RuntimeContext
         );
     }
 
-    public function renderer(?string $templateOverride = null): AutoReplyRenderer
+    public function renderer(?string $templateOverride = null, ?string $translationsOverride = null): AutoReplyRenderer
     {
-        if (null === $templateOverride) {
+        if (null === $templateOverride && null === $translationsOverride) {
             return $this->renderer ??= new AutoReplyRenderer(
                 $this->templatePath(),
                 $this->translationsPath(),
@@ -280,12 +283,14 @@ final class RuntimeContext
             );
         }
 
-        // Per-invocation template override (e.g. --template): resolve like the
-        // configured template and build a fresh renderer sharing the same
-        // translations, logo and MJML converter settings.
+        // Per-invocation/inbox override: resolve the template like the
+        // configured one and build a fresh renderer sharing the logo and MJML
+        // converter settings.
         return new AutoReplyRenderer(
-            $this->resolveTemplatePath($templateOverride),
-            $this->translationsPath(),
+            null === $templateOverride ? $this->templatePath() : $this->resolveTemplatePath($templateOverride),
+            null === $translationsOverride
+                ? $this->translationsPath()
+                : $this->resolveTranslationsPath($translationsOverride),
             $this->config()['template']['logo_url'] ?? null,
             $this->mjmlConverter,
         );
@@ -369,7 +374,7 @@ final class RuntimeContext
 
     private function templatePath(): string
     {
-        return $this->resolveTemplatePath($this->config()['template']['auto_reply_path']);
+        return $this->resolveTemplatePath($this->config()['template']['paths']['auto_reply']);
     }
 
     private function resolveTemplatePath(string $configured): string
@@ -390,7 +395,11 @@ final class RuntimeContext
      */
     private function translationsPath(): ?string
     {
-        $configured = $this->config()['template']['translations_path'];
+        return $this->resolveTranslationsPath($this->config()['template']['paths']['translations']);
+    }
+
+    private function resolveTranslationsPath(string $configured): ?string
+    {
         if (is_dir($configured)) {
             return $configured;
         }
