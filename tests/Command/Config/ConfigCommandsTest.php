@@ -85,33 +85,4 @@ final class ConfigCommandsTest extends TestCase
     {
         self::assertNotSame(0, $this->tester->run(['command' => 'config:get', 'key' => 'nope.missing']));
     }
-
-    public function testViewShowsMergedConfigurationWithEnvOverride(): void
-    {
-        $this->tester->run(['command' => 'config:set', 'key' => 'servers.0.host', 'value' => 'file.example.com']);
-        $this->tester->run(['command' => 'config:set', 'key' => 'servers.0.secret_key', 'value' => 'file-secret']);
-        $this->tester->run(['command' => 'config:set', 'key' => 'log_level', 'value' => 'debug']);
-
-        putenv('PLEAD_PLESK_SECRET_KEY=env-secret');
-
-        try {
-            $status = $this->tester->run(['command' => 'config:view']);
-        } finally {
-            putenv('PLEAD_PLESK_SECRET_KEY');
-        }
-
-        self::assertSame(0, $status);
-        $display = $this->tester->getDisplay();
-        self::assertStringContainsString('env-secret', $display);
-        self::assertStringContainsString('debug', $display);
-        self::assertStringContainsString('selected_server: file.example.com', $display);
-        self::assertStringNotContainsString("\nplesk:", $display);
-        self::assertStringNotContainsString("\nserver:", $display);
-    }
-
-    public function testViewFailsGracefullyWithoutConfig(): void
-    {
-        self::assertNotSame(0, $this->tester->run(['command' => 'config:view']));
-        self::assertStringContainsString('No complete configuration found', $this->tester->getDisplay());
-    }
 }

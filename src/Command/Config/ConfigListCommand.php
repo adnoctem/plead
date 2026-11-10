@@ -28,7 +28,7 @@ final class ConfigListCommand extends AbstractPleadCommand
             return self::FAILURE;
         }
 
-        $output->writeln(Yaml::dump(ConfigPresenter::forOutput($config, true), 8, 4));
+        $output->writeln(Yaml::dump(ConfigPresenter::forOutput($config), 8, 4));
 
         return self::SUCCESS;
     }

@@ -12,7 +12,6 @@ use App\Command\Config\ConfigGetCommand;
 use App\Command\Config\ConfigListCommand;
 use App\Command\Config\ConfigPathCommand;
 use App\Command\Config\ConfigSetCommand;
-use App\Command\Config\ConfigViewCommand;
 use App\Command\Db\DbPathCommand;
 use App\Command\Db\DbQueryCommand;
 use App\Command\Domain\DomainAddCommand;
@@ -95,7 +94,6 @@ final class PleadApplication extends Application
             new ConfigListCommand(),
             new ConfigPathCommand(),
             new ConfigSetCommand(),
-            new ConfigViewCommand(),
             new DbPathCommand(),
             new DbQueryCommand(),
             new DomainAddCommand(),
