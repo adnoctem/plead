@@ -31,6 +31,7 @@
     "domain": {
       "type": ["string", "null"],
       "format": "hostname",
+      "pattern": "^[^@\\s]+\\.[^@\\s]+$",
       "description": "Mail domain for samAccountName (null treated as absent). Required when neither ad-account-map.json nor watch.inbox.domain provides the address."
     },
     "startDate": {
