@@ -361,6 +361,12 @@ reconcilers also re-check state that was already reconciled (drift detection).
 The loop stops cleanly on SIGINT/SIGTERM between passes; the spinner is only
 drawn on a TTY.
 
+The pass summary (`changed N items`) goes to stdout; the individual rule and
+reconciler changes (which address was added/removed/created) are written to
+`plead.log` in the data directory. In the container, follow it with
+`docker compose exec plead tail -f /data/plead.log` (or `tail -f data/plead.log`
+on the host).
+
 For a service manager, run it in the foreground (e.g. `Restart=always` in
 systemd or `restart: unless-stopped` in Docker) rather than with `-d`.
 
