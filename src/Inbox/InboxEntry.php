@@ -8,11 +8,11 @@ namespace App\Inbox;
  * One validated absence entry from an inbox JSON file (schema v1).
  *
  * The format is intentionally not AD-specific: `email` addresses a mailbox
- * directly, while `samAccountName` (+ `domain`) is a convenience for
- * directory-driven generators. Unknown keys are ignored for forward
- * compatibility; anything contradicting the schema throws an
- * \InvalidArgumentException, which the processor turns into a move to
- * failed/.
+ * directly, while `samAccountName` resolves through an optional
+ * `ad-account-map.json` (or a `domain` fallback) for directory-driven
+ * generators. Unknown keys are ignored for forward compatibility; anything
+ * contradicting the schema throws an \InvalidArgumentException, which the
+ * processor turns into a move to failed/.
  */
 final class InboxEntry
 {
@@ -48,11 +48,16 @@ final class InboxEntry
      * @param array<string, mixed> $payload         decoded JSON object
      * @param null|string          $defaultDomain   domain appended to a bare samAccountName
      * @param \DateTimeZone        $defaultTimezone timezone for naive date/time values
+     * @param null|AccountMap      $accountMap      optional sAMAccountName -> email map
      *
      * @throws \InvalidArgumentException when the payload violates the schema
      */
-    public static function fromPayload(array $payload, ?string $defaultDomain, \DateTimeZone $defaultTimezone): self
-    {
+    public static function fromPayload(
+        array $payload,
+        ?string $defaultDomain,
+        \DateTimeZone $defaultTimezone,
+        ?AccountMap $accountMap = null,
+    ): self {
         self::validateSchemaVersion($payload);
 
         $action = self::string($payload, 'action') ?? self::ACTION_SCHEDULE;
@@ -66,7 +71,7 @@ final class InboxEntry
         }
 
         $samAccountName = self::string($payload, 'samAccountName');
-        $email = self::resolveEmail($payload, $samAccountName, $defaultDomain);
+        $email = self::resolveEmail($payload, $samAccountName, $defaultDomain, $accountMap);
         $submittedAt = self::submittedAt($payload);
 
         if (self::ACTION_CANCEL === $action) {
@@ -112,8 +117,12 @@ final class InboxEntry
     }
 
     /** @param array<string, mixed> $payload */
-    private static function resolveEmail(array $payload, ?string $samAccountName, ?string $defaultDomain): string
-    {
+    private static function resolveEmail(
+        array $payload,
+        ?string $samAccountName,
+        ?string $defaultDomain,
+        ?AccountMap $accountMap,
+    ): string {
         $email = self::string($payload, 'email');
         if (null !== $email) {
             return self::normalizeEmail($email);
@@ -128,6 +137,29 @@ final class InboxEntry
                 'samAccountName "%s" contains unsupported characters (allowed: letters, digits, ".", "_", "-").',
                 $samAccountName,
             ));
+        }
+
+        if (null !== $accountMap && $accountMap->isInvalid()) {
+            throw new \InvalidArgumentException(sprintf(
+                '%s is invalid; fix it before processing samAccountName entries.',
+                AccountMap::FILENAME,
+            ));
+        }
+
+        // The map is authoritative for AD-driven entries. A present map that
+        // lacks the account fails instead of guessing a domain: the whole point
+        // is to avoid a wrong mailbox when AD's own mail attribute is stale.
+        if (null !== $accountMap && $accountMap->hasEntries()) {
+            $mapped = $accountMap->lookup($samAccountName);
+            if (null === $mapped) {
+                throw new \InvalidArgumentException(sprintf(
+                    'samAccountName "%s" is not present in %s and the entry has no "email".',
+                    $samAccountName,
+                    AccountMap::FILENAME,
+                ));
+            }
+
+            return self::normalizeEmail($mapped);
         }
 
         $domain = self::string($payload, 'domain') ?? $defaultDomain;

@@ -51,13 +51,21 @@ final class InboxProcessor
             return 0;
         }
 
+        $accountMap = $this->accountMap();
+
         $files = glob($this->settings->directory.'/*.json') ?: [];
         sort($files);
 
         $changed = 0;
         foreach ($files as $path) {
+            // The account map is an input for this processor, not an absence
+            // entry. Skip it so it is never archived into processed/failed.
+            if (AccountMap::isMapFile($path)) {
+                continue;
+            }
+
             try {
-                $changed += $this->processFile($path);
+                $changed += $this->processFile($path, $accountMap);
             } catch (\Throwable $e) {
                 // Unexpected failure (render error, unreachable server, ...):
                 // keep the file so the next pass retries it.
@@ -71,7 +79,23 @@ final class InboxProcessor
         return $changed;
     }
 
-    private function processFile(string $path): int
+    /**
+     * Load `ad-account-map.json` once per pass. A malformed map is reported
+     * and treated as absent so explicit-email entries keep working; entries
+     * that depend on the map then fall back to the configured domain.
+     */
+    private function accountMap(): AccountMap
+    {
+        try {
+            return AccountMap::fromDirectory($this->settings->directory);
+        } catch (\InvalidArgumentException $e) {
+            $this->logger->error('Invalid inbox account map: {error}', ['error' => $e->getMessage()]);
+
+            return AccountMap::invalid();
+        }
+    }
+
+    private function processFile(string $path, AccountMap $accountMap): int
     {
         $contents = @file_get_contents($path);
         if (false === $contents) {
@@ -108,7 +132,12 @@ final class InboxProcessor
         }
 
         try {
-            $entry = InboxEntry::fromPayload($payload, $this->settings->domain, $this->settings->timezone);
+            $entry = InboxEntry::fromPayload(
+                $payload,
+                $this->settings->domain,
+                $this->settings->timezone,
+                $accountMap,
+            );
         } catch (\InvalidArgumentException $e) {
             $this->reject($path, $e->getMessage());
 

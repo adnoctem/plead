@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Inbox;
 
+use App\Inbox\AccountMap;
 use App\Inbox\InboxEntry;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
@@ -15,10 +16,19 @@ use PHPUnit\Framework\TestCase;
 final class InboxEntryTest extends TestCase
 {
     private \DateTimeZone $timezone;
+    private string $mapDirectory;
 
     protected function setUp(): void
     {
         $this->timezone = new \DateTimeZone('Europe/Berlin');
+        $this->mapDirectory = sys_get_temp_dir().'/plead-entry-map-test-'.bin2hex(random_bytes(4));
+        mkdir($this->mapDirectory, 0o777, true);
+    }
+
+    protected function tearDown(): void
+    {
+        @unlink($this->mapDirectory.'/'.AccountMap::FILENAME);
+        @rmdir($this->mapDirectory);
     }
 
     public function testSchedulesFullEntry(): void
@@ -110,6 +120,90 @@ final class InboxEntryTest extends TestCase
             'startDate' => '2026-09-17',
             'endDate' => '2026-09-18',
         ]);
+
+        self::assertSame('direct@example.com', $entry->email);
+    }
+
+    public function testSamAccountNameResolvesThroughAccountMap(): void
+    {
+        $entry = $this->entry([
+            'samAccountName' => 'CFischer',
+            'startDate' => '2026-09-17',
+            'endDate' => '2026-09-18',
+        ], 'ignored.example', $this->accountMap(['cfischer' => 'christopher.fischer@example.com']));
+
+        self::assertSame('christopher.fischer@example.com', $entry->email);
+        self::assertSame('CFischer', $entry->samAccountName);
+    }
+
+    public function testAccountMapWinsOverEntryDomain(): void
+    {
+        $entry = $this->entry([
+            'samAccountName' => 'CFischer',
+            'domain' => 'wrong.example',
+            'startDate' => '2026-09-17',
+            'endDate' => '2026-09-18',
+        ], null, $this->accountMap(['CFischer' => 'christopher.fischer@example.com']));
+
+        self::assertSame('christopher.fischer@example.com', $entry->email);
+    }
+
+    public function testExplicitEmailWinsOverAccountMap(): void
+    {
+        $entry = $this->entry([
+            'email' => 'direct@example.com',
+            'samAccountName' => 'CFischer',
+            'startDate' => '2026-09-17',
+            'endDate' => '2026-09-18',
+        ], null, $this->accountMap(['CFischer' => 'mapped@example.com']));
+
+        self::assertSame('direct@example.com', $entry->email);
+    }
+
+    public function testPresentMapWithoutTheAccountFailsInsteadOfGuessing(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('not present in ad-account-map.json');
+
+        $this->entry([
+            'samAccountName' => 'Ghost',
+            'domain' => 'example.com',
+            'startDate' => '2026-09-17',
+            'endDate' => '2026-09-18',
+        ], null, $this->accountMap(['CFischer' => 'christopher.fischer@example.com']));
+    }
+
+    public function testEmptyMapFallsBackToDomain(): void
+    {
+        $entry = $this->entry([
+            'samAccountName' => 'CFischer',
+            'startDate' => '2026-09-17',
+            'endDate' => '2026-09-18',
+        ], 'example.com', $this->accountMap([]));
+
+        self::assertSame('cfischer@example.com', $entry->email);
+    }
+
+    public function testInvalidMapRejectsSamAccountNameEntries(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('ad-account-map.json is invalid');
+
+        $this->entry([
+            'samAccountName' => 'CFischer',
+            'domain' => 'example.com',
+            'startDate' => '2026-09-17',
+            'endDate' => '2026-09-18',
+        ], null, AccountMap::invalid());
+    }
+
+    public function testExplicitEmailStillWorksWithAnInvalidMap(): void
+    {
+        $entry = $this->entry([
+            'email' => 'direct@example.com',
+            'startDate' => '2026-09-17',
+            'endDate' => '2026-09-18',
+        ], null, AccountMap::invalid());
 
         self::assertSame('direct@example.com', $entry->email);
     }
@@ -299,8 +393,22 @@ final class InboxEntryTest extends TestCase
     }
 
     /** @param array<string, mixed> $payload */
-    private function entry(array $payload, ?string $domain = 'example.com'): InboxEntry
+    private function entry(
+        array $payload,
+        ?string $domain = 'example.com',
+        ?AccountMap $accountMap = null,
+    ): InboxEntry {
+        return InboxEntry::fromPayload($payload, $domain, $this->timezone, $accountMap);
+    }
+
+    /** @param array<string, string> $entries */
+    private function accountMap(array $entries): AccountMap
     {
-        return InboxEntry::fromPayload($payload, $domain, $this->timezone);
+        file_put_contents(
+            $this->mapDirectory.'/'.AccountMap::FILENAME,
+            json_encode((object) $entries, JSON_THROW_ON_ERROR),
+        );
+
+        return AccountMap::fromDirectory($this->mapDirectory);
     }
 }

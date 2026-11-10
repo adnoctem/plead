@@ -195,6 +195,83 @@ final class InboxProcessorTest extends TestCase
         self::assertFileExists($this->inbox.'/notes.txt');
     }
 
+    public function testAccountMapResolvesSamAccountNameAndIsNotArchived(): void
+    {
+        $this->seedMailbox('christopher.fischer@example.com');
+        file_put_contents(
+            $this->inbox.'/ad-account-map.json',
+            json_encode(['CFischer' => 'christopher.fischer@example.com'], JSON_THROW_ON_ERROR),
+        );
+        $this->writeEntry('CFischer.json', $this->payload([
+            'samAccountName' => 'CFischer',
+            'startDate' => '2026-09-17',
+            'endDate' => '2026-09-18',
+        ]));
+
+        self::assertSame(1, $this->processor->process());
+
+        self::assertNotNull($this->autoReplies->find('christopher.fischer@example.com'));
+        self::assertFileExists($this->inbox.'/ad-account-map.json');
+        self::assertFileExists($this->inbox.'/processed/CFischer.json');
+    }
+
+    public function testAccountMapMissingTheAccountRejectsTheEntry(): void
+    {
+        file_put_contents(
+            $this->inbox.'/ad-account-map.json',
+            json_encode(['CFischer' => 'christopher.fischer@example.com'], JSON_THROW_ON_ERROR),
+        );
+        $this->writeEntry('Ghost.json', $this->payload([
+            'samAccountName' => 'Ghost',
+            'startDate' => '2026-09-17',
+            'endDate' => '2026-09-18',
+        ]));
+
+        self::assertSame(0, $this->processor->process());
+
+        self::assertFileExists($this->inbox.'/failed/Ghost.json');
+        self::assertStringContainsString(
+            'not present in ad-account-map.json',
+            (string) file_get_contents($this->inbox.'/failed/Ghost.json.error.txt'),
+        );
+        self::assertNull($this->autoReplies->find('ghost@company.com'));
+    }
+
+    public function testMalformedAccountMapIsNotArchived(): void
+    {
+        file_put_contents($this->inbox.'/ad-account-map.json', '{ not json');
+        $this->seedMailbox('user@company.com');
+        $this->writeEntry('user.json', $this->payload([
+            'email' => 'user@company.com',
+            'startDate' => '2026-09-17',
+            'endDate' => '2026-09-18',
+        ]));
+
+        self::assertSame(1, $this->processor->process());
+
+        self::assertFileExists($this->inbox.'/ad-account-map.json');
+        self::assertFileExists($this->inbox.'/processed/user.json');
+    }
+
+    public function testMalformedAccountMapRejectsSamAccountNameEntries(): void
+    {
+        file_put_contents($this->inbox.'/ad-account-map.json', '{ not json');
+        $this->writeEntry('CFischer.json', $this->payload([
+            'samAccountName' => 'CFischer',
+            'startDate' => '2026-09-17',
+            'endDate' => '2026-09-18',
+        ]));
+
+        self::assertSame(0, $this->processor->process());
+
+        self::assertFileExists($this->inbox.'/ad-account-map.json');
+        self::assertFileExists($this->inbox.'/failed/CFischer.json');
+        self::assertStringContainsString(
+            'ad-account-map.json is invalid',
+            (string) file_get_contents($this->inbox.'/failed/CFischer.json.error.txt'),
+        );
+    }
+
     public function testCancelDisablesTheReplyAndRemovesTheDeputy(): void
     {
         $this->seedMailbox('user@company.com');
