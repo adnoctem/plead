@@ -40,6 +40,9 @@ Empirically-verified facts about the Plesk XML API (tested against **Plesk Obsid
 - **Rename is a standalone op** (not `update`): `<mail><rename><site-id>N</site-id><name>old</name><new-name>new</new-name></rename></mail>` — `new-name` is the local part only. Multiple `<rename>` sections per packet are allowed. Shape confirmed from XSD 1.6.9.1; live validation pending.
 - **`mail-enable` / `mail-disable` toggle the site's mail service**, not a single mailbox: `<mail><enable><site-id>N</site-id></enable></mail>` (site-id is the only allowed child; `filter`/`name`/`id`/`mailname` are all rejected).
 - Forwarding: `<mail><update><add|remove>…<forwarding><address>…</address></forwarding>` (idempotent; safe to retry).
+- **Creating a missing mailname (forward-only mail group)** — validated live 2026-11-10 against Plesk Obsidian 18.0.81:
+  `<mail><create><filter><site-id>N</site-id><mailname><name>sales</name><mailbox><enabled>false</enabled></mailbox><forwarding><enabled>true</enabled><address>…</address></forwarding></mailname></filter></create></mail>`.
+  This creates a mailname with no mailbox and the given forwarding recipients; `update/add` cannot target a missing mailname. A `get_info` read of a missing mailname returns no `<mailname>` (our `requestOrNull` maps it to `null`).
 - Removal: `<mail><remove><filter><site-id>N</site-id><name>X</name></filter></remove></mail>` (bare `<name>`, not `<mailname>`).
 
 ### webspace operator
