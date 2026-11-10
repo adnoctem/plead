@@ -77,6 +77,27 @@ final class MailGroupReconciler
 
         $desired = $this->repository->activeRecipients($listEmail);
 
+        // A rule-driven group may not exist on Plesk yet (the config names a
+        // new list address). Create it as a forward-only mailname before the
+        // normal add/remove diff: update/add cannot target a missing mailname.
+        if ([] === $actual && [] !== $desired) {
+            try {
+                $exists = null !== $this->gateway->getMailboxInfo($listEmail);
+            } catch (\Throwable $e) {
+                $this->syncLog->log('mail_group', $listEmail, 'read', 'error:'.$e->getMessage());
+                $this->logger->error('Failed to check whether mail group {list} exists: {error}', [
+                    'list' => $listEmail,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return false;
+            }
+
+            if (!$exists) {
+                return $this->create($listEmail, $desired);
+            }
+        }
+
         $toAdd = array_values(array_diff($desired, $actual));
         $toRemove = array_values(array_diff($actual, $desired));
 
@@ -107,6 +128,43 @@ final class MailGroupReconciler
         }
 
         return !$failed;
+    }
+
+    /**
+     * Create a missing forward-only mail group with its full desired recipient
+     * set. Audit-first like every other mutation.
+     *
+     * @param string[] $desired
+     */
+    private function create(string $listEmail, array $desired): bool
+    {
+        $logId = $this->syncLog->logPending('mail_group', $listEmail, 'create', [
+            'recipients' => $desired,
+        ]);
+
+        try {
+            $this->gateway->createForwardingList($listEmail, $desired);
+            $this->syncLog->resolve($logId, $this->dryRun ? 'dry-run' : 'ok');
+
+            if (!$this->dryRun) {
+                $this->repository->markListReconciled($listEmail);
+            }
+
+            $this->logger->info('Created mail group {list} with {count} recipients', [
+                'list' => $listEmail,
+                'count' => count($desired),
+            ]);
+
+            return true;
+        } catch (\Throwable $e) {
+            $this->syncLog->resolve($logId, 'error:'.$e->getMessage());
+            $this->logger->error('Failed to create mail group {list}: {error}', [
+                'list' => $listEmail,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     /** @param string[] $addresses */

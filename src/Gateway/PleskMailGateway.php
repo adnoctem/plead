@@ -686,6 +686,51 @@ class PleskMailGateway
         $this->updateForwarding('remove', $email, $addresses);
     }
 
+    /**
+     * Create a forward-only mailname (mail group) with the given recipients.
+     * New mailnames use Plesk's <mail><create> operation, not <update><add>.
+     *
+     * @param string[] $addresses
+     */
+    public function createForwardingList(string $email, array $addresses): void
+    {
+        if ([] === $addresses) {
+            return;
+        }
+
+        if ($this->dryRun) {
+            $this->logger->info('DRY-RUN: would create forward-only mail group {email}: {addresses}', [
+                'email' => $email,
+                'addresses' => implode(', ', $addresses),
+            ]);
+
+            return;
+        }
+
+        [$siteId, $name] = $this->resolveEmail($email);
+
+        $packet = $this->client->getPacket();
+        $create = $packet->addChild('mail')->addChild('create');
+        $filter = $create->addChild('filter');
+        $filter->addChild('site-id', (string) $siteId);
+        $mailname = $filter->addChild('mailname');
+        $mailname->addChild('name', $name);
+        $mailbox = $mailname->addChild('mailbox');
+        $mailbox->addChild('enabled', 'false');
+        $forwarding = $mailname->addChild('forwarding');
+        $forwarding->addChild('enabled', 'true');
+        foreach ($addresses as $address) {
+            $forwarding->addChild('address', $address);
+        }
+
+        $this->client->request($packet);
+
+        $this->logger->info('Created forward-only mail group {email} with {count} recipients', [
+            'email' => $email,
+            'count' => count($addresses),
+        ]);
+    }
+
     /** @return string[] alias addresses currently configured for the mailname */
     public function getAliases(string $email): array
     {

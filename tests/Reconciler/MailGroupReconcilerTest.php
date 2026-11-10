@@ -30,6 +30,11 @@ final class MailGroupReconcilerTest extends TestCase
         $this->repository = new MailGroupRepository($this->connection, 'fake.local');
         $this->syncLog = new SyncLogRepository($this->connection, 'fake.local');
         $this->gateway = new RecordingGateway();
+        // Most tests exercise an existing list; the create tests use an
+        // address that is deliberately absent from this set.
+        foreach (['group@company.com', 'all@company.com'] as $email) {
+            $this->gateway->mailboxes[$email] = ['name' => $email];
+        }
     }
 
     public function testAddsMissingRecipientsAndMarksListReconciled(): void
@@ -40,6 +45,7 @@ final class MailGroupReconcilerTest extends TestCase
 
         self::assertTrue($changed);
         self::assertSame(['alice@company.com'], $this->gateway->forwarding['group@company.com']);
+        self::assertArrayNotHasKey('group@company.com', $this->gateway->createdLists);
         self::assertSame([], $this->repository->unreconciledLists());
     }
 
@@ -156,6 +162,38 @@ final class MailGroupReconcilerTest extends TestCase
             ['admin@company.com', 'newhire@company.com'],
             $this->gateway->forwarding['group@company.com'],
         );
+    }
+
+    public function testCreatesMissingListWithTheDesiredRecipients(): void
+    {
+        $this->repository->upsertActive('sales@company.com', 'alice@company.com');
+        $this->repository->upsertActive('sales@company.com', 'bob@company.com');
+
+        $changed = $this->reconciler()->reconcile('sales@company.com');
+
+        self::assertTrue($changed);
+        self::assertSame(
+            ['alice@company.com', 'bob@company.com'],
+            $this->gateway->createdLists['sales@company.com'],
+        );
+        self::assertSame(
+            ['alice@company.com', 'bob@company.com'],
+            $this->gateway->forwarding['sales@company.com'],
+        );
+        self::assertSame([], $this->repository->unreconciledLists());
+        self::assertContains('create', array_column($this->syncLog->recent(), 'action'));
+    }
+
+    public function testCreateFailureLeavesListDirtyForRetry(): void
+    {
+        $this->repository->upsertActive('sales@company.com', 'alice@company.com');
+        $this->gateway->failFor = ['sales@company.com'];
+
+        $changed = $this->reconciler()->reconcile('sales@company.com');
+
+        self::assertFalse($changed);
+        self::assertSame(['sales@company.com'], $this->repository->unreconciledLists());
+        self::assertContains('error:boom', array_column($this->syncLog->recent(), 'result'));
     }
 
     public function testDryRunComputesDiffWithoutMutating(): void

@@ -115,6 +115,9 @@ final class RecordingGateway extends PleskMailGateway
     /** @var array<string, array<string, mixed>> domain => info for getDomain */
     public array $domainsInfo = [];
 
+    /** @var array<string, string[]> email => recipients used when the list was created */
+    public array $createdLists = [];
+
     public function __construct(private readonly bool $dryRunMode = false)
     {
         parent::__construct(new Client('fake.local', 8443, 'https'), $this->dryRunMode, new Logger('test'));
@@ -162,6 +165,20 @@ final class RecordingGateway extends PleskMailGateway
             'charset' => 'utf-8',
             'end_date' => null,
         ];
+    }
+
+    public function createForwardingList(string $email, array $addresses): void
+    {
+        if ($this->dryRunMode) {
+            return;
+        }
+        if (in_array($email, $this->failFor, true)) {
+            throw new \RuntimeException('boom');
+        }
+
+        $this->createdLists[$email] = $addresses;
+        $this->forwarding[$email] = $addresses;
+        $this->mailboxes[$email] ??= ['name' => $email];
     }
 
     public function addForwardingRecipients(string $email, array $addresses): void

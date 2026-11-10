@@ -264,6 +264,20 @@ final class PleskMailGatewayTest extends TestCase
         self::assertStringContainsString('<address>bob@company.com</address>', $packet);
     }
 
+    public function testCreateForwardingListBuildsCreatePacket(): void
+    {
+        $this->gateway->createForwardingList('sales@company.com', ['alice@company.com', 'bob@company.com']);
+
+        $packet = $this->client->requests[1];
+        self::assertStringContainsString('<mail><create>', $packet);
+        self::assertStringContainsString('<site-id>17</site-id>', $packet);
+        self::assertStringContainsString('<mailname><name>sales</name>', $packet);
+        self::assertStringContainsString('<mailbox><enabled>false</enabled></mailbox>', $packet);
+        self::assertStringContainsString('<forwarding><enabled>true</enabled>', $packet);
+        self::assertStringContainsString('<address>alice@company.com</address>', $packet);
+        self::assertStringContainsString('<address>bob@company.com</address>', $packet);
+    }
+
     public function testRemoveForwardingRecipientsBuildsUpdateRemovePacket(): void
     {
         $this->gateway->removeForwardingRecipients('group@company.com', ['bob@company.com']);
