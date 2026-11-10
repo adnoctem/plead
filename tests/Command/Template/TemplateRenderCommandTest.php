@@ -121,6 +121,19 @@ final class TemplateRenderCommandTest extends TestCase
         self::assertStringStartsWith('<mjml', (string) file_get_contents($directory.'/preview.mjml'));
     }
 
+    public function testOutputCreatesParentDirectories(): void
+    {
+        $path = $this->base.'/nested/preview.txt';
+
+        self::assertSame(0, $this->runCommand([
+            '--format' => 'text',
+            '--output' => $path,
+        ]));
+
+        self::assertFileExists($path);
+        self::assertStringContainsString('nicht weitergeleitet', (string) file_get_contents($path));
+    }
+
     public function testMjmlFormatRejectsATextTemplate(): void
     {
         self::assertNotSame(0, $this->runCommand(['--format' => 'mjml']));

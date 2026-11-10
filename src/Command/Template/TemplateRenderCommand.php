@@ -73,6 +73,13 @@ final class TemplateRenderCommand extends AbstractTemplateCommand
         }
 
         if ('' !== $outputPath) {
+            $parent = dirname($outputPath);
+            if (!is_dir($parent) && !mkdir($parent, 0o775, true) && !is_dir($parent)) {
+                $output->writeln(sprintf('<error>Unable to create output directory: %s</error>', $parent));
+
+                return self::FAILURE;
+            }
+
             if (false === @file_put_contents($outputPath, $content)) {
                 $output->writeln(sprintf('<error>Unable to write %s</error>', $outputPath));
 
