@@ -35,17 +35,7 @@ final class ConfigPresenter
             }
         }
 
-        foreach ($servers as $index => $server) {
-            if (!is_array($server)) {
-                continue;
-            }
-            if (!empty($server['secret_key'])) {
-                $servers[$index]['secret_key'] = '***';
-            }
-            if (!empty($server['password'])) {
-                $servers[$index]['password'] = '***';
-            }
-        }
+        $servers = SecretMasker::mask($servers);
 
         return [
             'servers' => $servers,

@@ -110,11 +110,12 @@ plesk.example.com:
 Every value is validated by the config tree on load. `config:list` shows the
 resolved configuration with credentials masked; it prints the configured
 `servers` list plus `selected_server` / `default_server`, and never the
-internal `server` / `plesk` blocks. To inspect effective credentials, read the
-loaded configuration file (`config:path`). `config:set <key> <value>` writes
-one key into the persisted config file — the file `config:edit`/`config:set`
-targets is the first existing config path, or the first candidate when none
-exists.
+internal `server` / `plesk` blocks. `config:get` also masks `secret_key` and
+`password` values (including when the requested value is an array). To inspect
+effective credentials, read the loaded configuration file (`config:path`).
+`config:set <key> <value>` writes one key into the persisted config file — the
+file `config:edit`/`config:set` targets is the first existing config path, or
+the first candidate when none exists.
 
 ### Environment variables
 

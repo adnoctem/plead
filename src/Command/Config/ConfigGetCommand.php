@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Command\Config;
 
 use App\Command\AbstractPleadCommand;
+use App\Config\SecretMasker;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -21,8 +22,15 @@ final class ConfigGetCommand extends AbstractPleadCommand
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $key = (string) $input->getArgument('key');
         $config = $this->context()->config();
-        $value = self::nestedGet($config, $input->getArgument('key'));
+        $value = self::nestedGet($config, $key);
+
+        $lastSegment = str_contains($key, '.') ? substr($key, strrpos($key, '.') + 1) : $key;
+        if (null !== $value && SecretMasker::isSecretKey($lastSegment)) {
+            $value = '***';
+        }
+        $value = SecretMasker::mask($value);
 
         if (null === $value) {
             $output->writeln(sprintf('<error>Unknown configuration key: %s</error>', $input->getArgument('key')));

@@ -161,7 +161,7 @@ Read commands query the **live Plesk server** by default; add `--local` to read 
 | `domain:traffic:get <domain>`           | Traffic usage in a window (`--from=`, `--to=`, YYYY-MM-DD)                                                                                             |
 | `domain:traffic:set <domain>`           | Record traffic counters manually (`--date=`, `--smtp-in=`, ...)                                                                                        |
 | `domain:descriptor <domain>`            | Hosting settings descriptor (property names, types, defaults)                                                                                          |
-| `config:get <dotted.key>`               | Show the resolved value of one configuration key                                                                                                       |
+| `config:get <dotted.key>`               | Show the resolved value of one configuration key (secrets masked)                                                                                      |
 | `config:set <dotted.key> <value>`       | Write a configuration key to the user config file                                                                                                      |
 | `config:list`                           | Show the resolved configuration with secrets masked                                                                                                    |
 | `config:edit`                           | Open the user config file in `$EDITOR` and validate it afterwards                                                                                      |

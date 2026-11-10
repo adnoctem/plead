@@ -52,6 +52,20 @@ final class ConfigCommandsTest extends TestCase
         self::assertStringNotContainsString("\nserver:", $display);
     }
 
+    public function testGetMasksSecretValues(): void
+    {
+        $this->tester->run(['command' => 'config:set', 'key' => 'servers.0.host', 'value' => 'mail.company.com']);
+        $this->tester->run(['command' => 'config:set', 'key' => 'servers.0.secret_key', 'value' => 's3cret']);
+
+        self::assertSame(0, $this->tester->run(['command' => 'config:get', 'key' => 'servers.0.secret_key']));
+        self::assertStringContainsString('***', $this->tester->getDisplay());
+        self::assertStringNotContainsString('s3cret', $this->tester->getDisplay());
+
+        self::assertSame(0, $this->tester->run(['command' => 'config:get', 'key' => 'servers.0']));
+        self::assertStringContainsString('***', $this->tester->getDisplay());
+        self::assertStringNotContainsString('s3cret', $this->tester->getDisplay());
+    }
+
     public function testListFailsGracefullyWithoutConfig(): void
     {
         self::assertNotSame(0, $this->tester->run(['command' => 'config:list']));
