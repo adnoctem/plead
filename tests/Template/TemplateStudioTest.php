@@ -162,9 +162,9 @@ final class TemplateStudioTest extends TestCase
 
     public function testTemplatesAndDataFilesAreDiscovered(): void
     {
-        self::assertContains($this->textTemplate, $this->studio->templates());
-        self::assertContains($this->mjmlTemplate, $this->studio->templates());
-        self::assertContains($this->dataFile, $this->studio->dataFiles());
+        self::assertContains(realpath($this->textTemplate) ?: $this->textTemplate, $this->studio->templates());
+        self::assertContains(realpath($this->mjmlTemplate) ?: $this->mjmlTemplate, $this->studio->templates());
+        self::assertContains(realpath($this->dataFile) ?: $this->dataFile, $this->studio->dataFiles());
     }
 
     public function testMissingTemplateFailsClearly(): void

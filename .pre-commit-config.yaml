@@ -92,7 +92,7 @@ repos:
 
       - id: prettier-format
         name: Prettier format
-        entry: bun x prettier --write "**/*.{html,md,json,yaml,yml}"
+        entry: bun x prettier --write "**/*.{css,html,js,json,md,yaml,yml}"
         language: system
         pass_filenames: false
 
