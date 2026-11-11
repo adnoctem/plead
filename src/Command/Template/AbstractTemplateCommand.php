@@ -27,7 +27,7 @@ abstract class AbstractTemplateCommand extends AbstractPleadCommand
             ->addOption('start-date', null, InputOption::VALUE_REQUIRED, 'Absence start (YYYY-MM-DD or ISO 8601; default: today)')
             ->addOption('end-date', null, InputOption::VALUE_REQUIRED, 'Absence end (YYYY-MM-DD or ISO 8601; default: +7 days)')
             ->addOption('inclusive', null, InputOption::VALUE_NEGATABLE, 'Whether the end date is inclusive (default: config, then true)')
-            ->addOption('logo-url', null, InputOption::VALUE_REQUIRED, 'Override template.logo_url for this preview')
+            ->addOption('logo-url', null, InputOption::VALUE_REQUIRED, 'Override template.urls.logo for this preview')
         ;
     }
 

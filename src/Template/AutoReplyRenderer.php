@@ -28,18 +28,22 @@ final class AutoReplyRenderer
     private readonly MjmlConverter $mjmlConverter;
 
     /**
-     * @param null|string        $translationsPath directory with autoresponder.{locale}.yaml
-     *                                             catalogs; null or missing = no languages
-     * @param null|string        $logoUrl          per-install logo (template.logo_url); a
-     *                                             data-file logo_url may override it
-     * @param null|MjmlConverter $mjmlConverter    converter for templates that render MJML
-     *                                             markup (detected by the <mjml> output prefix)
+     * @param null|string           $translationsPath directory with autoresponder.{locale}.yaml
+     *                                                catalogs; null or missing = no languages
+     * @param null|string           $logoUrl          per-install logo (template.urls.logo); a
+     *                                                data-file logo_url may override it
+     * @param null|MjmlConverter    $mjmlConverter    converter for templates that render MJML
+     *                                                markup (detected by the <mjml> output prefix)
+     * @param array<string, string> $urls             template.urls map (logo + social profiles)
+     * @param null|string           $organization     footer organization (template.organization)
      */
     public function __construct(
         private readonly string $templatePath,
         ?string $translationsPath = null,
         private readonly ?string $logoUrl = null,
         ?MjmlConverter $mjmlConverter = null,
+        private readonly array $urls = [],
+        private readonly ?string $organization = null,
     ) {
         $this->twig = new Environment(
             new FilesystemLoader(dirname($templatePath)),
@@ -144,11 +148,19 @@ final class AutoReplyRenderer
             $context = array_merge($data, $extraData, $context);
         }
 
-        // The logo is per installation (template.logo_url); the data file may
+        // The logo is per installation (template.urls.logo); the data file may
         // override it per campaign (e.g. a seasonal logo).
         if (null !== $this->logoUrl && !isset($context['logo_url'])) {
             $context['logo_url'] = $this->logoUrl;
         }
+
+        if ([] !== $this->urls && !isset($context['urls'])) {
+            $context['urls'] = $this->urls;
+        }
+        if (null !== $this->organization && !isset($context['organization'])) {
+            $context['organization'] = $this->organization;
+        }
+        $context['social_share_networks'] = TemplateUrls::SHARE_NETWORKS;
 
         $message = $this->render($context);
 

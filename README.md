@@ -253,7 +253,12 @@ template:
   paths:
     auto_reply: resources/templates/autoresponder.txt.twig
     translations: resources/translations
-  logo_url: "https://example.com/logo.png" # optional: logo for HTML templates
+  organization: "Ad Noctem Collective" # optional: footer name
+  urls: # optional: logo + social icons (map order)
+    logo: "https://example.com/logo.png"
+    # github: "https://github.com/adnoctem"
+    # x: "https://x.com/adnoctemcollective"
+    # web: "https://adnoctem.co"
   language: de # optional: render language for single-language templates
 
 # general config applying to every server
@@ -325,7 +330,7 @@ inside the language loop: `email: {de: buchhaltung@example.com, en: invoices@exa
 address in the German section and the English one in the English section (a plain string applies to every
 language, and a locale missing from the map falls back to the German value). The same works for `department`,
 `phonenumber` and any future field. `logo_url` optionally overrides
-`template.logo_url` for this autoresponder (e.g. a seasonal logo). With `--write-config` the data file path is
+`template.urls.logo` for this autoresponder (e.g. a seasonal logo). With `--write-config` the data file path is
 persisted alongside the message file, so `watch` renders the identical message.
 
 Pass `--preview` to print the rendered message without recording an intent, touching the database or calling Plesk —
@@ -350,7 +355,11 @@ inside the text are clickable `tel:`/`mailto:` links and the action buttons sit 
 The email is fully responsive: below 650px viewport width MJML stacks the columns, the 196px page gaps shrink
 to 56px and the card tightens its padding. Note that the mjml.io try-it-live pane is desktop-width only — to
 preview the mobile layout, shrink your browser window below 650px.
-Template authors should note that Twig consumes one newline after every `{% %}` tag — keep two blank source lines
+**Branding.** `template.urls.logo` sets the logo, `template.urls.<network>` adds a social icon to the footer row
+(map order), and `template.organization` sets the footer name. Supported networks are `facebook`, `twitter`, `x`,
+`google`, `pinterest`, `linkedin`, `tumblr` and `xing` (share-capable; the template keeps the configured URL via
+`-noshare`), plus `github`, `instagram`, `web`, `snapchat`, `youtube`, `vimeo`, `medium`, `soundcloud` and `dribbble`.
+Omit a network to remove its icon. Template authors should note that Twig consumes one newline after every `{% %}` tag — keep two blank source lines
 where the message should show a blank line (the shipped template documents this in its header comment).
 
 ### Inbox — absence files from external tools

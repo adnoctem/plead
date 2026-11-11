@@ -79,7 +79,12 @@ template:
   paths:
     auto_reply: resources/templates/autoresponder.txt.twig
     translations: resources/translations
-  logo_url: "https://example.com/logo.png"
+  organization: "Ad Noctem Collective"
+  urls:
+    logo: "https://example.com/logo.png"
+    # github: "https://github.com/adnoctem"
+    # x: "https://x.com/adnoctemcollective"
+    # web: "https://adnoctem.co"
   language: de
 
 mail:
@@ -438,6 +443,20 @@ to HTML automatically by the render pipeline (via the `mjml` CLI); the stored
 message is ready for Plesk. The single template chooses the body sentence:
 `absence` when no deputy is present, and `forwarded_to` with `%deputy%` when
 the absence carries a deputy.
+
+**Branding.** `template.urls.logo` sets the logo; a data-file `logo_url` still
+overrides it per campaign. `template.organization` sets the footer name.
+`template.urls.<network>` adds a social icon to the footer row (the row order
+follows the map order); omit a network to remove its icon, and use an empty
+value to clear a default. Supported networks:
+
+- With a share URL: `facebook`, `twitter`, `x`, `google`, `pinterest`,
+  `linkedin`, `tumblr`, `xing`
+- Without a share URL: `github`, `instagram`, `web`, `snapchat`, `youtube`,
+  `vimeo`, `medium`, `soundcloud`, `dribbble`
+
+The template uses the `-noshare` variant for share-capable networks, so the
+configured URL is the actual destination rather than a share link.
 
 ### Template development
 

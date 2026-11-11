@@ -81,11 +81,25 @@ final class ConfigCommandsTest extends TestCase
             'key' => 'template.paths.auto_reply',
             'value' => 'resources/templates/custom.txt.twig',
         ]));
+        self::assertSame(0, $this->tester->run([
+            'command' => 'config:set',
+            'key' => 'template.urls.instagram',
+            'value' => 'https://instagram.com/example',
+        ]));
 
         self::assertSame(0, $this->tester->run(['command' => 'config:get', 'key' => 'watch.inbox.paths.root']));
         self::assertStringContainsString('/srv/inbox', $this->tester->getDisplay());
         self::assertSame(0, $this->tester->run(['command' => 'config:get', 'key' => 'template.paths.auto_reply']));
         self::assertStringContainsString('resources/templates/custom.txt.twig', $this->tester->getDisplay());
+        self::assertSame(0, $this->tester->run(['command' => 'config:get', 'key' => 'template.urls.instagram']));
+        self::assertStringContainsString('https://instagram.com/example', $this->tester->getDisplay());
+
+        self::assertNotSame(0, $this->tester->run([
+            'command' => 'config:set',
+            'key' => 'template.urls.unknown',
+            'value' => 'https://example.com',
+        ]));
+        self::assertStringContainsString('is not writable', $this->tester->getDisplay());
     }
 
     public function testGetExposesSecretsWhenAsked(): void

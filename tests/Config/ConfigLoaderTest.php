@@ -94,6 +94,8 @@ final class ConfigLoaderTest extends TestCase
         self::assertSame('info', $config['log_level']);
         self::assertSame('resources/templates/autoresponder.txt.twig', $config['template']['paths']['auto_reply']);
         self::assertSame('resources/translations', $config['template']['paths']['translations']);
+        self::assertSame('Ad Noctem Collective', $config['template']['organization']);
+        self::assertSame([], $config['template']['urls'] ?? []);
         self::assertNull($config['mail']['defaults']['antivirus']);
         self::assertNull($config['mail']['defaults']['quota']);
         self::assertSame(60, $config['watch']['interval']);
@@ -239,6 +241,47 @@ final class ConfigLoaderTest extends TestCase
         ]));
 
         self::assertSame(300, $this->loader->load()['watch']['interval']);
+    }
+
+    public function testTemplateUrlsAndOrganizationAreParsed(): void
+    {
+        file_put_contents($this->userDir.'/plead.yaml', implode("\n", [
+            'servers:',
+            '    - host: only.example.com',
+            '      secret_key: a',
+            'template:',
+            '    organization: ACME',
+            '    urls:',
+            '        logo: https://example.com/logo.png',
+            '        github: https://github.com/acme',
+            '        x: https://x.com/acme',
+        ]));
+
+        $config = $this->loader->load();
+
+        self::assertSame('ACME', $config['template']['organization']);
+        self::assertSame([
+            'logo' => 'https://example.com/logo.png',
+            'github' => 'https://github.com/acme',
+            'x' => 'https://x.com/acme',
+        ], $config['template']['urls']);
+    }
+
+    public function testTemplateUrlsRejectUnknownNetwork(): void
+    {
+        file_put_contents($this->userDir.'/plead.yaml', implode("\n", [
+            'servers:',
+            '    - host: only.example.com',
+            '      secret_key: a',
+            'template:',
+            '    urls:',
+            '        myspace: https://myspace.com/acme',
+        ]));
+
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('template.urls supports only');
+
+        $this->loader->load();
     }
 
     public function testAutoresponderEntriesMergeByAddress(): void

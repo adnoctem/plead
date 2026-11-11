@@ -82,7 +82,7 @@ final class TemplateStudio
 
     public function defaultLogoUrl(): ?string
     {
-        $configured = trim((string) ($this->config['template']['logo_url'] ?? ''));
+        $configured = trim((string) ($this->config['template']['urls']['logo'] ?? ''));
 
         return '' === $configured ? null : $configured;
     }
@@ -159,11 +159,10 @@ final class TemplateStudio
     public function languagesFor(TemplateRenderRequest $request): array
     {
         $templatePath = $this->resolveTemplatePath($request->templatePath);
-        $renderer = new AutoReplyRenderer(
+        $renderer = $this->renderer(
             $templatePath,
             $this->resolveTranslationsPath($request->translationsPath),
             $request->logoUrl ?? $this->defaultLogoUrl(),
-            $this->mjmlConverter,
         );
 
         return $renderer->languages();
@@ -182,11 +181,10 @@ final class TemplateStudio
         }
 
         $translationsPath = $this->resolveTranslationsPath($request->translationsPath);
-        $renderer = new AutoReplyRenderer(
+        $renderer = $this->renderer(
             $templatePath,
             $translationsPath,
             $request->logoUrl ?? $this->defaultLogoUrl(),
-            $this->mjmlConverter,
         );
 
         $extraData = $request->extraData;
@@ -275,6 +273,36 @@ final class TemplateStudio
         sort($files);
 
         return $files;
+    }
+
+    /** @return array<string, string> */
+    private function templateUrls(): array
+    {
+        $configured = $this->config['template']['urls'] ?? [];
+        if (!is_array($configured)) {
+            return [];
+        }
+
+        return array_filter($configured, static fn (mixed $url): bool => is_string($url));
+    }
+
+    private function templateOrganization(): ?string
+    {
+        $configured = trim((string) ($this->config['template']['organization'] ?? ''));
+
+        return '' === $configured ? null : $configured;
+    }
+
+    private function renderer(string $templatePath, ?string $translationsPath, ?string $logoUrl): AutoReplyRenderer
+    {
+        return new AutoReplyRenderer(
+            $templatePath,
+            $translationsPath,
+            $logoUrl,
+            $this->mjmlConverter,
+            $this->templateUrls(),
+            $this->templateOrganization(),
+        );
     }
 
     /**

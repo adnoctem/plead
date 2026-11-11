@@ -34,7 +34,7 @@ final class TemplateStudioTest extends TestCase
         $this->textTemplate = $this->base.'/templates/message.txt.twig';
         file_put_contents(
             $this->textTemplate,
-            "{{ 'greeting'|trans({}, 'autoresponder', language) }}|{{ 'absence'|trans({}, 'autoresponder', language) }}|{{ 'forwarded_to'|trans({}, 'autoresponder', language) }}|{{ deputyEmail ?? '' }}",
+            "{{ 'greeting'|trans({}, 'autoresponder', language) }}|{{ 'absence'|trans({}, 'autoresponder', language) }}|{{ 'forwarded_to'|trans({}, 'autoresponder', language) }}|{{ deputyEmail ?? '' }}|{{ organization }}|{{ urls.github ?? '' }}",
         );
 
         $this->mjmlTemplate = $this->base.'/templates/message.mjml.twig';
@@ -61,7 +61,12 @@ final class TemplateStudioTest extends TestCase
                     'auto_reply' => $this->textTemplate,
                     'translations' => $this->translations,
                 ],
-                'logo_url' => null,
+                'organization' => 'ACME',
+                'urls' => [
+                    'logo' => 'https://example.com/logo.png',
+                    'github' => 'https://github.com/acme',
+                    'x' => 'https://x.com/acme',
+                ],
                 'language' => 'de',
             ],
             'watch' => [
@@ -88,6 +93,7 @@ final class TemplateStudioTest extends TestCase
         self::assertSame($this->dataFile, $this->studio->defaultDataFile(true));
         self::assertTrue($this->studio->defaultInclusive(true));
         self::assertSame('de', $this->studio->defaultLanguage());
+        self::assertSame('https://example.com/logo.png', $this->studio->defaultLogoUrl());
     }
 
     public function testRendersTextSourceAndHtml(): void
@@ -97,6 +103,8 @@ final class TemplateStudioTest extends TestCase
         self::assertSame(RenderedTemplate::KIND_TEXT, $result->kind);
         self::assertStringContainsString('Hallo', $result->source);
         self::assertStringContainsString('abwesend', $result->source);
+        self::assertStringContainsString('ACME', $result->source);
+        self::assertStringContainsString('https://github.com/acme', $result->source);
         self::assertSame($result->source, $result->html);
     }
 
@@ -108,6 +116,29 @@ final class TemplateStudioTest extends TestCase
         self::assertStringStartsWith('<mjml', ltrim($result->source));
         self::assertStringContainsString('<!doctype html>', $result->html);
         self::assertStringContainsString('Hallo', $result->html);
+    }
+
+    public function testShippedTemplateRendersConfiguredSocialLinksAndOrganization(): void
+    {
+        $request = new TemplateRenderRequest(
+            dirname(__DIR__, 2).'/resources/templates/autoresponder.mjml.twig',
+            null,
+            dirname(__DIR__, 2).'/resources/translations',
+            null,
+            'de',
+            null,
+            '2026-11-10T00:00:00+01:00',
+            '2026-11-17T23:59:59+01:00',
+            true,
+        );
+
+        $result = $this->studio->render($request);
+
+        self::assertStringContainsString('<mj-social-element name="github" href="https://github.com/acme"', $result->source);
+        self::assertStringContainsString('<mj-social-element name="x-noshare" href="https://x.com/acme"', $result->source);
+        self::assertStringContainsString('https://example.com/logo.png', $result->source);
+        self::assertStringContainsString('ACME', $result->source);
+        self::assertStringNotContainsString('instagram', $result->source);
     }
 
     public function testDeputyEmailReachesTheTemplate(): void

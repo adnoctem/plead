@@ -689,9 +689,8 @@ final class AutoresponderCommandsTest extends TestCase
         self::assertSame(2, substr_count($display, 'href="mailto:'));
         self::assertStringContainsString('Anrufen', $display);
         self::assertStringContainsString('E-Mail schreiben', $display);
-        // Footer with social links and copyright.
-        self::assertStringContainsString('github.com/adnoctem', $display);
-        self::assertStringContainsString('adnoctem.co', $display);
+        // Footer with the default organization; social links are configured
+        // through template.urls.
         self::assertStringContainsString('Ad Noctem Collective', $display);
         // Bold dates inside the period sentence (spans, not nested mj-text).
         self::assertStringContainsString('<span style="font-weight:600">01.01.2099</span>', $display);

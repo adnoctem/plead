@@ -6,6 +6,7 @@ namespace App\Command\Config;
 
 use App\Command\AbstractPleadCommand;
 use App\Config\ConfigFile;
+use App\Template\TemplateUrls;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -34,7 +35,8 @@ final class ConfigSetCommand extends AbstractPleadCommand
         'watch.inbox.format',
         'template.paths.auto_reply',
         'template.paths.translations',
-        'template.logo_url',
+        'template.urls.logo',
+        'template.organization',
         'template.language',
         'log_level',
     ];
@@ -54,7 +56,7 @@ final class ConfigSetCommand extends AbstractPleadCommand
 
         // Allow any servers.<index>.<field> key, not just the literal first
         // server - the whitelist above only demonstrates the common case.
-        if (!in_array($key, self::WRITABLE_KEYS, true) && !$this->isServerKey($key)) {
+        if (!in_array($key, self::WRITABLE_KEYS, true) && !$this->isServerKey($key) && !$this->isTemplateUrlKey($key)) {
             $output->writeln(sprintf(
                 '<error>Key "%s" is not writable. Valid keys: %s</error>',
                 $key,
@@ -116,5 +118,15 @@ final class ConfigSetCommand extends AbstractPleadCommand
     private function isServerKey(string $key): bool
     {
         return 1 === preg_match('/^servers\.\d+\.(host|secret_key|login|password)$/', $key);
+    }
+
+    private function isTemplateUrlKey(string $key): bool
+    {
+        $prefix = 'template.urls.';
+        if (!str_starts_with($key, $prefix)) {
+            return false;
+        }
+
+        return TemplateUrls::isAllowed(substr($key, strlen($prefix)));
     }
 }

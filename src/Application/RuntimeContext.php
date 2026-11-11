@@ -274,25 +274,33 @@ final class RuntimeContext
 
     public function renderer(?string $templateOverride = null, ?string $translationsOverride = null): AutoReplyRenderer
     {
+        $urls = $this->templateUrls();
+        $logoUrl = $urls['logo'] ?? null;
+        $organization = $this->templateOrganization();
+
         if (null === $templateOverride && null === $translationsOverride) {
             return $this->renderer ??= new AutoReplyRenderer(
                 $this->templatePath(),
                 $this->translationsPath(),
-                $this->config()['template']['logo_url'] ?? null,
+                $logoUrl,
                 $this->mjmlConverter,
+                $urls,
+                $organization,
             );
         }
 
         // Per-invocation/inbox override: resolve the template like the
-        // configured one and build a fresh renderer sharing the logo and MJML
-        // converter settings.
+        // configured one and build a fresh renderer sharing the logo, URLs,
+        // organization and MJML converter settings.
         return new AutoReplyRenderer(
             null === $templateOverride ? $this->templatePath() : $this->resolveTemplatePath($templateOverride),
             null === $translationsOverride
                 ? $this->translationsPath()
                 : $this->resolveTranslationsPath($translationsOverride),
-            $this->config()['template']['logo_url'] ?? null,
+            $logoUrl,
             $this->mjmlConverter,
+            $urls,
+            $organization,
         );
     }
 
@@ -370,6 +378,24 @@ final class RuntimeContext
         }
 
         return $client;
+    }
+
+    /** @return array<string, string> */
+    private function templateUrls(): array
+    {
+        $configured = $this->config()['template']['urls'] ?? [];
+        if (!is_array($configured)) {
+            return [];
+        }
+
+        return array_filter($configured, static fn (mixed $url): bool => is_string($url));
+    }
+
+    private function templateOrganization(): ?string
+    {
+        $configured = trim((string) ($this->config()['template']['organization'] ?? ''));
+
+        return '' === $configured ? null : $configured;
     }
 
     private function templatePath(): string

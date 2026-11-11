@@ -1,7 +1,7 @@
 # This file is an example for an autoresponder configuration.
 # Values that differ per language are locale maps (key[lang] ?? key);
 # scalars apply to every language. logo_url is optional - it overrides
-# template.logo_url for this autoresponder (e.g. a seasonal logo).
+# template.urls.logo for this autoresponder (e.g. a seasonal logo).
 firstname: Erika
 surname: Mustermann
 department:

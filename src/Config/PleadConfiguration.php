@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Config;
 
+use App\Template\TemplateUrls;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
 
@@ -76,7 +77,15 @@ final class PleadConfiguration implements ConfigurationInterface
             ->scalarNode('translations')->defaultValue('resources/translations')->end()
             ->end()
             ->end()
-            ->scalarNode('logo_url')->defaultNull()->end()
+            ->arrayNode('urls')
+            ->useAttributeAsKey('name')
+            ->scalarPrototype()->end()
+            ->validate()
+            ->ifTrue(static fn (array $urls): bool => [] !== array_diff(array_keys($urls), TemplateUrls::all()))
+            ->thenInvalid('template.urls supports only: '.implode(', ', TemplateUrls::all()))
+            ->end()
+            ->end()
+            ->scalarNode('organization')->defaultValue('Ad Noctem Collective')->end()
             ->scalarNode('language')->defaultNull()->end()
             ->end()
             ->end()

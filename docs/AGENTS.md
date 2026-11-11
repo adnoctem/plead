@@ -69,8 +69,9 @@ same before building. `git-version` injects the git tag/commit into `src/Applica
   data values as `key[lang] ?? key.de ?? key`. Both templates render ONE language per invocation via the
   `language` context variable (`--language` / `template.language` / per-entry `language`). MJML output is
   auto-converted to HTML by `MjmlConverter` (the `mjml` CLI binary via symfony/process; `MJML_BINARY_PATH`
-  overrides the PATH lookup - spatie's node-module import cannot work inside the phar). `template.logo_url`
-  feeds the HTML templates; a data-file `logo_url` overrides it per campaign.
+  overrides the PATH lookup - spatie's node-module import cannot work inside the phar). `template.urls.logo`
+  feeds the HTML templates; a data-file `logo_url` overrides it per campaign. `template.urls.<network>` adds
+  MJML social icons (map order), and `template.organization` supplies the footer name.
 - **Template studio.** `src/Template/TemplateStudio.php` renders one template with the same context as `AutoReplyRenderer` and returns both source and HTML; `template:render` is the one-shot CLI, `template:serve` starts a loopback-only `php -S` studio (`src/Template/DevServer/`) whose UI polls `/api/state` for hot reload. The studio is config-backed but never connects to Plesk.
 - **Batching.** The Plesk API has no cross-domain mail listing, so live list commands batch N queries into one HTTP POST via `PleskMailGateway::*Bulk()` + `Client::multiRequest` → `mail:address:list` = 2 round trips, group/autoresponder/export = 3.
 

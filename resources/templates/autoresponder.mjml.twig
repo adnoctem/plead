@@ -5,8 +5,10 @@
    (--language / template.language / the first catalog language); the txt
    template renders every language instead. Sentences come from
    resources/translations/autoresponder.{locale}.yaml, per-language data values
-   resolve as key[lang] ?? key.de ?? key, and the logo comes from
-   template.logo_url (overridable per campaign via a data-file logo_url). #}
+   resolve as key[lang] ?? key.de ?? key, the logo comes from
+   template.urls.logo (overridable per campaign via a data-file logo_url), the
+   footer name from template.organization, and the social icons from
+   template.urls.* in map order. #}
 {% set lang = language ?? languages|first %}
 {% set fmt = 'date_format'|trans({}, 'autoresponder', lang) %}
 {% set phone = phonenumber[lang] ?? phonenumber.de ?? phonenumber %}
@@ -21,6 +23,12 @@
     '%firstname%': firstname,
     '%surname%': surname,
 } %}
+{% set social = [] %}
+{% for network, url in urls|default({}) %}
+    {% if network != 'logo' and url is not empty %}
+        {% set social = social|merge([{name: network, url: url}]) %}
+    {% endif %}
+{% endfor %}
 <mjml background-color="#0B0B0F">
     <mj-head>
         <mj-font name="Source Sans 3" href="https://fonts.googleapis.com/css?family=Source+Sans+3"></mj-font>
@@ -82,13 +90,16 @@
         </mj-section>
         <mj-section text-align="center">
             <mj-column vertical-align="bottom" padding="20px 20px 0px 0px">
+                {% if social|length > 0 %}
                 <mj-social mode="horizontal" icon-size="24px" padding="0px" inner-padding="0px 10px 0px 0px" align="left">
-                    <mj-social-element name="github" href="https://github.com/adnoctem" background-color="transparent"></mj-social-element>
-                    <mj-social-element name="x" href="https://github.com/adnoctemcollective" background-color="transparent"></mj-social-element>
-                    <mj-social-element name="web" href="https://adnoctem.co" background-color="transparent"></mj-social-element>
+                    {% for item in social %}
+                    {% set social_name = item.name in (social_share_networks|default([])) ? item.name ~ '-noshare' : item.name %}
+                    <mj-social-element name="{{ social_name }}" href="{{ item.url }}" background-color="transparent"></mj-social-element>
+                    {% endfor %}
                 </mj-social>
                 <mj-spacer height="14px"></mj-spacer>
-                <mj-text align="left" padding="0px" font-size="14px" line-height="22px" color="#fff">© 2026 - Ad Noctem Collective</mj-text>
+                {% endif %}
+                <mj-text align="left" padding="0px" font-size="14px" line-height="22px" color="#fff">© {{ date|date('Y') }} - {{ organization|default('Ad Noctem Collective') }}</mj-text>
                 <mj-spacer height="14px"></mj-spacer>
             </mj-column>
         </mj-section>
